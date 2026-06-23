@@ -45,7 +45,7 @@ export default function SEACommandCenterSection() {
         >
           <Satellite className="w-4 h-4 text-emerald-400" />
           <span className="text-[11px] font-mono tracking-[0.35em] uppercase text-emerald-400/80">
-            Guanlan ◆ SEA Command · Live Multi-Agent Engine
+            MemeCMO ◆ SEA Command · Live Multi-Agent Engine
           </span>
           <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-emerald-500/40 bg-emerald-500/10">
             <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />

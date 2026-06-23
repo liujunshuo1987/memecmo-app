@@ -123,7 +123,7 @@ const LOCALES: { code: Locale; label: string; flag: string }[] = [
 
 const I18N: Record<Locale, Record<string, string>> = {
   zh: {
-    subtitle: '观澜 ◆ 东南亚指挥',
+    subtitle: 'MemeCMO ◆ 东南亚指挥',
     title: '东南亚 GEO 多智能体指挥中心',
     grid: '网格',
     risk: '风险',
@@ -235,7 +235,7 @@ const I18N: Record<Locale, Record<string, string>> = {
     stageCrisis: '危机',
   },
   en: {
-    subtitle: 'Guanlan ◆ SEA Command',
+    subtitle: 'MemeCMO ◆ SEA Command',
     title: 'SOUTHEAST ASIA GEO MULTI-AGENT COMMAND CENTER',
     grid: 'GRID',
     risk: 'RISK',
@@ -347,7 +347,7 @@ const I18N: Record<Locale, Record<string, string>> = {
     stageCrisis: 'Crisis',
   },
   vi: {
-    subtitle: 'Guanlan ◆ Chỉ huy ĐNA',
+    subtitle: 'MemeCMO ◆ Chỉ huy ĐNA',
     title: 'TRUNG TÂM CHỈ HUY GEO ĐA TÁC TỬ ĐÔNG NAM Á',
     grid: 'LƯỚI',
     risk: 'RỦI RO',
@@ -385,7 +385,7 @@ const I18N: Record<Locale, Record<string, string>> = {
     aborted: '[SYSTEM] ⧖ đã hủy',
   },
   id: {
-    subtitle: 'Guanlan ◆ Komando ASEAN',
+    subtitle: 'MemeCMO ◆ Komando ASEAN',
     title: 'PUSAT KOMANDO GEO MULTI-AGEN ASIA TENGGARA',
     grid: 'GRID',
     risk: 'RISIKO',
@@ -423,7 +423,7 @@ const I18N: Record<Locale, Record<string, string>> = {
     aborted: '[SYSTEM] ⧖ dibatalkan',
   },
   th: {
-    subtitle: 'Guanlan ◆ ศูนย์บัญชาการอาเซียน',
+    subtitle: 'MemeCMO ◆ ศูนย์บัญชาการอาเซียน',
     title: 'ศูนย์บัญชาการ GEO หลายเอเจนต์เอเชียตะวันออกเฉียงใต้',
     grid: 'กริด',
     risk: 'ความเสี่ยง',

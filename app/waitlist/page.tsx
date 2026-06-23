@@ -7,13 +7,13 @@ import WaitlistClient from './waitlist-client';
 export const revalidate = 60; // re-fetch public counter every 60s
 
 export const metadata: Metadata = {
-  title: '加入等待列表 · 观澜智能体库',
+  title: 'Join the waitlist · MemeCMO.ai',
   description:
-    '出海品牌的生成式引擎可见度正在被重新定义。观澜智能体库当前为受邀测试期，欢迎品牌方与 GEO 顾问加入名单。',
+    'MemeCMO.ai is the multi-agent GEO platform for Southeast Asia. Currently in invite-only beta — brands and GEO consultants are welcome to join the queue.',
   openGraph: {
-    title: '加入等待列表 · 观澜智能体库 / MemeCMO.ai',
+    title: 'Join the waitlist · MemeCMO.ai',
     description:
-      '观澜智能体库（Guanlan Agent Library）—— 由专业 LLM 智能体矩阵构成的可计算情报基础设施。当前为受邀测试期。',
+      'Multi-agent GEO platform for Vietnam, Thailand, Indonesia, Philippines, Singapore, Malaysia. Built on the Guanlan Agent Library (观澜智能体库) R&D stack. Invite-only beta.',
     type: 'website',
   },
   robots: { index: true, follow: true },

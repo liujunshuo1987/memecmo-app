@@ -176,8 +176,8 @@ export default function WaitlistClient({ initialStats }: { initialStats: PublicS
           </span>
         </h1>
         <p className="text-base sm:text-lg text-gray-400 max-w-2xl mx-auto leading-relaxed">
-          观澜智能体库（Guanlan Agent Library）—— 由专业 LLM 智能体矩阵构成的可计算情报基础设施。
-          我们正在邀请第一批同行者，专注出海品牌在 LLM 答案里的可见度、引用份额与情感倾向。
+          MemeCMO.ai —— 面向东南亚的多智能体 GEO 平台，由 <span className="text-gray-300">观澜智能体库 (Guanlan Agent Library)</span> R&amp;D 引擎驱动。
+          我们正在邀请第一批同行者，专注出海品牌在 ChatGPT、Perplexity、Gemini、Claude 答案里的可见度、引用份额与情感倾向。
         </p>
 
         {/* Public counter */}
