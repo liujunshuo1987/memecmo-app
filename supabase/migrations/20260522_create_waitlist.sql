@@ -234,16 +234,12 @@ GRANT SELECT ON waitlist TO authenticated;  -- gated further by RLS to own row o
 
 -- ── Comments for future maintainers ──────────────────────────────────────
 COMMENT ON TABLE waitlist IS
-  'Tier 0 entry gate. Lifecycle: pending → approved (Wed 09:00 batch) → signed_up. ' ||
-  'See docs/GUANLAN_AGENT_LIBRARY.md.';
+  'Tier 0 entry gate. Lifecycle: pending -> approved (Wed 09:00 batch) -> signed_up. See docs/AGENT_LIBRARY.md.';
 COMMENT ON COLUMN waitlist.priority_score IS
   '0-70 auto-computed from optional intake completeness; 71-100 reserved for manual founder override.';
 COMMENT ON COLUMN waitlist.approved_in_batch IS
   'UTC date of the Wednesday batch when this entry was approved. Null for non-approved.';
 COMMENT ON COLUMN waitlist.signup_token IS
-  'One-time magic-link token sent in approval email. Consumed when user signs up. ' ||
-  'Generated server-side via crypto.randomUUID() or similar.';
+  'One-time magic-link token sent in approval email. Consumed when user signs up. Generated server-side via crypto.randomUUID() or similar.';
 COMMENT ON FUNCTION get_waitlist_status(TEXT) IS
-  'Public-callable lookup so anonymous users can see their own position. ' ||
-  'Caller passes their email; function returns status/position/total. ' ||
-  'Does not require authentication on purpose — the waitlist exists pre-signup.';
+  'Public-callable lookup so anonymous users can see their own position. Caller passes their email; function returns status/position/total. Does not require authentication on purpose — the waitlist exists pre-signup.';
