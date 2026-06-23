@@ -192,6 +192,9 @@ export function SEACommandCenterSchemaLD() {
       { '@type': 'Country', name: 'Vietnam', identifier: 'VN' },
       { '@type': 'Country', name: 'Indonesia', identifier: 'ID' },
       { '@type': 'Country', name: 'Thailand', identifier: 'TH' },
+      { '@type': 'Country', name: 'Philippines', identifier: 'PH' },
+      { '@type': 'Country', name: 'Singapore', identifier: 'SG' },
+      { '@type': 'Country', name: 'Malaysia', identifier: 'MY' },
     ],
     audience: {
       '@type': 'BusinessAudience',

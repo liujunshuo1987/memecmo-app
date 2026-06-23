@@ -149,8 +149,8 @@ async function callPoeWithFallback(
 const STOPWORDS = new Set([
   'The', 'A', 'An', 'In', 'On', 'At', 'To', 'Of', 'For', 'With', 'By', 'From',
   'And', 'But', 'Or', 'Not', 'Is', 'Are', 'Was', 'Were', 'It', 'They',
-  'Vietnam', 'Indonesia', 'Thailand', 'Singapore', 'Malaysia', 'Asia', 'Southeast', 'Asian',
-  'English', 'Vietnamese', 'Indonesian', 'Thai', 'Malay', 'Bahasa',
+  'Vietnam', 'Indonesia', 'Thailand', 'Philippines', 'Singapore', 'Malaysia', 'Asia', 'Southeast', 'Asian',
+  'English', 'Vietnamese', 'Indonesian', 'Thai', 'Filipino', 'Tagalog', 'Malay', 'Bahasa',
 ]);
 
 function escapeRegex(s: string): string {

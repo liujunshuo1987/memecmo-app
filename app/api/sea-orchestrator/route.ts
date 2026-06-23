@@ -31,7 +31,7 @@ type AgentId =
 
 interface OrchestratorRequest {
   brandName: string;
-  targetCountry: 'Vietnam' | 'Indonesia' | 'Thailand' | string;
+  targetCountry: 'Vietnam' | 'Indonesia' | 'Thailand' | 'Philippines' | 'Singapore' | 'Malaysia' | string;
   brandHomepage?: string;
 }
 
@@ -43,6 +43,7 @@ const COUNTRY_LANG: Record<string, { native: string; code: string; tld: string }
   Thailand: { native: '泰语 (ภาษาไทย)', code: 'th', tld: '.co.th / .th' },
   Singapore: { native: '英语 + 华语 / 马来语 / 泰米尔语（新加坡英语主导，但双语信息常见）', code: 'en-SG', tld: '.sg / .com.sg' },
   Malaysia: { native: '马来语 (Bahasa Melayu) + 英语（城市双语）', code: 'ms', tld: '.my / .com.my' },
+  Philippines: { native: '菲律宾语 (Filipino) + 英语（双语并重，他加禄语 Tagalog 与 Cebuano 在地区差异显著）', code: 'fil', tld: '.ph / .com.ph' },
 };
 
 function countryCtx(country: string): { native: string; code: string; tld: string } {

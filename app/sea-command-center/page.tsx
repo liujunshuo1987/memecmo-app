@@ -745,6 +745,7 @@ const COUNTRIES = [
   { code: 'Vietnam', label: 'Vietnam / 越南' },
   { code: 'Indonesia', label: 'Indonesia / 印尼' },
   { code: 'Thailand', label: 'Thailand / 泰国' },
+  { code: 'Philippines', label: 'Philippines / 菲律宾' },
   { code: 'Singapore', label: 'Singapore / 新加坡' },
   { code: 'Malaysia', label: 'Malaysia / 马来西亚' },
 ];
@@ -780,6 +781,7 @@ function guessHomepage(brand: string, country: string): string {
     country === 'Vietnam' ? '.vn' :
     country === 'Indonesia' ? '.co.id' :
     country === 'Thailand' ? '.co.th' :
+    country === 'Philippines' ? '.ph' :
     country === 'Singapore' ? '.sg' :
     country === 'Malaysia' ? '.com.my' :
     '.com';
