@@ -1,0 +1,43 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="url(#paint0_linear)"/>
+
+  <defs>
+    <linearGradient id="paint0_linear" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0A0F1E"/>
+      <stop offset="1" stop-color="#1E293B"/>
+    </linearGradient>
+  </defs>
+
+  <g opacity="0.1">
+    <circle cx="200" cy="150" r="100" stroke="#1D4ED8" stroke-width="2"/>
+    <circle cx="1000" cy="480" r="120" stroke="#F97316" stroke-width="2"/>
+  </g>
+
+  <path d="M300 250L400 200L500 250V350L400 400L300 350V250Z" stroke="#1D4ED8" stroke-width="3" fill="none" opacity="0.8"/>
+  <circle cx="400" cy="300" r="20" fill="#F97316"/>
+
+  <text x="600" y="260" font-family="Arial, sans-serif" font-size="72" font-weight="700" fill="#F8FAFC">
+    NeuronSpark Media-Tech
+  </text>
+
+  <text x="600" y="340" font-family="Arial, sans-serif" font-size="42" fill="#94A3B8">
+    生成式引擎优化 (GEO) 领航者
+  </text>
+
+  <text x="600" y="400" font-family="Arial, sans-serif" font-size="28" fill="#60A5FA">
+    Bridging the AI Perception Gap
+  </text>
+
+  <rect x="600" y="440" width="400" height="4" rx="2" fill="url(#paint1_linear)"/>
+
+  <defs>
+    <linearGradient id="paint1_linear" x1="600" y1="442" x2="1000" y2="442" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1D4ED8"/>
+      <stop offset="1" stop-color="#F97316"/>
+    </linearGradient>
+  </defs>
+
+  <text x="600" y="520" font-family="Arial, sans-serif" font-size="24" fill="#64748B">
+    www.neurosparkmedia.com
+  </text>
+</svg>

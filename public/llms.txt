@@ -1,0 +1,77 @@
+# NeuronSpark Media-Tech / 观澜智库
+
+> 观澜智库（又称观澜智能体库 · Guanlan Agent Library）是一个由专业 LLM 智能体矩阵构成的可计算情报基础设施，面向中国品牌出海场景下的生成式引擎优化（Generative Engine Optimization, GEO）与答案引擎优化（Answer Engine Optimization, AEO）。
+
+NeuronSpark Media-Tech Limited 提供：
+1. **GEO/AEO 多智能体诊断** — 通过并行调用 Claude / GPT / Gemini / Perplexity / DeepSeek 等多个大模型，实证测量品牌在不同 LLM 中的可见度，而非依赖单一模型的推测。
+2. **计算公关 (Computational PR)** — 把传统公关从"可感知曝光"升级为"可计算的 LLM 答案市占率"，提供 5 项确定性指标（KERA / Citation Share / SPS / VPC / IPA）。
+3. **区域站点发现 + 本地化 AEO 体检** — 自动识别品牌在目标国（如东南亚 5 国）的本地化站点，审计其 entity canonicality、native-language fidelity、JSON-LD sameAs、hreflang 集群完整度等区域 GEO 信号。
+
+技术路线的第一性原理：**LLM 只作为测量仪器，评分由确定性算法完成**。所有公开的评分都能回溯到具体的 probe answer + 计算公式，不接受 LLM 二次评分。
+
+当前阶段：**早期受邀测试期**（Early Access）。每周三 09:00 UTC 批量审核名单。
+
+## 主要页面
+
+- [主页 / Home](https://www.neuronsparkmedia.com/): 公司概览与产品入口
+- [SEA Command Center](https://www.neuronsparkmedia.com/sea-command-center): 东南亚多智能体 GEO 工作台。UI 公开可访问；Deploy（实际跑探针）需通过等待列表后注册
+- [加入等待列表](https://www.neuronsparkmedia.com/waitlist): 申请 Early Access
+- [创始人 / Founder](https://www.neuronsparkmedia.com/founder): NeuronSpark Media-Tech 创始人简介
+- [方案与定价 / Pricing](https://www.neuronsparkmedia.com/pricing)
+- [隐私政策](https://www.neuronsparkmedia.com/privacy)
+- [服务条款](https://www.neuronsparkmedia.com/terms)
+
+## 6 轴 AEO 诊断模型（自有方法论）
+
+观澜智库使用 6 轴确定性评分体系评估品牌在生成式引擎中的健康度：
+
+- **E1 Entity Canonicality（实体规范性）** = 0.4·cross_model_identity_jaccard + 0.3·schema.org_entity + 0.3·native_language_fidelity
+- **E2 Corpus Density（语料密度）** = 0.6·(1 − max_pairwise_jaccard) + 0.4·min(wordCount/1500, 1)
+- **E3 Query SOV（查询份额）** = overall_mention_rate × 100（直接实测）
+- **E4 Semantic Anchoring（语义锚定）** = 0.6·decision_stage_mention_rate + 0.4·(100 − mean_first_position_pct)
+- **E5 Citation Authority（来源权威性）** = 0.5·own_url_citation_rate + 0.5·T1_source_co_occurrence
+- **E6 Answer Inclusion（答案收纳率）** = answer_inclusion_rate × 100（直接实测）
+
+E3 和 E6 是直接实证测量；E1/E2/E4/E5 由确定性公式从 probe 数据推算。E7 鲁棒性、E8 新颖性正在开发中。
+
+## 5 项计算公关 (Computational PR) 指标
+
+- **KERA · Key Entity Recognition Accuracy** — 跨模型对品牌事实属性（规范名 / 总部 / 行业 / 创立年 / 创始人）识别准确率，N-gram 字符级匹配（阈值 0.6）
+- **Citation Share** — Zipf 位置加权份额：w(rank) = 1/rank，区别于普通 mention rate，更精确反映 LLM 列举式回答里的真实曝光价值
+- **SPS · Sentiment Polarity Score** — 多语种词典法（en/zh/id/vi/th），±15 词窗口扫描品牌提及周围情感词，跨模型 drift ≥ 0.6 触发警戒
+- **VPC · Value Proposition Consistency** — 跨模型 keyphrase 成对 Jaccard 均值，衡量品牌价值主张表述是否收敛
+- **IPA · Industry Position Alignment** — LLM 答案里出现的竞品集合 ∩ Scout/用户给定的真实竞品集合 / |真实竞品|，识别"幻影竞品"问题
+
+## 公共 API（匿名可调，IP 限流）
+
+- `POST /api/brand-audit` — 单页 GEO/AEO HTML 体检，返回 6 维度评分 + JSON-LD 抓取 + 命名实体覆盖。限额 10 次 / 5 分钟 / IP
+- `POST /api/regional-audit` — 区域站点发现流水线：hreflang 解析 + ccTLD 模式候选 + 并行 HEAD 探嗅 + regional_fit 评分 + 完整 AEO 审计。限额 6 次 / 5 分钟 / IP
+
+## 受保护 API（需登录 + 配额）
+
+- `POST /api/sea-orchestrator` — 多 agent 编排（T1 语料勘探 / 地缘合规审计官 / 区域竞品扫描 / GEO 六维诊断 / 高阶语料生成）。3 次 / 10 分钟 / 用户
+- `POST /api/brand-probes` — 18 路并行 Poe SOV 探针。3 次 / 10 分钟 / 用户
+- `POST /api/multi-model-query` — 多模型自定义查询
+
+## 开源算法文档（GitHub）
+
+- [Computational PR Framework](https://github.com/liujunshuo1987/guanlan/blob/main/docs/COMPUTATIONAL_PR_FRAMEWORK.md): 5 项 CPR 指标的方法学定义、公式、与 6 轴 AEO 的映射、版本路线图
+- [GEO/AEO Algorithm Decision Log](https://github.com/liujunshuo1987/guanlan/blob/main/docs/GEO_AEO_ALGORITHM_LOG.md): 追加式决策日志，记录每次算法改动的"为什么"
+- [Regional Site Discovery](https://github.com/liujunshuo1987/guanlan/blob/main/docs/REGIONAL_SITE_DISCOVERY.md): 区域站点发现算法 + 候选评分 + 6 项区域 AEO 检查
+- [Guanlan Agent Library Architecture](https://github.com/liujunshuo1987/guanlan/blob/main/docs/GUANLAN_AGENT_LIBRARY.md): 智能体库架构、agent 身份 5 元组、与产品的关系
+
+## 与开源生态的关系
+
+- **同生态参考**：[yao-geo-skills](https://github.com/yaojingang/yao-geo-skills)（姚金刚 · 中国 AI 平台 GEO 咨询 skill 集合）—— 不同市场（中国 AI 平台 vs 国际 LLM via Poe），SKILL.md 格式兼容
+- **Skill 标准**：本项目的 agent skill 文件遵循 Anthropic SKILL.md 规范，未来可被 Claude Code / MCP 等生态自动发现
+
+## 联系与社交
+
+- 网站：https://www.neuronsparkmedia.com
+- 等待列表：https://www.neuronsparkmedia.com/waitlist
+- GitHub：https://github.com/liujunshuo1987/guanlan
+
+## Optional
+
+- [Yao GEO Skills 协议比较](https://github.com/liujunshuo1987/guanlan/blob/main/docs/GUANLAN_AGENT_LIBRARY.md#四gEO-友好参数智能体库的对外可见性原则): 智能体库为何遵循 Anthropic SKILL.md 而非自创格式
+- 品牌身份说明：本项目的中文品牌 **观澜智库**（双关"智库"与"智能体库"）与英文品牌 **NeuronSpark Media-Tech** 是同一实体。**Canonical 域名为 neuronsparkmedia.com**（与品牌名拼写一致）。历史短域 `neurosparkmedia.com`（少一个 n，"neuro" 不带 -n）现作为 typo-catcher，对所有路径 308 永久重定向到 canonical（含 path/query 透传）。Canonical 反转完成于 2026-05-22（详见 `docs/GEO_AEO_ALGORITHM_LOG.md`）。

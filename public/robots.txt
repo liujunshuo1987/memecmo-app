@@ -1,0 +1,123 @@
+# NeuronSpark Media-Tech - Generative Engine Optimization (GEO) Focused robots.txt
+# Optimized for maximum AI crawler accessibility and knowledge graph integration
+
+User-agent: *
+Allow: /
+Crawl-delay: 0
+
+# OpenAI GPT Crawlers (ChatGPT, GPT-4, etc.)
+User-agent: GPTBot
+Allow: /
+Crawl-delay: 0
+
+User-agent: ChatGPT-User
+Allow: /
+Crawl-delay: 0
+
+# Anthropic Claude Crawlers
+User-agent: anthropic-ai
+Allow: /
+Crawl-delay: 0
+
+User-agent: Claude-Web
+Allow: /
+Crawl-delay: 0
+
+# Google AI Crawlers (Gemini, Bard, etc.)
+User-agent: Google-Extended
+Allow: /
+Crawl-delay: 0
+
+User-agent: GoogleOther
+Allow: /
+Crawl-delay: 0
+
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 0
+
+User-agent: Googlebot-Image
+Allow: /
+
+User-agent: Googlebot-News
+Allow: /
+
+# Common Crawl (used by many LLM training datasets)
+User-agent: CCBot
+Allow: /
+Crawl-delay: 0
+
+# Cohere AI Crawlers
+User-agent: cohere-ai
+Allow: /
+Crawl-delay: 0
+
+# Meta AI Crawlers (LLaMA, etc.)
+User-agent: FacebookBot
+Allow: /
+Crawl-delay: 0
+
+User-agent: meta-externalagent
+Allow: /
+Crawl-delay: 0
+
+# Perplexity AI
+User-agent: PerplexityBot
+Allow: /
+Crawl-delay: 0
+
+# Bing and Microsoft AI
+User-agent: bingbot
+Allow: /
+Crawl-delay: 0
+
+User-agent: msnbot
+Allow: /
+Crawl-delay: 0
+
+# Chinese Search Engines and AI Systems
+User-agent: Baiduspider
+Allow: /
+Crawl-delay: 0
+
+User-agent: Sogou
+Allow: /
+Crawl-delay: 0
+
+User-agent: Sosospider
+Allow: /
+Crawl-delay: 0
+
+User-agent: 360Spider
+Allow: /
+Crawl-delay: 0
+
+User-agent: Yisouspider
+Allow: /
+Crawl-delay: 0
+
+# Bytedance AI Crawlers (Doubao, etc.)
+User-agent: Bytespider
+Allow: /
+Crawl-delay: 0
+
+# Yandex
+User-agent: Yandex
+Allow: /
+Crawl-delay: 0
+
+# DuckDuckGo
+User-agent: DuckDuckBot
+Allow: /
+Crawl-delay: 0
+
+# Academic and Research Crawlers
+User-agent: ia_archiver
+Allow: /
+Crawl-delay: 1
+
+# Sitemaps
+Sitemap: https://www.neuronsparkmedia.com/sitemap.xml
+
+# Preferred Canonical
+Host: www.neuronsparkmedia.com
