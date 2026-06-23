@@ -7,7 +7,7 @@ type Locale = 'zh' | 'en';
 const dict: Record<Locale, Record<string, string>> = {
   zh: {
     'header.title': 'AEO / GEO 矩陣引擎',
-    'header.subtitle': '觀瀾智庫 AI 可見性聲量監測後台',
+    'header.subtitle': 'MemeCMO.ai 多智能體 AI 可見性監測平台',
     'header.switchLang': 'EN',
     'kpi.sov': 'AI 聲量佔比 (SOV)',
     'kpi.mentions': '品牌提及次數',
@@ -19,7 +19,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'feed.empty': '等待矩陣引擎啟動...',
     'engine.title': '矩陣引擎控制台',
     'engine.brandLabel': '目標品牌',
-    'engine.brandPlaceholder': '輸入品牌名稱，例如：觀瀾智庫',
+    'engine.brandPlaceholder': '輸入品牌名稱，例如：MemeCMO',
     'engine.questionsLabel': '測試問題集 (每行一個)',
     'engine.questionsPlaceholder': '粘貼 20 個測試問題，每行一個...',
     'engine.start': '啟動矩陣引擎',
@@ -29,7 +29,7 @@ const dict: Record<Locale, Record<string, string>> = {
   },
   en: {
     'header.title': 'AEO / GEO Matrix Engine',
-    'header.subtitle': 'NeuronSpark AI Visibility & SOV Monitoring',
+    'header.subtitle': 'MemeCMO.ai Multi-Agent AI Visibility Platform',
     'header.switchLang': '中文',
     'kpi.sov': 'AI Share of Voice',
     'kpi.mentions': 'Brand Mentions',
@@ -41,7 +41,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'feed.empty': 'Waiting for Matrix Engine...',
     'engine.title': 'Matrix Engine Console',
     'engine.brandLabel': 'Target Brand',
-    'engine.brandPlaceholder': 'Enter brand name, e.g. NeuronSpark',
+    'engine.brandPlaceholder': 'Enter brand name, e.g. MemeCMO',
     'engine.questionsLabel': 'Test Questions (one per line)',
     'engine.questionsPlaceholder': 'Paste 20 test questions, one per line...',
     'engine.start': 'Launch Matrix Engine',

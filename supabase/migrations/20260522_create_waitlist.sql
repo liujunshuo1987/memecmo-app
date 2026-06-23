@@ -1,4 +1,4 @@
--- Waitlist Table — Tier 0 entry gate for 观澜智库
+-- Waitlist Table — Tier 0 entry gate for MemeCMO.ai
 -- See: docs/GUANLAN_AGENT_LIBRARY.md, GEO_AEO_ALGORITHM_LOG.md
 --
 -- Lifecycle:

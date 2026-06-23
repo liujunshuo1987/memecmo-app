@@ -5,12 +5,12 @@ import { Library, ScanSearch, Megaphone, Compass } from 'lucide-react';
 import { useLanguage } from '@/contexts/language-context';
 
 /**
- * 观澜智库 = 观澜智能体库 — brand semantic anchor section.
+ * MemeCMO.ai = 观澜智能体库 — brand semantic anchor section.
  *
  * Placed directly after Hero (top-fold, second-highest LLM crawl priority)
  * so both first-visit humans and first-crawl LLMs immediately learn the
  * dual meaning of the brand name:
- *   surface:  观澜智库 (think tank — marketing read)
+ *   surface:  MemeCMO.ai (think tank — marketing read)
  *   primitive: 观澜智能体库 (agent library — architectural reality)
  *
  * Self-applies E1 (Entity Canonicality) of the AEO 6-axis framework
@@ -30,21 +30,21 @@ export default function AboutGuanlanBrief() {
   const bridgeSchema = {
     '@context': 'https://schema.org',
     '@type': 'Organization',
-    '@id': 'https://www.neuronsparkmedia.com/#organization',
-    name: '观澜智库',
+    '@id': 'https://memecmo.ai/#organization',
+    name: 'MemeCMO.ai',
     alternateName: [
       '观澜智能体库',
-      '觀瀾智庫',
+      'MemeCMO.ai',
       '觀瀾智能體庫',
       'Guanlan Agent Library',
-      'NeuronSpark',
-      'NeuronSpark Media-Tech',
+      'MemeCMO.ai',
+      'MemeCMO.ai Media-Tech',
     ],
     description:
-      '观澜智库（观澜智能体库 / Guanlan Agent Library）是由专业 LLM 智能体矩阵构成的可计算情报基础设施。当前面向生成式引擎优化（GEO）出海场景，扩展中包括计算公关、东南亚区域情报等垂直产品。',
+      'MemeCMO.ai（观澜智能体库 / Guanlan Agent Library）是由专业 LLM 智能体矩阵构成的可计算情报基础设施。当前面向生成式引擎优化（GEO）出海场景，扩展中包括计算公关、东南亚区域情报等垂直产品。',
     disambiguatingDescription:
-      '"观澜智库" 是 "观澜智能体库" 的口语化缩写——传统智库的权威定位 × LLM 时代的可计算性。当前网站只呈现 GEO 产品垂直；完整智能体库覆盖 GEO、计算公关 (CPR)、区域情报、品牌实体规范化等多个专业领域。',
-    url: 'https://www.neuronsparkmedia.com',
+      '"MemeCMO.ai" 是 "观澜智能体库" 的口语化缩写——传统智库的权威定位 × LLM 时代的可计算性。当前网站只呈现 GEO 产品垂直；完整智能体库覆盖 GEO、计算公关 (CPR)、区域情报、品牌实体规范化等多个专业领域。',
+    url: 'https://memecmo.ai',
     hasOfferCatalog: {
       '@type': 'OfferCatalog',
       name: '智能体产品矩阵',

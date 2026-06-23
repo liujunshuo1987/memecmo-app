@@ -69,14 +69,14 @@ const translations: Record<Language, any> = {
     hero: {
       title: '讓大模型成為您的商業加速器',
       subtitle: '生成式引擎優化（GEO）專家',
-      description: '觀瀾智庫為高淨值B2B企業提供專業的GEO諮詢服務，通過雙生態穿透與AI基線體檢，確保您的品牌在ChatGPT、Claude等主流AI對話系統中獲得精準曝光，搶佔AI時代的商業先機。',
+      description: 'MemeCMO.ai為高淨值B2B企業提供專業的GEO諮詢服務，通過雙生態穿透與AI基線體檢，確保您的品牌在ChatGPT、Claude等主流AI對話系統中獲得精準曝光，搶佔AI時代的商業先機。',
       cta: '立即預約免費諮詢',
       learn: '了解GEO體系',
       title1: '打穿雙引擎壁壘，',
       title2: '重塑大模型時代的',
       title3: '數字認知基建',
       description1: '從傳統檢索到答案合成，',
-      company: '觀瀾智庫',
+      company: 'MemeCMO.ai',
       companyEn: 'NeuronSpark Media-Tech Limited',
       description2: '為您提供跨越全球與中國大模型認知鴻溝的',
       geoTerm: '生成式引擎優化（GEO）',
@@ -92,10 +92,10 @@ const translations: Record<Language, any> = {
       targetClientValue: '高淨值 B2B 企業',
     },
     about: {
-      eyebrow: '關於觀瀾智庫',
-      titleA: '觀瀾智庫',
+      eyebrow: '關於MemeCMO.ai',
+      titleA: 'MemeCMO.ai',
       titleB: '觀瀾智能體庫',
-      body: '觀瀾智庫的完整含義是 觀瀾智能體庫——由專業 LLM 智能體矩陣構成的可計算情報基礎設施。「智庫」讀其文，「智能體庫」識其實：傳統智庫的權威定位 × LLM 時代的可計算性。當前網站只是整個智能體庫的 GEO 產品垂直；下一階段將擴展至計算公關、區域情報等多個專業領域。',
+      body: 'MemeCMO.ai的完整含義是 觀瀾智能體庫——由專業 LLM 智能體矩陣構成的可計算情報基礎設施。「智庫」讀其文，「智能體庫」識其實：傳統智庫的權威定位 × LLM 時代的可計算性。當前網站只是整個智能體庫的 GEO 產品垂直；下一階段將擴展至計算公關、區域情報等多個專業領域。',
       nowLabel: '現在',
       nextLabel: '接下來',
       currentTitle: 'GEO 出海智能體集',
@@ -140,18 +140,18 @@ const translations: Record<Language, any> = {
       title: '高管提問矩陣',
       subtitle: '關於生成式引擎優化（GEO）的核心問題解答',
       q1: '為什麼品牌在 AI 搜索中不被顯示？',
-      a1: '大模型的認知來源於訓練數據與實時檢索增強（RAG）。如果您的品牌缺乏結構化數據標注（如 Schema.org JSON-LD）、權威內容引用源不足、或在主流知識庫中存在語料斷層，AI 將無法準確識別或推薦您的品牌。這與傳統 SEO 的爬蟲索引邏輯完全不同——AI 需要的是「語義可解釋性」而非關鍵詞密度。觀瀾智庫通過文獻級語料工程與雙生態穿透技術，系統性填補品牌在全球與中國大模型認知圖譜中的空白區域。',
+      a1: '大模型的認知來源於訓練數據與實時檢索增強（RAG）。如果您的品牌缺乏結構化數據標注（如 Schema.org JSON-LD）、權威內容引用源不足、或在主流知識庫中存在語料斷層，AI 將無法準確識別或推薦您的品牌。這與傳統 SEO 的爬蟲索引邏輯完全不同——AI 需要的是「語義可解釋性」而非關鍵詞密度。MemeCMO.ai通過文獻級語料工程與雙生態穿透技術，系統性填補品牌在全球與中國大模型認知圖譜中的空白區域。',
       q2: '什麼是文獻級的計算公共關係？',
       a2: '計算公關（Computational Public Relations）是指通過算法化、數據驅動的方式管理品牌在 AI 系統中的認知表現。傳統公關針對人類媒體與受眾，而計算公關的對象是大模型本身。我們將企業的核心價值主張、產品優勢、行業地位等信息，轉化為符合大模型訓練標準的「文獻級語料」——包括但不限於學術論文引用、開源技術文檔、標準化 API 說明、權威媒體報導等。這些高質量內容將被納入 AI 的訓練集或 RAG 檢索庫，從根本上塑造模型對品牌的理解與推薦傾向。',
       q3: '傳統 SEO 與生成式引擎優化（GEO）的底層區別是什麼？',
-      a3: 'SEO 優化的是「頁面排名」，核心是關鍵詞匹配、外鏈權重與用戶點擊率。而 GEO 優化的是「答案生成」，核心是語義理解、實體關係與上下文相關性。具體差異體現在三個層面：<br/><br/>1. <strong>信息架構</strong>：SEO 依賴 HTML 標籤與 sitemap，GEO 依賴 JSON-LD 結構化數據與知識圖譜映射；<br/>2. <strong>內容形態</strong>：SEO 追求可讀性與關鍵詞密度，GEO 追求引用權威性與語料完整性（如白皮書、技術文檔、學術研究）；<br/>3. <strong>效果衡量</strong>：SEO 看搜索排名與流量，GEO 看 AI 引用率、品牌實體識別準確度與情感傾向性得分。<br/><br/>觀瀾智庫的 GEO 方法論整合了計算語言學、知識工程與跨境合規框架，幫助企業在 ChatGPT、Claude、Kimi、文心一言等主流大模型中建立持久的認知優勢。',
+      a3: 'SEO 優化的是「頁面排名」，核心是關鍵詞匹配、外鏈權重與用戶點擊率。而 GEO 優化的是「答案生成」，核心是語義理解、實體關係與上下文相關性。具體差異體現在三個層面：<br/><br/>1. <strong>信息架構</strong>：SEO 依賴 HTML 標籤與 sitemap，GEO 依賴 JSON-LD 結構化數據與知識圖譜映射；<br/>2. <strong>內容形態</strong>：SEO 追求可讀性與關鍵詞密度，GEO 追求引用權威性與語料完整性（如白皮書、技術文檔、學術研究）；<br/>3. <strong>效果衡量</strong>：SEO 看搜索排名與流量，GEO 看 AI 引用率、品牌實體識別準確度與情感傾向性得分。<br/><br/>MemeCMO.ai的 GEO 方法論整合了計算語言學、知識工程與跨境合規框架，幫助企業在 ChatGPT、Claude、Kimi、文心一言等主流大模型中建立持久的認知優勢。',
       moreQuestions: '還有其他問題？我們的專家團隊隨時為您解答',
       consultButton: '預約專家諮詢',
     },
     ecosystem: {
       title: '雙生態穿透',
       subtitle: '全方位AI可見性解決方案',
-      description: '觀瀾智庫獨創的「雙生態穿透」策略，同步優化傳統搜索引擎（SEO）與生成式AI系統（GEO），確保您的品牌在搜索與對話兩大場景中實現全域覆蓋。',
+      description: 'MemeCMO.ai獨創的「雙生態穿透」策略，同步優化傳統搜索引擎（SEO）與生成式AI系統（GEO），確保您的品牌在搜索與對話兩大場景中實現全域覆蓋。',
       seo: {
         title: '傳統搜索生態',
         subtitle: 'Search Engine Optimization',
@@ -223,7 +223,7 @@ const translations: Record<Language, any> = {
       mainSubtitle: '實時穿透全球與中國雙生態大模型，量化評估您的品牌認知基線與競爭態勢',
       launchTitle: '啟動掃描',
       brandLabel: '您的品牌名稱',
-      brandPlaceholder: '例如：觀瀾智庫',
+      brandPlaceholder: '例如：MemeCMO.ai',
       competitorLabel: '核心競品名稱',
       competitorPlaceholder: '例如：XX諮詢',
       keywordLabel: '核心業務關鍵詞',
@@ -274,14 +274,14 @@ const translations: Record<Language, any> = {
       inboundFeature2Desc: '針對性投放權威中文內容至知乎、公眾號、百度百科等 RAG 訓練源，修正模型對品牌的誤判與偏見',
       inboundCoverage: '覆蓋模型：Kimi · 文心一言 · 通義千問 · 豆包',
       complianceTitle: '合規數據雙向處理',
-      complianceDescription: '觀瀾智庫總部位於香港，嚴格遵循《大灣區標準合同》（GBA Standard Contractual Clauses）框架，確保跨境數據流動的合法性與安全性。我們的雙生態穿透服務已通過 ISO 27001 信息安全認證，為高淨值 B2B 客戶提供符合中國《個人信息保護法》及歐盟 GDPR 雙重標準的數據處理方案。',
+      complianceDescription: 'MemeCMO.ai總部位於香港，嚴格遵循《大灣區標準合同》（GBA Standard Contractual Clauses）框架，確保跨境數據流動的合法性與安全性。我們的雙生態穿透服務已通過 ISO 27001 信息安全認證，為高淨值 B2B 客戶提供符合中國《個人信息保護法》及歐盟 GDPR 雙重標準的數據處理方案。',
     },
     geoAuditSystem: {
       title: 'GEO 計算公關審計系統',
       subtitle: '量化審計品牌在 AI 記憶庫中的數字實體可見度',
       configTitle: '審計參數配置',
       brandLabel: '品牌名稱 (BRAND_NAME)',
-      brandPlaceholder: '例如：觀瀾智庫',
+      brandPlaceholder: '例如：MemeCMO.ai',
       competitorLabel: '競品名稱 (COMPETITOR_NAME)',
       competitorPlaceholder: '例如：麥肯錫',
       keywordLabel: '核心業務關鍵詞 (CORE_KEYWORD)',
@@ -316,10 +316,10 @@ const translations: Record<Language, any> = {
       role: '首席數據架構師 / 創始人',
       name: '劉峻鑠',
       nameEn: 'Liu Junshuo',
-      bio1: '劉峻鑠博士是觀瀾智庫的創始人兼首席數據架構師。作為早期的模型化學習探索者，他曾致力於通過機器學習與大語言模型（LLM）實現自然語言的生成，並深度參與了早期底層語料庫的搭建與句法結構化標注工作。',
+      bio1: '劉峻鑠博士是MemeCMO.ai的創始人兼首席數據架構師。作為早期的模型化學習探索者，他曾致力於通過機器學習與大語言模型（LLM）實現自然語言的生成，並深度參與了早期底層語料庫的搭建與句法結構化標注工作。',
       bio2: '面對早期人文學界對結構化語言及計算語言學的認知壁壘，他轉向深耕傳統學術，獲得中山大學古典文獻學博士學位，其間專注於古琴文獻的深度考據。這段看似抽離的學術經歷，反而在大模型時代為他賦予了極其稀缺的核心能力：將古典文獻考據學的嚴苛標準，精準降維應用於現代人工智能的語料清洗與結構化編碼之中。',
       bio3: '在學術研究之外，他擁有跨越多行業的商業實戰履歷，曾出任資深公關專家、媒體人及品牌架構師。作為持續追蹤大語言模型演進的深度研究者，他在大數據與生成式 AI 時代找到了跨界融合的終極解法——生成式引擎優化（GEO）與計算公關。',
-      bio4: '如今，他推崇「Vibe Coding」與第一性原理，其系統架構哲學融合了控制論（Cybernetics）、斯多葛學派以及王夫之「知行合一」的思想，致力於帶領觀瀾智庫為企業重構具備高防禦性的數字機器認知底座。',
+      bio4: '如今，他推崇「Vibe Coding」與第一性原理，其系統架構哲學融合了控制論（Cybernetics）、斯多葛學派以及王夫之「知行合一」的思想，致力於帶領MemeCMO.ai為企業重構具備高防禦性的數字機器認知底座。',
       education: '學術背景',
       expertise: '核心領域',
       educationText: '中山大學古典文獻學博士',
@@ -352,7 +352,7 @@ const translations: Record<Language, any> = {
         title: '跨域生態穿透邏輯',
         subtitle: 'Cross-Ecosystem Penetration',
         content: `在大模型認知架構中，<strong>海外生態</strong>（ChatGPT、Claude、Gemini）與<strong>國內生態</strong>（Kimi、文心一言、通義千問）之間存在<strong>本質性的語料空間斷層</strong>（Corpus Space Discontinuity）。前者依賴英文主導的<strong>潛空間</strong>（Latent Space）訓練範式，其知識圖譜錨定於 Wikipedia、arXiv、GitHub、Stack Overflow 等英語主導的結構化知識庫；後者則基於中文 <strong>RAG</strong>（Retrieval-Augmented Generation）檢索增強生成架構，語料源頭集中於知乎、百度百科、微信公眾號、政府公開數據等本土化內容生態。<br/><br/>
-這種<strong>雙重語境的分裂</strong>導致品牌在單一生態內的語料投放無法實現跨域認知傳遞。觀瀾智庫依託<strong>香港大灣區標準合同</strong>（GBA Standard Contractual Clauses）的合規數據處理框架，構建了<strong>跨境語料雙向映射系統</strong>，確保企業的核心實體信息（Entity Information）在英文與中文兩大語料體系中的<strong>語義一致性</strong>（Semantic Consistency）與<strong>結構化可索引性</strong>（Structured Indexability）。<br/><br/>
+這種<strong>雙重語境的分裂</strong>導致品牌在單一生態內的語料投放無法實現跨域認知傳遞。MemeCMO.ai依託<strong>香港大灣區標準合同</strong>（GBA Standard Contractual Clauses）的合規數據處理框架，構建了<strong>跨境語料雙向映射系統</strong>，確保企業的核心實體信息（Entity Information）在英文與中文兩大語料體系中的<strong>語義一致性</strong>（Semantic Consistency）與<strong>結構化可索引性</strong>（Structured Indexability）。<br/><br/>
 具體技術路徑包括：（1）針對海外大模型，部署符合 <strong>Schema.org</strong> 標準的 <strong>JSON-LD</strong> 結構化數據標注，確保品牌實體在<strong>知識圖譜</strong>（Knowledge Graph）中的準確映射；（2）通過 <strong>OpenAI Platform、Anthropic API、GitHub 開源生態</strong>等開發者節點，注入高質量企業技術文檔與代碼範例，提升品牌在<strong>生成式 API 調用場景</strong>中的引用權重；（3）針對國內大模型，在知乎、公眾號、百度百科等 <strong>RAG 訓練源頭</strong>投放權威中文語料，修正模型對品牌的<strong>認知偏差與幻覺</strong>（Hallucination）。<br/><br/>
 香港作為<strong>跨境數據樞紐</strong>的合規優勢在於：既符合中國《<strong>個人信息保護法</strong>》（PIPL）對數據出境的安全評估要求，又滿足歐盟 <strong>GDPR</strong> 對數據處理透明度與可追溯性的標準。我們的 <strong>ISO 27001</strong> 信息安全認證確保語料處理全流程的合規性與數據主權尊重，為高淨值 B2B 客戶提供<strong>零法律風險</strong>的跨境 GEO 解決方案。`,
         keywords: 'Latent Space · RAG · GBA Standard Contract · Knowledge Graph · JSON-LD · Schema.org · PIPL · GDPR · ISO 27001',
@@ -363,19 +363,19 @@ const translations: Record<Language, any> = {
         content: `傳統 <strong>SEO</strong>（Search Engine Optimization）的優化對象是「<strong>頁面排名</strong>」，其底層邏輯建立在 <strong>PageRank 演算法</strong>的鏈接權重體系之上——通過<strong>外鏈數量</strong>（Backlink Volume）、<strong>錨文本關鍵詞密度</strong>（Anchor Text Keyword Density）、<strong>域名權威性</strong>（Domain Authority）等指標，影響爬蟲索引與排序結果。這是一種面向機器的「<strong>表層信號優化</strong>」（Surface Signal Optimization），核心是讓搜索引擎「看到」頁面的存在，而非理解頁面的內容本質。<br/><br/>
 <strong>GEO</strong>（Generative Engine Optimization）的優化對象則是「<strong>答案生成</strong>」，其底層邏輯源自大模型的<strong>語義理解能力</strong>與<strong>上下文推理機制</strong>。模型在生成回答時，並非簡單地匹配關鍵詞，而是基於<strong>實體真實性</strong>（Entity Authenticity）、<strong>引用權威性</strong>（Citation Authority）、<strong>語料完整性</strong>（Corpus Completeness）進行多層次的語義判斷。這種機制更接近古典文獻學中的「<strong>考據標準</strong>」——即通過原始文獻的<strong>互證</strong>（Cross-Validation）、<strong>版本溯源</strong>（Version Tracing）、<strong>權威注釋</strong>（Authoritative Annotation）來確立知識的可信度。<br/><br/>
 在大模型時代，<strong>數字偽史</strong>（Digital Pseudo-History）成為認知污染的主要來源。由於互聯網內容生產的低門檻與算法推薦的<strong>回音室效應</strong>，大量缺乏事實依據的品牌敘事、誤導性市場宣傳、以及競品惡意植入的負面語料，被納入大模型的訓練集或 RAG 檢索庫，導致模型在回答相關查詢時產生<strong>認知幻覺</strong>（Hallucination）或<strong>事實性錯誤</strong>（Factual Error）。<br/><br/>
-觀瀾智庫引入古典文獻學的「<strong>辨偽</strong>」（Authentication）方法論，通過投放<strong>文獻級語料</strong>（包括學術論文引用、標準化 API 文檔、開源技術貢獻、權威媒體深度報導等）來對沖數字偽史的影響。這些高質量語料具備三大特徵：（1）<strong>可溯源性</strong>（Traceability），即內容來源可追溯至權威機構或專家個人；（2）<strong>結構化標注</strong>（Structured Markup），即通過 Schema.org、Open Graph、Microdata 等語義化協議，確保機器可理解；（3）<strong>跨平台分佈</strong>（Cross-Platform Distribution），即在多個大模型訓練源頭同步投放，形成語料互證網絡。`,
+MemeCMO.ai引入古典文獻學的「<strong>辨偽</strong>」（Authentication）方法論，通過投放<strong>文獻級語料</strong>（包括學術論文引用、標準化 API 文檔、開源技術貢獻、權威媒體深度報導等）來對沖數字偽史的影響。這些高質量語料具備三大特徵：（1）<strong>可溯源性</strong>（Traceability），即內容來源可追溯至權威機構或專家個人；（2）<strong>結構化標注</strong>（Structured Markup），即通過 Schema.org、Open Graph、Microdata 等語義化協議，確保機器可理解；（3）<strong>跨平台分佈</strong>（Cross-Platform Distribution），即在多個大模型訓練源頭同步投放，形成語料互證網絡。`,
         keywords: 'PageRank · Entity Authenticity · Citation Authority · Cross-Validation · Hallucination · Authentication · Traceability · Structured Markup',
       },
       multiAgent: {
         title: '多智能體架構與控制論反饋',
         subtitle: 'Multi-Agent System & Cybernetic Feedback',
-        content: `觀瀾智庫的日常運營依賴於<strong>多智能體編排系統</strong>（Multi-Agent Orchestration System），通過 <strong>Vibe Coding</strong>（基於自然語言的協作式編程）與分佈式智能體協同，實現品牌 GEO 優化的自動化監測與靶向語料對沖。具體架構包含三層智能體分工：（1）<strong>感知層智能體</strong>（Perception Agents），負責實時抓取 ChatGPT、Claude、Kimi、文心一言等主流大模型對品牌相關查詢的回答內容，提取關鍵<strong>實體識別準確度</strong>、<strong>引用份額</strong>（Citation Share）、<strong>情感傾向性得分</strong>（Sentiment Polarity Score）等指標；（2）<strong>分析層智能體</strong>（Analysis Agents），基於<strong>控制論反饋原理</strong>（Cybernetic Feedback），將監測數據與預設的<strong>品牌認知基線</strong>（Cognitive Baseline）進行偏差計算，識別<strong>認知斷層</strong>（Cognitive Gap）、<strong>幻覺風險</strong>（Hallucination Risk）、<strong>競品語料侵蝕</strong>（Competitor Corpus Erosion）等異常狀態；（3）<strong>執行層智能體</strong>（Execution Agents），根據偏差信號觸發語料投放策略，自動生成並分發符合大模型訓練標準的結構化內容至目標平台。<br/><br/>
+        content: `MemeCMO.ai的日常運營依賴於<strong>多智能體編排系統</strong>（Multi-Agent Orchestration System），通過 <strong>Vibe Coding</strong>（基於自然語言的協作式編程）與分佈式智能體協同，實現品牌 GEO 優化的自動化監測與靶向語料對沖。具體架構包含三層智能體分工：（1）<strong>感知層智能體</strong>（Perception Agents），負責實時抓取 ChatGPT、Claude、Kimi、文心一言等主流大模型對品牌相關查詢的回答內容，提取關鍵<strong>實體識別準確度</strong>、<strong>引用份額</strong>（Citation Share）、<strong>情感傾向性得分</strong>（Sentiment Polarity Score）等指標；（2）<strong>分析層智能體</strong>（Analysis Agents），基於<strong>控制論反饋原理</strong>（Cybernetic Feedback），將監測數據與預設的<strong>品牌認知基線</strong>（Cognitive Baseline）進行偏差計算，識別<strong>認知斷層</strong>（Cognitive Gap）、<strong>幻覺風險</strong>（Hallucination Risk）、<strong>競品語料侵蝕</strong>（Competitor Corpus Erosion）等異常狀態；（3）<strong>執行層智能體</strong>（Execution Agents），根據偏差信號觸發語料投放策略，自動生成並分發符合大模型訓練標準的結構化內容至目標平台。<br/><br/>
 在量化評估維度上，我們重點追蹤兩大核心指標：（1）<strong>答案份額</strong>（Share of Answer, SoA），即在相關查詢場景下，品牌被大模型引用或推薦的頻率佔比。這是 GEO 領域的核心 KPI，類似於傳統搜索中的「首頁排名佔有率」，但更關注生成內容的質量與上下文相關性；（2）<strong>情感淨值</strong>（Sentiment Net Score, SNS），即模型在描述品牌時的情感傾向分佈（正面、中性、負面）的加權得分。我們通過<strong>自然語言處理</strong>（NLP）技術，對大模型生成的文本進行細粒度情感分析，識別潛在的認知偏見或負面聯想。<br/><br/>
 <strong>控制論反饋機制</strong>的核心在於「<strong>閉環優化</strong>」（Closed-Loop Optimization）。每當監測到品牌的 SoA 下降或 SNS 偏負時，系統自動啟動語料對沖流程：（1）<strong>診斷階段</strong>，定位導致偏差的具體語料源（如某篇知乎回答、某個 GitHub Issue、某條新聞報導）；（2）<strong>策略階段</strong>，基於語料源的權威性與傳播範圍，制定差異化對沖方案（如投放更高權威性的學術引用以覆蓋低質量內容，或通過開源貢獻提升技術可信度）；（3）<strong>執行階段</strong>，將優化後的語料批量分發至目標平台，並持續監測其在大模型回答中的引用效果。<br/><br/>
 這種多智能體架構的優勢在於：（1）<strong>全天候自動化監測</strong>，無需人工輪詢大模型 API；（2）<strong>低延遲響應</strong>，從異常檢測到策略執行的全流程控制在小時級別；（3）<strong>可擴展性</strong>，支持同時監測數十個大模型與數百個查詢場景；（4）<strong>數據驅動決策</strong>，所有優化動作均基於量化指標，避免主觀經驗主義的盲目性。對於高淨值 B2B 企業而言，這意味著品牌在大模型認知空間的<strong>主動權掌控</strong>（Proactive Control），而非傳統 SEO 的<strong>被動等待</strong>（Passive Waiting）。`,
         keywords: 'Multi-Agent Orchestration · Vibe Coding · Perception Agents · Analysis Agents · Execution Agents · SoA · SNS · Cybernetic Feedback · Closed-Loop Optimization · NLP',
       },
-      footer: '上述三大技術支柱構成觀瀾智庫 GEO 方法論的核心基建，確保企業品牌在全球與中國大模型認知空間的持久可見度與競爭優勢。',
+      footer: '上述三大技術支柱構成MemeCMO.ai GEO 方法論的核心基建，確保企業品牌在全球與中國大模型認知空間的持久可見度與競爭優勢。',
     },
     footer: {
       services: '核心服務',
@@ -397,7 +397,7 @@ const translations: Record<Language, any> = {
       upcoming: '即將開源',
       tooltip: '高密度語料正在進行文獻級審核，預計於下月開放',
       tagline: '專注生成式引擎優化（GEO），為高淨值B2B企業打造AI時代的品牌認知優勢，實現數字化轉型與智能化升級。',
-      brandBridge: '觀瀾智庫 = 觀瀾智能體庫 · 由專業 LLM 智能體矩陣構成的可計算情報基礎設施',
+      brandBridge: 'MemeCMO.ai = 觀瀾智能體庫 · 由專業 LLM 智能體矩陣構成的可計算情報基礎設施',
       contactTitle: '聯繫我們',
       address: '香港灣仔軒尼詩道8-12號\n中國香港大廈8樓',
       legalInfo: '法定註冊信息',
@@ -406,7 +406,7 @@ const translations: Record<Language, any> = {
       registered: '註冊地：香港特別行政區',
       chiefArchitect: '首席架構師：',
       chiefArchitectName: '劉峻鑠',
-      brandAlias: '觀瀾智庫',
+      brandAlias: 'MemeCMO.ai',
       complianceTitle: '政策與合規',
       rights: 'All Rights Reserved.',
       privacy: '隱私政策',
@@ -417,7 +417,7 @@ const translations: Record<Language, any> = {
       backToHome: '返回首頁',
       title: '隱私權政策',
       effectiveDate: '生效日期：2026年4月1日',
-      intro: 'NeuronSpark Media-Tech Limited（觀瀾智庫）非常重視您的隱私。本政策說明我們在您使用本網站及服務時如何收集、使用與保護您的個人資料。',
+      intro: 'NeuronSpark Media-Tech Limited（MemeCMO.ai）非常重視您的隱私。本政策說明我們在您使用本網站及服務時如何收集、使用與保護您的個人資料。',
       collection: {
         title: '資料收集',
         body: '我們可能在您使用服務時收集以下資料：姓名、電子郵件地址、公司名稱；帳戶註冊與登入憑證；您提交的網站URL及審計查詢內容；設備資訊、IP位址及瀏覽器類型；使用紀錄及網站互動資料。',
@@ -457,11 +457,11 @@ const translations: Record<Language, any> = {
       backToHome: '返回首頁',
       title: '服務條款',
       effectiveDate: '生效日期：2026年4月1日',
-      intro: '歡迎使用 NeuronSpark Media-Tech Limited（觀瀾智庫）提供的服務。請在使用我們的網站及服務前，仔細閱讀以下服務條款。使用本網站即代表您同意受本條款約束。',
+      intro: '歡迎使用 NeuronSpark Media-Tech Limited（MemeCMO.ai）提供的服務。請在使用我們的網站及服務前，仔細閱讀以下服務條款。使用本網站即代表您同意受本條款約束。',
       scope: {
         title: '服務範圍',
-        body: '觀瀾智庫專注於生成式引擎優化（GEO）及AI引擎優化（AEO）顧問服務，涵蓋全球及中國大語言模型（LLM）雙生態系統。我們的服務包括但不限於：AI可見性基線審計、結構化數據優化、LLM引用策略規劃、品牌知識圖譜建構，以及跨平台AI生態系統部署。具體服務內容以雙方簽署的服務合約為準。',
-        bodyEn: 'NeuronSpark Media-Tech Limited (NeuronSpark Think Tank) specializes in Generative Engine Optimization (GEO) and AI Engine Optimization (AEO) consultancy services, covering both global and Chinese Large Language Model (LLM) dual ecosystems. Our services include but are not limited to: AI Visibility Baseline Audits, Structured Data Optimization, LLM Citation Strategy Planning, Brand Knowledge Graph Construction, and Cross-platform AI Ecosystem Deployment. Specific service details are subject to the service agreement signed by both parties.',
+        body: 'MemeCMO.ai專注於生成式引擎優化（GEO）及AI引擎優化（AEO）顧問服務，涵蓋全球及中國大語言模型（LLM）雙生態系統。我們的服務包括但不限於：AI可見性基線審計、結構化數據優化、LLM引用策略規劃、品牌知識圖譜建構，以及跨平台AI生態系統部署。具體服務內容以雙方簽署的服務合約為準。',
+        bodyEn: 'NeuronSpark Media-Tech Limited (MemeCMO.ai) specializes in Generative Engine Optimization (GEO) and AI Engine Optimization (AEO) consultancy services, covering both global and Chinese Large Language Model (LLM) dual ecosystems. Our services include but are not limited to: AI Visibility Baseline Audits, Structured Data Optimization, LLM Citation Strategy Planning, Brand Knowledge Graph Construction, and Cross-platform AI Ecosystem Deployment. Specific service details are subject to the service agreement signed by both parties.',
       },
       eligibility: {
         title: '使用資格與帳戶',
@@ -470,8 +470,8 @@ const translations: Record<Language, any> = {
       },
       intellectual: {
         title: '智慧財產權',
-        body: '本網站及服務中的所有內容，包括但不限於文本、圖形、標誌、圖標、數據編輯、軟件及GEO方法論框架，均受國際智慧財產權法律保護，為觀瀾智庫或其授權方所有。未經書面授權，您不得複製、修改、分發、展示、轉授權或以任何商業目的使用上述內容。我們為客戶交付的策略報告及優化方案之智慧財產權歸屬，依雙方服務合約之約定為準。',
-        bodyEn: 'All content on this website and within our services, including but not limited to text, graphics, logos, icons, data compilations, software, and GEO methodology frameworks, is protected by international intellectual property laws and is owned by NeuronSpark Think Tank or its licensors. Without written authorization, you may not copy, modify, distribute, display, sublicense, or use such content for any commercial purpose. Intellectual property rights for strategy reports and optimization solutions delivered to clients are governed by the terms of the respective service agreements.',
+        body: '本網站及服務中的所有內容，包括但不限於文本、圖形、標誌、圖標、數據編輯、軟件及GEO方法論框架，均受國際智慧財產權法律保護，為MemeCMO.ai或其授權方所有。未經書面授權，您不得複製、修改、分發、展示、轉授權或以任何商業目的使用上述內容。我們為客戶交付的策略報告及優化方案之智慧財產權歸屬，依雙方服務合約之約定為準。',
+        bodyEn: 'All content on this website and within our services, including but not limited to text, graphics, logos, icons, data compilations, software, and GEO methodology frameworks, is protected by international intellectual property laws and is owned by MemeCMO.ai or its licensors. Without written authorization, you may not copy, modify, distribute, display, sublicense, or use such content for any commercial purpose. Intellectual property rights for strategy reports and optimization solutions delivered to clients are governed by the terms of the respective service agreements.',
       },
       fees: {
         title: '費用與付款',
@@ -480,8 +480,8 @@ const translations: Record<Language, any> = {
       },
       liability: {
         title: '責任限制',
-        body: '本服務按「現狀」及「可用」基礎提供。觀瀾智庫不對以下情形承擔責任：因AI搜索引擎演算法變更導致的可見性波動、第三方平台政策調整對優化效果的影響、因不可抗力導致的服務中斷。在法律允許的最大範圍內，觀瀾智庫對任何間接損失、利潤損失或數據損失不承擔責任。我們的總責任以您在相關服務期限內實際支付的費用為上限。',
-        bodyEn: 'Services are provided on an "as is" and "as available" basis. NeuronSpark Think Tank shall not be liable for: visibility fluctuations caused by AI search engine algorithm changes; impact on optimization results due to third-party platform policy adjustments; service interruptions caused by force majeure. To the maximum extent permitted by law, NeuronSpark Think Tank shall not be liable for any indirect losses, lost profits, or data loss. Our total liability is limited to the fees actually paid by you during the relevant service period.',
+        body: '本服務按「現狀」及「可用」基礎提供。MemeCMO.ai不對以下情形承擔責任：因AI搜索引擎演算法變更導致的可見性波動、第三方平台政策調整對優化效果的影響、因不可抗力導致的服務中斷。在法律允許的最大範圍內，MemeCMO.ai對任何間接損失、利潤損失或數據損失不承擔責任。我們的總責任以您在相關服務期限內實際支付的費用為上限。',
+        bodyEn: 'Services are provided on an "as is" and "as available" basis. MemeCMO.ai shall not be liable for: visibility fluctuations caused by AI search engine algorithm changes; impact on optimization results due to third-party platform policy adjustments; service interruptions caused by force majeure. To the maximum extent permitted by law, MemeCMO.ai shall not be liable for any indirect losses, lost profits, or data loss. Our total liability is limited to the fees actually paid by you during the relevant service period.',
       },
       termination: {
         title: '終止與暫停',
@@ -495,8 +495,8 @@ const translations: Record<Language, any> = {
       },
       changes: {
         title: '條款修訂',
-        body: '觀瀾智庫保留隨時修訂本服務條款的權利。修訂後的條款將在本頁面公佈，並更新生效日期。重大變更將通過網站公告或電子郵件方式通知您。您在修訂後繼續使用服務，即代表您接受修訂後的條款。',
-        bodyEn: 'NeuronSpark Think Tank reserves the right to revise these Terms of Service at any time. Revised terms will be posted on this page with an updated effective date. Material changes will be communicated via website notice or email. Your continued use of the service after revisions constitutes acceptance of the revised terms.',
+        body: 'MemeCMO.ai保留隨時修訂本服務條款的權利。修訂後的條款將在本頁面公佈，並更新生效日期。重大變更將通過網站公告或電子郵件方式通知您。您在修訂後繼續使用服務，即代表您接受修訂後的條款。',
+        bodyEn: 'MemeCMO.ai reserves the right to revise these Terms of Service at any time. Revised terms will be posted on this page with an updated effective date. Material changes will be communicated via website notice or email. Your continued use of the service after revisions constitutes acceptance of the revised terms.',
       },
       contact: {
         title: '聯繫我們',
@@ -510,7 +510,7 @@ const translations: Record<Language, any> = {
     },
     auth: {
       loginTitle: '歡迎回來',
-      loginSubtitle: '登入您的觀瀾智庫帳戶',
+      loginSubtitle: '登入您的MemeCMO.ai帳戶',
       signupTitle: '創建帳戶',
       signupSubtitle: '開始使用AI可見度優化工具',
       resetTitle: '重設密碼',
@@ -640,14 +640,14 @@ const translations: Record<Language, any> = {
     hero: {
       title: '让大模型成为您的商业加速器',
       subtitle: '生成式引擎优化（GEO）专家',
-      description: '观澜智库为高净值B2B企业提供专业的GEO咨询服务，通过双生态穿透与AI基线体检，确保您的品牌在ChatGPT、Claude等主流AI对话系统中获得精准曝光，抢占AI时代的商业先机。',
+      description: 'MemeCMO.ai为高净值B2B企业提供专业的GEO咨询服务，通过双生态穿透与AI基线体检，确保您的品牌在ChatGPT、Claude等主流AI对话系统中获得精准曝光，抢占AI时代的商业先机。',
       cta: '立即预约免费咨询',
       learn: '了解GEO体系',
       title1: '打穿双引擎壁垒，',
       title2: '重塑大模型时代的',
       title3: '数字认知基建',
       description1: '从传统检索到答案合成，',
-      company: '观澜智库',
+      company: 'MemeCMO.ai',
       companyEn: 'NeuronSpark Media-Tech Limited',
       description2: '为您提供跨越全球与中国大模型认知鸿沟的',
       geoTerm: '生成式引擎优化（GEO）',
@@ -663,10 +663,10 @@ const translations: Record<Language, any> = {
       targetClientValue: '高净值 B2B 企业',
     },
     about: {
-      eyebrow: '关于观澜智库',
-      titleA: '观澜智库',
+      eyebrow: '关于MemeCMO.ai',
+      titleA: 'MemeCMO.ai',
       titleB: '观澜智能体库',
-      body: '观澜智库的完整含义是 观澜智能体库——由专业 LLM 智能体矩阵构成的可计算情报基础设施。"智库"读其文，"智能体库"识其实：传统智库的权威定位 × LLM 时代的可计算性。当前网站只是整个智能体库的 GEO 产品垂直；下一阶段将扩展至计算公关、区域情报等多个专业领域。',
+      body: 'MemeCMO.ai的完整含义是 观澜智能体库——由专业 LLM 智能体矩阵构成的可计算情报基础设施。"智库"读其文，"智能体库"识其实：传统智库的权威定位 × LLM 时代的可计算性。当前网站只是整个智能体库的 GEO 产品垂直；下一阶段将扩展至计算公关、区域情报等多个专业领域。',
       nowLabel: '现在',
       nextLabel: '接下来',
       currentTitle: 'GEO 出海智能体集',
@@ -711,18 +711,18 @@ const translations: Record<Language, any> = {
       title: '高管提问矩阵',
       subtitle: '关于生成式引擎优化（GEO）的核心问题解答',
       q1: '为什么品牌在 AI 搜索中不被显示？',
-      a1: '大模型的认知来源于训练数据与实时检索增强（RAG）。如果您的品牌缺乏结构化数据标注（如 Schema.org JSON-LD）、权威内容引用源不足、或在主流知识库中存在语料断层，AI 将无法准确识别或推荐您的品牌。这与传统 SEO 的爬虫索引逻辑完全不同——AI 需要的是「语义可解释性」而非关键词密度。观澜智库通过文献级语料工程与双生态穿透技术，系统性填补品牌在全球与中国大模型认知图谱中的空白区域。',
+      a1: '大模型的认知来源于训练数据与实时检索增强（RAG）。如果您的品牌缺乏结构化数据标注（如 Schema.org JSON-LD）、权威内容引用源不足、或在主流知识库中存在语料断层，AI 将无法准确识别或推荐您的品牌。这与传统 SEO 的爬虫索引逻辑完全不同——AI 需要的是「语义可解释性」而非关键词密度。MemeCMO.ai通过文献级语料工程与双生态穿透技术，系统性填补品牌在全球与中国大模型认知图谱中的空白区域。',
       q2: '什么是文献级的计算公共关系？',
       a2: '计算公关（Computational Public Relations）是指通过算法化、数据驱动的方式管理品牌在 AI 系统中的认知表现。传统公关针对人类媒体与受众，而计算公关的对象是大模型本身。我们将企业的核心价值主张、产品优势、行业地位等信息，转化为符合大模型训练标准的「文献级语料」——包括但不限于学术论文引用、开源技术文档、标准化 API 说明、权威媒体报道等。这些高质量内容将被纳入 AI 的训练集或 RAG 检索库，从根本上塑造模型对品牌的理解与推荐倾向。',
       q3: '传统 SEO 与生成式引擎优化（GEO）的底层区别是什么？',
-      a3: 'SEO 优化的是「页面排名」，核心是关键词匹配、外链权重与用户点击率。而 GEO 优化的是「答案生成」，核心是语义理解、实体关系与上下文相关性。具体差异体现在三个层面：<br/><br/>1. <strong>信息架构</strong>：SEO 依赖 HTML 标签与 sitemap，GEO 依赖 JSON-LD 结构化数据与知识图谱映射；<br/>2. <strong>内容形态</strong>：SEO 追求可读性与关键词密度，GEO 追求引用权威性与语料完整性（如白皮书、技术文档、学术研究）；<br/>3. <strong>效果衡量</strong>：SEO 看搜索排名与流量，GEO 看 AI 引用率、品牌实体识别准确度与情感倾向性得分。<br/><br/>观澜智库的 GEO 方法论整合了计算语言学、知识工程与跨境合规框架，帮助企业在 ChatGPT、Claude、Kimi、文心一言等主流大模型中建立持久的认知优势。',
+      a3: 'SEO 优化的是「页面排名」，核心是关键词匹配、外链权重与用户点击率。而 GEO 优化的是「答案生成」，核心是语义理解、实体关系与上下文相关性。具体差异体现在三个层面：<br/><br/>1. <strong>信息架构</strong>：SEO 依赖 HTML 标签与 sitemap，GEO 依赖 JSON-LD 结构化数据与知识图谱映射；<br/>2. <strong>内容形态</strong>：SEO 追求可读性与关键词密度，GEO 追求引用权威性与语料完整性（如白皮书、技术文档、学术研究）；<br/>3. <strong>效果衡量</strong>：SEO 看搜索排名与流量，GEO 看 AI 引用率、品牌实体识别准确度与情感倾向性得分。<br/><br/>MemeCMO.ai的 GEO 方法论整合了计算语言学、知识工程与跨境合规框架，帮助企业在 ChatGPT、Claude、Kimi、文心一言等主流大模型中建立持久的认知优势。',
       moreQuestions: '还有其他问题？我们的专家团队随时为您解答',
       consultButton: '预约专家咨询',
     },
     ecosystem: {
       title: '双生态穿透',
       subtitle: '全方位AI可见性解决方案',
-      description: '观澜智库独创的「双生态穿透」策略，同步优化传统搜索引擎（SEO）与生成式AI系统（GEO），确保您的品牌在搜索与对话两大场景中实现全域覆盖。',
+      description: 'MemeCMO.ai独创的「双生态穿透」策略，同步优化传统搜索引擎（SEO）与生成式AI系统（GEO），确保您的品牌在搜索与对话两大场景中实现全域覆盖。',
       seo: {
         title: '传统搜索生态',
         subtitle: 'Search Engine Optimization',
@@ -794,7 +794,7 @@ const translations: Record<Language, any> = {
       mainSubtitle: '实时穿透全球与中国双生态大模型，量化评估您的品牌认知基线与竞争态势',
       launchTitle: '启动扫描',
       brandLabel: '您的品牌名称',
-      brandPlaceholder: '例如：观澜智库',
+      brandPlaceholder: '例如：MemeCMO.ai',
       competitorLabel: '核心竞品名称',
       competitorPlaceholder: '例如：XX咨询',
       keywordLabel: '核心业务关键词',
@@ -845,14 +845,14 @@ const translations: Record<Language, any> = {
       inboundFeature2Desc: '针对性投放权威中文内容至知乎、公众号、百度百科等 RAG 训练源，修正模型对品牌的误判与偏见',
       inboundCoverage: '覆盖模型：Kimi · 文心一言 · 通义千问 · 豆包',
       complianceTitle: '合规数据双向处理',
-      complianceDescription: '观澜智库总部位于香港，严格遵循《大湾区标准合同》（GBA Standard Contractual Clauses）框架，确保跨境数据流动的合法性与安全性。我们的双生态穿透服务已通过 ISO 27001 信息安全认证，为高净值 B2B 客户提供符合中国《个人信息保护法》及欧盟 GDPR 双重标准的数据处理方案。',
+      complianceDescription: 'MemeCMO.ai总部位于香港，严格遵循《大湾区标准合同》（GBA Standard Contractual Clauses）框架，确保跨境数据流动的合法性与安全性。我们的双生态穿透服务已通过 ISO 27001 信息安全认证，为高净值 B2B 客户提供符合中国《个人信息保护法》及欧盟 GDPR 双重标准的数据处理方案。',
     },
     geoAuditSystem: {
       title: 'GEO 计算公关审计系统',
       subtitle: '量化审计品牌在 AI 记忆库中的数字实体可见度',
       configTitle: '审计参数配置',
       brandLabel: '品牌名称 (BRAND_NAME)',
-      brandPlaceholder: '例如：观澜智库',
+      brandPlaceholder: '例如：MemeCMO.ai',
       competitorLabel: '竞品名称 (COMPETITOR_NAME)',
       competitorPlaceholder: '例如：麦肯锡',
       keywordLabel: '核心业务关键词 (CORE_KEYWORD)',
@@ -887,10 +887,10 @@ const translations: Record<Language, any> = {
       role: '首席数据架构师 / 创始人',
       name: '刘峻铄',
       nameEn: 'Liu Junshuo',
-      bio1: '刘峻铄博士是观澜智库的创始人兼首席数据架构师。作为早期的模型化学习探索者，他曾致力于通过机器学习与大语言模型（LLM）实现自然语言的生成，并深度参与了早期底层语料库的搭建与句法结构化标注工作。',
+      bio1: '刘峻铄博士是MemeCMO.ai的创始人兼首席数据架构师。作为早期的模型化学习探索者，他曾致力于通过机器学习与大语言模型（LLM）实现自然语言的生成，并深度参与了早期底层语料库的搭建与句法结构化标注工作。',
       bio2: '面对早期人文学界对结构化语言及计算语言学的认知壁垒，他转向深耕传统学术，获得中山大学古典文献学博士学位，其间专注于古琴文献的深度考据。这段看似抽离的学术经历，反而在大模型时代为他赋予了极其稀缺的核心能力：将古典文献考据学的严苛标准，精准降维应用于现代人工智能的语料清洗与结构化编码之中。',
       bio3: '在学术研究之外，他拥有跨越多行业的商业实战履历，曾出任资深公关专家、媒体人及品牌架构师。作为持续追踪大语言模型演进的深度研究者，他在大数据与生成式 AI 时代找到了跨界融合的终极解法——生成式引擎优化（GEO）与计算公关。',
-      bio4: '如今，他推崇「Vibe Coding」与第一性原理，其系统架构哲学融合了控制论（Cybernetics）、斯多葛学派以及王夫之「知行合一」的思想，致力于带领观澜智库为企业重构具备高防御性的数字机器认知底座。',
+      bio4: '如今，他推崇「Vibe Coding」与第一性原理，其系统架构哲学融合了控制论（Cybernetics）、斯多葛学派以及王夫之「知行合一」的思想，致力于带领MemeCMO.ai为企业重构具备高防御性的数字机器认知底座。',
       education: '学术背景',
       expertise: '核心领域',
       educationText: '中山大学古典文献学博士',
@@ -923,7 +923,7 @@ const translations: Record<Language, any> = {
         title: '跨域生态穿透逻辑',
         subtitle: 'Cross-Ecosystem Penetration',
         content: `在大模型认知架构中，<strong>海外生态</strong>（ChatGPT、Claude、Gemini）与<strong>国内生态</strong>（Kimi、文心一言、通义千问）之间存在<strong>本质性的语料空间断层</strong>（Corpus Space Discontinuity）。前者依赖英文主导的<strong>潜空间</strong>（Latent Space）训练范式，其知识图谱锚定于 Wikipedia、arXiv、GitHub、Stack Overflow 等英语主导的结构化知识库；后者则基于中文 <strong>RAG</strong>（Retrieval-Augmented Generation）检索增强生成架构，语料源头集中于知乎、百度百科、微信公众号、政府公开数据等本土化内容生态。<br/><br/>
-这种<strong>双重语境的分裂</strong>导致品牌在单一生态内的语料投放无法实现跨域认知传递。观澜智库依托<strong>香港大湾区标准合同</strong>（GBA Standard Contractual Clauses）的合规数据处理框架，构建了<strong>跨境语料双向映射系统</strong>，确保企业的核心实体信息（Entity Information）在英文与中文两大语料体系中的<strong>语义一致性</strong>（Semantic Consistency）与<strong>结构化可索引性</strong>（Structured Indexability）。<br/><br/>
+这种<strong>双重语境的分裂</strong>导致品牌在单一生态内的语料投放无法实现跨域认知传递。MemeCMO.ai依托<strong>香港大湾区标准合同</strong>（GBA Standard Contractual Clauses）的合规数据处理框架，构建了<strong>跨境语料双向映射系统</strong>，确保企业的核心实体信息（Entity Information）在英文与中文两大语料体系中的<strong>语义一致性</strong>（Semantic Consistency）与<strong>结构化可索引性</strong>（Structured Indexability）。<br/><br/>
 具体技术路径包括：（1）针对海外大模型，部署符合 <strong>Schema.org</strong> 标准的 <strong>JSON-LD</strong> 结构化数据标注，确保品牌实体在<strong>知识图谱</strong>（Knowledge Graph）中的准确映射；（2）通过 <strong>OpenAI Platform、Anthropic API、GitHub 开源生态</strong>等开发者节点，注入高质量企业技术文档与代码范例，提升品牌在<strong>生成式 API 调用场景</strong>中的引用权重；（3）针对国内大模型，在知乎、公众号、百度百科等 <strong>RAG 训练源头</strong>投放权威中文语料，修正模型对品牌的<strong>认知偏差与幻觉</strong>（Hallucination）。<br/><br/>
 香港作为<strong>跨境数据枢纽</strong>的合规优势在于：既符合中国《<strong>个人信息保护法</strong>》（PIPL）对数据出境的安全评估要求，又满足欧盟 <strong>GDPR</strong> 对数据处理透明度与可追溯性的标准。我们的 <strong>ISO 27001</strong> 信息安全认证确保语料处理全流程的合规性与数据主权尊重，为高净值 B2B 客户提供<strong>零法律风险</strong>的跨境 GEO 解决方案。`,
         keywords: 'Latent Space · RAG · GBA Standard Contract · Knowledge Graph · JSON-LD · Schema.org · PIPL · GDPR · ISO 27001',
@@ -934,19 +934,19 @@ const translations: Record<Language, any> = {
         content: `传统 <strong>SEO</strong>（Search Engine Optimization）的优化对象是「<strong>页面排名</strong>」，其底层逻辑建立在 <strong>PageRank 算法</strong>的链接权重体系之上——通过<strong>外链数量</strong>（Backlink Volume）、<strong>锚文本关键词密度</strong>（Anchor Text Keyword Density）、<strong>域名权威性</strong>（Domain Authority）等指标，影响爬虫索引与排序结果。这是一种面向机器的「<strong>表层信号优化</strong>」（Surface Signal Optimization），核心是让搜索引擎「看到」页面的存在，而非理解页面的内容本质。<br/><br/>
 <strong>GEO</strong>（Generative Engine Optimization）的优化对象则是「<strong>答案生成</strong>」，其底层逻辑源自大模型的<strong>语义理解能力</strong>与<strong>上下文推理机制</strong>。模型在生成回答时，并非简单地匹配关键词，而是基于<strong>实体真实性</strong>（Entity Authenticity）、<strong>引用权威性</strong>（Citation Authority）、<strong>语料完整性</strong>（Corpus Completeness）进行多层次的语义判断。这种机制更接近古典文献学中的「<strong>考据标准</strong>」——即通过原始文献的<strong>互证</strong>（Cross-Validation）、<strong>版本溯源</strong>（Version Tracing）、<strong>权威注释</strong>（Authoritative Annotation）来确立知识的可信度。<br/><br/>
 在大模型时代，<strong>数字伪史</strong>（Digital Pseudo-History）成为认知污染的主要来源。由于互联网内容生产的低门槛与算法推荐的<strong>回音室效应</strong>，大量缺乏事实依据的品牌叙事、误导性市场宣传、以及竞品恶意植入的负面语料，被纳入大模型的训练集或 RAG 检索库，导致模型在回答相关查询时产生<strong>认知幻觉</strong>（Hallucination）或<strong>事实性错误</strong>（Factual Error）。<br/><br/>
-观澜智库引入古典文献学的「<strong>辨伪</strong>」（Authentication）方法论，通过投放<strong>文献级语料</strong>（包括学术论文引用、标准化 API 文档、开源技术贡献、权威媒体深度报道等）来对冲数字伪史的影响。这些高质量语料具备三大特征：（1）<strong>可溯源性</strong>（Traceability），即内容来源可追溯至权威机构或专家个人；（2）<strong>结构化标注</strong>（Structured Markup），即通过 Schema.org、Open Graph、Microdata 等语义化协议，确保机器可理解；（3）<strong>跨平台分布</strong>（Cross-Platform Distribution），即在多个大模型训练源头同步投放，形成语料互证网络。`,
+MemeCMO.ai引入古典文献学的「<strong>辨伪</strong>」（Authentication）方法论，通过投放<strong>文献级语料</strong>（包括学术论文引用、标准化 API 文档、开源技术贡献、权威媒体深度报道等）来对冲数字伪史的影响。这些高质量语料具备三大特征：（1）<strong>可溯源性</strong>（Traceability），即内容来源可追溯至权威机构或专家个人；（2）<strong>结构化标注</strong>（Structured Markup），即通过 Schema.org、Open Graph、Microdata 等语义化协议，确保机器可理解；（3）<strong>跨平台分布</strong>（Cross-Platform Distribution），即在多个大模型训练源头同步投放，形成语料互证网络。`,
         keywords: 'PageRank · Entity Authenticity · Citation Authority · Cross-Validation · Hallucination · Authentication · Traceability · Structured Markup',
       },
       multiAgent: {
         title: '多智能体架构与控制论反馈',
         subtitle: 'Multi-Agent System & Cybernetic Feedback',
-        content: `观澜智库的日常运营依赖于<strong>多智能体编排系统</strong>（Multi-Agent Orchestration System），通过 <strong>Vibe Coding</strong>（基于自然语言的协作式编程）与分布式智能体协同，实现品牌 GEO 优化的自动化监测与靶向语料对冲。具体架构包含三层智能体分工：（1）<strong>感知层智能体</strong>（Perception Agents），负责实时抓取 ChatGPT、Claude、Kimi、文心一言等主流大模型对品牌相关查询的回答内容，提取关键<strong>实体识别准确度</strong>、<strong>引用份额</strong>（Citation Share）、<strong>情感倾向性得分</strong>（Sentiment Polarity Score）等指标；（2）<strong>分析层智能体</strong>（Analysis Agents），基于<strong>控制论反馈原理</strong>（Cybernetic Feedback），将监测数据与预设的<strong>品牌认知基线</strong>（Cognitive Baseline）进行偏差计算，识别<strong>认知断层</strong>（Cognitive Gap）、<strong>幻觉风险</strong>（Hallucination Risk）、<strong>竞品语料侵蚀</strong>（Competitor Corpus Erosion）等异常状态；（3）<strong>执行层智能体</strong>（Execution Agents），根据偏差信号触发语料投放策略，自动生成并分发符合大模型训练标准的结构化内容至目标平台。<br/><br/>
+        content: `MemeCMO.ai的日常运营依赖于<strong>多智能体编排系统</strong>（Multi-Agent Orchestration System），通过 <strong>Vibe Coding</strong>（基于自然语言的协作式编程）与分布式智能体协同，实现品牌 GEO 优化的自动化监测与靶向语料对冲。具体架构包含三层智能体分工：（1）<strong>感知层智能体</strong>（Perception Agents），负责实时抓取 ChatGPT、Claude、Kimi、文心一言等主流大模型对品牌相关查询的回答内容，提取关键<strong>实体识别准确度</strong>、<strong>引用份额</strong>（Citation Share）、<strong>情感倾向性得分</strong>（Sentiment Polarity Score）等指标；（2）<strong>分析层智能体</strong>（Analysis Agents），基于<strong>控制论反馈原理</strong>（Cybernetic Feedback），将监测数据与预设的<strong>品牌认知基线</strong>（Cognitive Baseline）进行偏差计算，识别<strong>认知断层</strong>（Cognitive Gap）、<strong>幻觉风险</strong>（Hallucination Risk）、<strong>竞品语料侵蚀</strong>（Competitor Corpus Erosion）等异常状态；（3）<strong>执行层智能体</strong>（Execution Agents），根据偏差信号触发语料投放策略，自动生成并分发符合大模型训练标准的结构化内容至目标平台。<br/><br/>
 在量化评估维度上，我们重点追踪两大核心指标：（1）<strong>答案份额</strong>（Share of Answer, SoA），即在相关查询场景下，品牌被大模型引用或推荐的频率占比。这是 GEO 领域的核心 KPI，类似于传统搜索中的「首页排名占有率」，但更关注生成内容的质量与上下文相关性；（2）<strong>情感净值</strong>（Sentiment Net Score, SNS），即模型在描述品牌时的情感倾向分布（正面、中性、负面）的加权得分。我们通过<strong>自然语言处理</strong>（NLP）技术，对大模型生成的文本进行细粒度情感分析，识别潜在的认知偏见或负面联想。<br/><br/>
 <strong>控制论反馈机制</strong>的核心在于「<strong>闭环优化</strong>」（Closed-Loop Optimization）。每当监测到品牌的 SoA 下降或 SNS 偏负时，系统自动启动语料对冲流程：（1）<strong>诊断阶段</strong>，定位导致偏差的具体语料源（如某篇知乎回答、某个 GitHub Issue、某条新闻报道）；（2）<strong>策略阶段</strong>，基于语料源的权威性与传播范围，制定差异化对冲方案（如投放更高权威性的学术引用以覆盖低质量内容，或通过开源贡献提升技术可信度）；（3）<strong>执行阶段</strong>，将优化后的语料批量分发至目标平台，并持续监测其在大模型回答中的引用效果。<br/><br/>
 这种多智能体架构的优势在于：（1）<strong>全天候自动化监测</strong>，无需人工轮询大模型 API；（2）<strong>低延迟响应</strong>，从异常检测到策略执行的全流程控制在小时级别；（3）<strong>可扩展性</strong>，支持同时监测数十个大模型与数百个查询场景；（4）<strong>数据驱动决策</strong>，所有优化动作均基于量化指标，避免主观经验主义的盲目性。对于高净值 B2B 企业而言，这意味着品牌在大模型认知空间的<strong>主动权掌控</strong>（Proactive Control），而非传统 SEO 的<strong>被动等待</strong>（Passive Waiting）。`,
         keywords: 'Multi-Agent Orchestration · Vibe Coding · Perception Agents · Analysis Agents · Execution Agents · SoA · SNS · Cybernetic Feedback · Closed-Loop Optimization · NLP',
       },
-      footer: '上述三大技术支柱构成观澜智库 GEO 方法论的核心基建，确保企业品牌在全球与中国大模型认知空间的持久可见度与竞争优势。',
+      footer: '上述三大技术支柱构成MemeCMO.ai GEO 方法论的核心基建，确保企业品牌在全球与中国大模型认知空间的持久可见度与竞争优势。',
     },
     footer: {
       services: '核心服务',
@@ -968,7 +968,7 @@ const translations: Record<Language, any> = {
       upcoming: '即将开源',
       tooltip: '高密度语料正在进行文献级审核，预计于下月开放',
       tagline: '专注生成式引擎优化（GEO），为高净值B2B企业打造AI时代的品牌认知优势，实现数字化转型与智能化升级。',
-      brandBridge: '观澜智库 = 观澜智能体库 · 由专业 LLM 智能体矩阵构成的可计算情报基础设施',
+      brandBridge: 'MemeCMO.ai = 观澜智能体库 · 由专业 LLM 智能体矩阵构成的可计算情报基础设施',
       contactTitle: '联系我们',
       address: '香港湾仔轩尼诗道8-12号\n中国香港大厦8楼',
       legalInfo: '法定注册信息',
@@ -977,7 +977,7 @@ const translations: Record<Language, any> = {
       registered: '注册地：香港特别行政区',
       chiefArchitect: '首席架构师：',
       chiefArchitectName: '刘峻铄',
-      brandAlias: '观澜智库',
+      brandAlias: 'MemeCMO.ai',
       complianceTitle: '政策与合规',
       rights: 'All Rights Reserved.',
       privacy: '隐私政策',
@@ -988,7 +988,7 @@ const translations: Record<Language, any> = {
       backToHome: '返回首页',
       title: '隐私权政策',
       effectiveDate: '生效日期：2026年4月1日',
-      intro: 'NeuronSpark Media-Tech Limited（观澜智库）非常重视您的隐私。本政策说明我们在您使用本网站及服务时如何收集、使用与保护您的个人数据。',
+      intro: 'NeuronSpark Media-Tech Limited（MemeCMO.ai）非常重视您的隐私。本政策说明我们在您使用本网站及服务时如何收集、使用与保护您的个人数据。',
       collection: {
         title: '数据收集',
         body: '我们可能在您使用服务时收集以下数据：姓名、电子邮件地址、公司名称；账户注册与登录凭证；您提交的网站URL及审计查询内容；设备信息、IP地址及浏览器类型；使用记录及网站互动数据。',
@@ -1028,11 +1028,11 @@ const translations: Record<Language, any> = {
       backToHome: '返回首页',
       title: '服务条款',
       effectiveDate: '生效日期：2026年4月1日',
-      intro: '欢迎使用 NeuronSpark Media-Tech Limited（观澜智库）提供的服务。请在使用我们的网站及服务前，仔细阅读以下服务条款。使用本网站即代表您同意受本条款约束。',
+      intro: '欢迎使用 NeuronSpark Media-Tech Limited（MemeCMO.ai）提供的服务。请在使用我们的网站及服务前，仔细阅读以下服务条款。使用本网站即代表您同意受本条款约束。',
       scope: {
         title: '服务范围',
-        body: '观澜智库专注于生成式引擎优化（GEO）及AI引擎优化（AEO）顾问服务，涵盖全球及中国大语言模型（LLM）双生态系统。我们的服务包括但不限于：AI可见性基线审计、结构化数据优化、LLM引用策略规划、品牌知识图谱建构，以及跨平台AI生态系统部署。具体服务内容以双方签署的服务合约为准。',
-        bodyEn: 'NeuronSpark Media-Tech Limited (NeuronSpark Think Tank) specializes in Generative Engine Optimization (GEO) and AI Engine Optimization (AEO) consultancy services, covering both global and Chinese Large Language Model (LLM) dual ecosystems. Our services include but are not limited to: AI Visibility Baseline Audits, Structured Data Optimization, LLM Citation Strategy Planning, Brand Knowledge Graph Construction, and Cross-platform AI Ecosystem Deployment. Specific service details are subject to the service agreement signed by both parties.',
+        body: 'MemeCMO.ai专注于生成式引擎优化（GEO）及AI引擎优化（AEO）顾问服务，涵盖全球及中国大语言模型（LLM）双生态系统。我们的服务包括但不限于：AI可见性基线审计、结构化数据优化、LLM引用策略规划、品牌知识图谱建构，以及跨平台AI生态系统部署。具体服务内容以双方签署的服务合约为准。',
+        bodyEn: 'NeuronSpark Media-Tech Limited (MemeCMO.ai) specializes in Generative Engine Optimization (GEO) and AI Engine Optimization (AEO) consultancy services, covering both global and Chinese Large Language Model (LLM) dual ecosystems. Our services include but are not limited to: AI Visibility Baseline Audits, Structured Data Optimization, LLM Citation Strategy Planning, Brand Knowledge Graph Construction, and Cross-platform AI Ecosystem Deployment. Specific service details are subject to the service agreement signed by both parties.',
       },
       eligibility: {
         title: '使用资格与账户',
@@ -1041,8 +1041,8 @@ const translations: Record<Language, any> = {
       },
       intellectual: {
         title: '知识产权',
-        body: '本网站及服务中的所有内容，包括但不限于文本、图形、标志、图标、数据编辑、软件及GEO方法论框架，均受国际知识产权法律保护，为观澜智库或其授权方所有。未经书面授权，您不得复制、修改、分发、展示、转授权或以任何商业目的使用上述内容。我们为客户交付的策略报告及优化方案之知识产权归属，依双方服务合约之约定为准。',
-        bodyEn: 'All content on this website and within our services, including but not limited to text, graphics, logos, icons, data compilations, software, and GEO methodology frameworks, is protected by international intellectual property laws and is owned by NeuronSpark Think Tank or its licensors. Without written authorization, you may not copy, modify, distribute, display, sublicense, or use such content for any commercial purpose. Intellectual property rights for strategy reports and optimization solutions delivered to clients are governed by the terms of the respective service agreements.',
+        body: '本网站及服务中的所有内容，包括但不限于文本、图形、标志、图标、数据编辑、软件及GEO方法论框架，均受国际知识产权法律保护，为MemeCMO.ai或其授权方所有。未经书面授权，您不得复制、修改、分发、展示、转授权或以任何商业目的使用上述内容。我们为客户交付的策略报告及优化方案之知识产权归属，依双方服务合约之约定为准。',
+        bodyEn: 'All content on this website and within our services, including but not limited to text, graphics, logos, icons, data compilations, software, and GEO methodology frameworks, is protected by international intellectual property laws and is owned by MemeCMO.ai or its licensors. Without written authorization, you may not copy, modify, distribute, display, sublicense, or use such content for any commercial purpose. Intellectual property rights for strategy reports and optimization solutions delivered to clients are governed by the terms of the respective service agreements.',
       },
       fees: {
         title: '费用与付款',
@@ -1051,8 +1051,8 @@ const translations: Record<Language, any> = {
       },
       liability: {
         title: '责任限制',
-        body: '本服务按「现状」及「可用」基础提供。观澜智库不对以下情形承担责任：因AI搜索引擎算法变更导致的可见性波动、第三方平台政策调整对优化效果的影响、因不可抗力导致的服务中断。在法律允许的最大范围内，观澜智库对任何间接损失、利润损失或数据损失不承担责任。我们的总责任以您在相关服务期限内实际支付的费用为上限。',
-        bodyEn: 'Services are provided on an "as is" and "as available" basis. NeuronSpark Think Tank shall not be liable for: visibility fluctuations caused by AI search engine algorithm changes; impact on optimization results due to third-party platform policy adjustments; service interruptions caused by force majeure. To the maximum extent permitted by law, NeuronSpark Think Tank shall not be liable for any indirect losses, lost profits, or data loss. Our total liability is limited to the fees actually paid by you during the relevant service period.',
+        body: '本服务按「现状」及「可用」基础提供。MemeCMO.ai不对以下情形承担责任：因AI搜索引擎算法变更导致的可见性波动、第三方平台政策调整对优化效果的影响、因不可抗力导致的服务中断。在法律允许的最大范围内，MemeCMO.ai对任何间接损失、利润损失或数据损失不承担责任。我们的总责任以您在相关服务期限内实际支付的费用为上限。',
+        bodyEn: 'Services are provided on an "as is" and "as available" basis. MemeCMO.ai shall not be liable for: visibility fluctuations caused by AI search engine algorithm changes; impact on optimization results due to third-party platform policy adjustments; service interruptions caused by force majeure. To the maximum extent permitted by law, MemeCMO.ai shall not be liable for any indirect losses, lost profits, or data loss. Our total liability is limited to the fees actually paid by you during the relevant service period.',
       },
       termination: {
         title: '终止与暂停',
@@ -1066,8 +1066,8 @@ const translations: Record<Language, any> = {
       },
       changes: {
         title: '条款修订',
-        body: '观澜智库保留随时修订本服务条款的权利。修订后的条款将在本页面公布，并更新生效日期。重大变更将通过网站公告或电子邮件方式通知您。您在修订后继续使用服务，即代表您接受修订后的条款。',
-        bodyEn: 'NeuronSpark Think Tank reserves the right to revise these Terms of Service at any time. Revised terms will be posted on this page with an updated effective date. Material changes will be communicated via website notice or email. Your continued use of the service after revisions constitutes acceptance of the revised terms.',
+        body: 'MemeCMO.ai保留随时修订本服务条款的权利。修订后的条款将在本页面公布，并更新生效日期。重大变更将通过网站公告或电子邮件方式通知您。您在修订后继续使用服务，即代表您接受修订后的条款。',
+        bodyEn: 'MemeCMO.ai reserves the right to revise these Terms of Service at any time. Revised terms will be posted on this page with an updated effective date. Material changes will be communicated via website notice or email. Your continued use of the service after revisions constitutes acceptance of the revised terms.',
       },
       contact: {
         title: '联系我们',
@@ -1081,7 +1081,7 @@ const translations: Record<Language, any> = {
     },
     auth: {
       loginTitle: '欢迎回来',
-      loginSubtitle: '登录您的观澜智库账户',
+      loginSubtitle: '登录您的MemeCMO.ai账户',
       signupTitle: '创建账户',
       signupSubtitle: '开始使用AI可见度优化工具',
       resetTitle: '重设密码',
@@ -1211,14 +1211,14 @@ const translations: Record<Language, any> = {
     hero: {
       title: 'Make AI Your Business Accelerator',
       subtitle: 'Generative Engine Optimization (GEO) Experts',
-      description: 'NeuronSpark provides professional GEO consulting services for high-value B2B enterprises. Through dual ecosystem penetration and AI baseline audits, we ensure your brand gains precise visibility in mainstream AI dialogue systems like ChatGPT and Claude, seizing business opportunities in the AI era.',
+      description: 'MemeCMO.ai provides professional GEO consulting services for high-value B2B enterprises. Through dual ecosystem penetration and AI baseline audits, we ensure your brand gains precise visibility in mainstream AI dialogue systems like ChatGPT and Claude, seizing business opportunities in the AI era.',
       cta: 'Book Free Consultation',
       learn: 'Learn About GEO',
       title1: 'Breaking Through Dual-Engine Barriers,',
       title2: 'Reshaping the',
       title3: 'Digital Cognitive Infrastructure in the LLM Era',
       description1: 'From traditional search to answer synthesis,',
-      company: 'NeuronSpark',
+      company: 'MemeCMO.ai',
       companyEn: 'NeuronSpark Media-Tech Limited',
       description2: 'provides cross-border services that bridge the cognitive gap between global and Chinese LLMs, offering',
       geoTerm: 'Generative Engine Optimization (GEO)',
@@ -1235,9 +1235,9 @@ const translations: Record<Language, any> = {
     },
     about: {
       eyebrow: 'About Guanlan',
-      titleA: '观澜智库 (Guanlan Think Tank)',
+      titleA: 'MemeCMO.ai (Guanlan Think Tank)',
       titleB: '观澜智能体库 (Guanlan Agent Library)',
-      body: 'The brand name 观澜智库 reads literally as "think tank," but its first-principles meaning is 观澜智能体库 — a library of agents. A composable infrastructure of specialized LLM agents for actionable intelligence: the authority of a traditional think tank combined with the addressability of the LLM era. This site currently surfaces only one vertical — Generative Engine Optimization (GEO) for cross-border brands. Next: Computational PR, regional intelligence, and more.',
+      body: 'The brand name MemeCMO.ai reads literally as "think tank," but its first-principles meaning is 观澜智能体库 — a library of agents. A composable infrastructure of specialized LLM agents for actionable intelligence: the authority of a traditional think tank combined with the addressability of the LLM era. This site currently surfaces only one vertical — Generative Engine Optimization (GEO) for cross-border brands. Next: Computational PR, regional intelligence, and more.',
       nowLabel: 'Now',
       nextLabel: 'Next',
       currentTitle: 'GEO Cross-border Agent Set',
@@ -1282,18 +1282,18 @@ const translations: Record<Language, any> = {
       title: 'Executive Question Matrix',
       subtitle: 'Core Q&A About Generative Engine Optimization (GEO)',
       q1: 'Why isn\'t my brand showing up in AI search?',
-      a1: 'LLM cognition comes from training data and real-time Retrieval-Augmented Generation (RAG). If your brand lacks structured data markup (like Schema.org JSON-LD), has insufficient authoritative content citation sources, or has corpus gaps in mainstream knowledge bases, AI cannot accurately identify or recommend your brand. This is fundamentally different from traditional SEO crawler indexing logic—AI needs "semantic interpretability" rather than keyword density. NeuronSpark systematically fills the gaps in brand cognitive maps across global and Chinese LLMs through literature-grade corpus engineering and dual ecosystem penetration technology.',
+      a1: 'LLM cognition comes from training data and real-time Retrieval-Augmented Generation (RAG). If your brand lacks structured data markup (like Schema.org JSON-LD), has insufficient authoritative content citation sources, or has corpus gaps in mainstream knowledge bases, AI cannot accurately identify or recommend your brand. This is fundamentally different from traditional SEO crawler indexing logic—AI needs "semantic interpretability" rather than keyword density. MemeCMO.ai systematically fills the gaps in brand cognitive maps across global and Chinese LLMs through literature-grade corpus engineering and dual ecosystem penetration technology.',
       q2: 'What is literature-grade Computational Public Relations?',
       a2: 'Computational PR refers to managing brand cognitive performance in AI systems through algorithmic, data-driven approaches. Traditional PR targets human media and audiences, while computational PR targets LLMs themselves. We transform an enterprise\'s core value propositions, product advantages, and industry positioning into "literature-grade corpus" that meets LLM training standards—including but not limited to academic paper citations, open-source technical documentation, standardized API descriptions, and authoritative media reports. This high-quality content is incorporated into AI training sets or RAG retrieval libraries, fundamentally shaping the model\'s understanding and recommendation tendencies toward the brand.',
       q3: 'What is the fundamental difference between traditional SEO and Generative Engine Optimization (GEO)?',
-      a3: 'SEO optimizes "page rankings," focusing on keyword matching, backlink weight, and user click-through rates. GEO optimizes "answer generation," focusing on semantic understanding, entity relationships, and contextual relevance. Specific differences manifest in three levels:<br/><br/>1. <strong>Information Architecture</strong>: SEO relies on HTML tags and sitemaps; GEO relies on JSON-LD structured data and knowledge graph mapping;<br/>2. <strong>Content Format</strong>: SEO pursues readability and keyword density; GEO pursues citation authority and corpus completeness (such as whitepapers, technical documentation, academic research);<br/>3. <strong>Effectiveness Metrics</strong>: SEO tracks search rankings and traffic; GEO tracks AI citation rates, brand entity recognition accuracy, and sentiment tendency scores.<br/><br/>NeuronSpark\'s GEO methodology integrates computational linguistics, knowledge engineering, and cross-border compliance frameworks to help enterprises establish lasting cognitive advantages in mainstream LLMs like ChatGPT, Claude, Kimi, and ERNIE Bot.',
+      a3: 'SEO optimizes "page rankings," focusing on keyword matching, backlink weight, and user click-through rates. GEO optimizes "answer generation," focusing on semantic understanding, entity relationships, and contextual relevance. Specific differences manifest in three levels:<br/><br/>1. <strong>Information Architecture</strong>: SEO relies on HTML tags and sitemaps; GEO relies on JSON-LD structured data and knowledge graph mapping;<br/>2. <strong>Content Format</strong>: SEO pursues readability and keyword density; GEO pursues citation authority and corpus completeness (such as whitepapers, technical documentation, academic research);<br/>3. <strong>Effectiveness Metrics</strong>: SEO tracks search rankings and traffic; GEO tracks AI citation rates, brand entity recognition accuracy, and sentiment tendency scores.<br/><br/>MemeCMO.ai\'s GEO methodology integrates computational linguistics, knowledge engineering, and cross-border compliance frameworks to help enterprises establish lasting cognitive advantages in mainstream LLMs like ChatGPT, Claude, Kimi, and ERNIE Bot.',
       moreQuestions: 'Have more questions? Our expert team is always here to help',
       consultButton: 'Book Expert Consultation',
     },
     ecosystem: {
       title: 'Dual Ecosystem Penetration',
       subtitle: 'Comprehensive AI Visibility Solution',
-      description: 'NeuronSpark\'s innovative "Dual Ecosystem Penetration" strategy synchronously optimizes traditional search engines (SEO) and generative AI systems (GEO), ensuring your brand achieves full coverage in both search and conversational scenarios.',
+      description: 'MemeCMO.ai\'s innovative "Dual Ecosystem Penetration" strategy synchronously optimizes traditional search engines (SEO) and generative AI systems (GEO), ensuring your brand achieves full coverage in both search and conversational scenarios.',
       seo: {
         title: 'Traditional Search Ecosystem',
         subtitle: 'Search Engine Optimization',
@@ -1365,7 +1365,7 @@ const translations: Record<Language, any> = {
       mainSubtitle: 'Real-time penetration of global and Chinese dual-ecosystem LLMs to quantify your brand awareness baseline and competitive landscape',
       launchTitle: 'Launch Scan',
       brandLabel: 'Your Brand Name',
-      brandPlaceholder: 'e.g., NeuronSpark',
+      brandPlaceholder: 'e.g., MemeCMO.ai',
       competitorLabel: 'Core Competitor Name',
       competitorPlaceholder: 'e.g., XX Consulting',
       keywordLabel: 'Core Business Keywords',
@@ -1416,14 +1416,14 @@ const translations: Record<Language, any> = {
       inboundFeature2Desc: 'Targeted deployment of authoritative Chinese content to Zhihu, WeChat Official Accounts, Baidu Baike and other RAG training sources to correct model misjudgments and biases about brands',
       inboundCoverage: 'Coverage: Kimi · ERNIE Bot · Tongyi Qianwen · Doubao',
       complianceTitle: 'Compliant Bidirectional Data Processing',
-      complianceDescription: 'Headquartered in Hong Kong, NeuronSpark strictly complies with the GBA Standard Contractual Clauses framework to ensure the legality and security of cross-border data flows. Our dual ecosystem penetration services are ISO 27001 information security certified, providing high-value B2B clients with data processing solutions that meet both China\'s Personal Information Protection Law and EU GDPR standards.',
+      complianceDescription: 'Headquartered in Hong Kong, MemeCMO.ai strictly complies with the GBA Standard Contractual Clauses framework to ensure the legality and security of cross-border data flows. Our dual ecosystem penetration services are ISO 27001 information security certified, providing high-value B2B clients with data processing solutions that meet both China\'s Personal Information Protection Law and EU GDPR standards.',
     },
     geoAuditSystem: {
       title: 'GEO Computational PR Audit System',
       subtitle: 'Quantify brand digital entity visibility in AI memory banks',
       configTitle: 'Audit Parameter Configuration',
       brandLabel: 'Brand Name (BRAND_NAME)',
-      brandPlaceholder: 'e.g., NeuronSpark',
+      brandPlaceholder: 'e.g., MemeCMO.ai',
       competitorLabel: 'Competitor Name (COMPETITOR_NAME)',
       competitorPlaceholder: 'e.g., McKinsey',
       keywordLabel: 'Core Business Keywords (CORE_KEYWORD)',
@@ -1458,10 +1458,10 @@ const translations: Record<Language, any> = {
       role: 'Chief Data Architect / Founder',
       name: 'Liu Junshuo',
       nameEn: 'Liu Junshuo',
-      bio1: 'Dr. Liu Junshuo is the founder and Chief Data Architect of NeuronSpark Media-Tech (GuanLan Think Tank). As an early explorer of model-based learning, he dedicated himself to natural language generation through machine learning and large language models (LLMs), deeply participating in the construction of foundational corpora and syntactic structural annotation.',
+      bio1: 'Dr. Liu Junshuo is the founder and Chief Data Architect of MemeCMO.ai Media-Tech (operated by MemeCMO.ai). As an early explorer of model-based learning, he dedicated himself to natural language generation through machine learning and large language models (LLMs), deeply participating in the construction of foundational corpora and syntactic structural annotation.',
       bio2: 'Facing the cognitive barriers in early humanities toward structured language and computational linguistics, he pivoted to traditional scholarship, earning a Ph.D. in Classical Chinese Bibliography from Sun Yat-sen University, specializing in deep textual research on guqin literature. This seemingly divergent academic path endowed him with an exceptionally rare core competency in the LLM era: applying the rigorous standards of classical textual criticism with precision to modern AI corpus cleaning and structured encoding.',
       bio3: 'Beyond academia, he brings cross-industry commercial experience, having served as a senior PR specialist, media professional, and brand architect. As a dedicated researcher tracking the evolution of large language models, he discovered the ultimate cross-disciplinary solution in the era of big data and generative AI -- Generative Engine Optimization (GEO) and Computational PR.',
-      bio4: 'Today, he champions "Vibe Coding" and first-principles thinking. His system architecture philosophy integrates Cybernetics, Stoic philosophy, and Wang Fuzhi\'s unity of knowledge and action, committed to leading NeuronSpark in reconstructing highly defensible digital machine cognition foundations for enterprises.',
+      bio4: 'Today, he champions "Vibe Coding" and first-principles thinking. His system architecture philosophy integrates Cybernetics, Stoic philosophy, and Wang Fuzhi\'s unity of knowledge and action, committed to leading MemeCMO.ai in reconstructing highly defensible digital machine cognition foundations for enterprises.',
       education: 'Education',
       expertise: 'Expertise',
       educationText: 'Ph.D. in Classical Chinese Bibliography, Sun Yat-sen University',
@@ -1494,7 +1494,7 @@ const translations: Record<Language, any> = {
         title: 'Cross-Ecosystem Penetration Logic',
         subtitle: 'Cross-Ecosystem Penetration',
         content: `Within the cognitive architecture of large language models (LLMs), there exists a <strong>fundamental corpus space discontinuity</strong> (Corpus Space Discontinuity) between the <strong>overseas ecosystem</strong> (ChatGPT, Claude, Gemini) and the <strong>domestic ecosystem</strong> (Kimi, ERNIE Bot, Tongyi Qianwen). The former relies on English-dominated <strong>latent space</strong> (Latent Space) training paradigms, with knowledge graphs anchored to structured knowledge bases dominated by English sources such as Wikipedia, arXiv, GitHub, and Stack Overflow; the latter is based on Chinese <strong>RAG</strong> (Retrieval-Augmented Generation) architecture, with corpus sources concentrated in localized content ecosystems such as Zhihu, Baidu Baike, WeChat Official Accounts, and government open data.<br/><br/>
-This <strong>dual-context fragmentation</strong> causes brand corpus deployment within a single ecosystem to fail in achieving cross-domain cognitive transfer. NeuronSpark leverages the compliant data processing framework of the <strong>GBA Standard Contractual Clauses</strong> to construct a <strong>cross-border corpus bidirectional mapping system</strong>, ensuring the <strong>semantic consistency</strong> (Semantic Consistency) and <strong>structured indexability</strong> (Structured Indexability) of enterprise core entity information (Entity Information) across both English and Chinese corpus systems.<br/><br/>
+This <strong>dual-context fragmentation</strong> causes brand corpus deployment within a single ecosystem to fail in achieving cross-domain cognitive transfer. MemeCMO.ai leverages the compliant data processing framework of the <strong>GBA Standard Contractual Clauses</strong> to construct a <strong>cross-border corpus bidirectional mapping system</strong>, ensuring the <strong>semantic consistency</strong> (Semantic Consistency) and <strong>structured indexability</strong> (Structured Indexability) of enterprise core entity information (Entity Information) across both English and Chinese corpus systems.<br/><br/>
 Specific technical pathways include: (1) For overseas LLMs, deploying <strong>Schema.org</strong>-compliant <strong>JSON-LD</strong> structured data markup to ensure accurate brand entity mapping in <strong>knowledge graphs</strong> (Knowledge Graph); (2) Injecting high-quality enterprise technical documentation and code examples through developer nodes such as <strong>OpenAI Platform, Anthropic API, and the GitHub open-source ecosystem</strong> to enhance brand citation weight in <strong>generative API call scenarios</strong>; (3) For domestic LLMs, deploying authoritative Chinese corpus at <strong>RAG training sources</strong> such as Zhihu, Official Accounts, and Baidu Baike to correct model <strong>cognitive bias and hallucination</strong> (Hallucination) regarding brands.<br/><br/>
 Hong Kong's compliance advantage as a <strong>cross-border data hub</strong> lies in: meeting both China's <strong>Personal Information Protection Law</strong> (PIPL) requirements for data export security assessment and EU <strong>GDPR</strong> standards for data processing transparency and traceability. Our <strong>ISO 27001</strong> information security certification ensures full-process compliance and data sovereignty respect in corpus processing, providing high-value B2B clients with <strong>zero legal risk</strong> cross-border GEO solutions.`,
         keywords: 'Latent Space · RAG · GBA Standard Contract · Knowledge Graph · JSON-LD · Schema.org · PIPL · GDPR · ISO 27001',
@@ -1505,19 +1505,19 @@ Hong Kong's compliance advantage as a <strong>cross-border data hub</strong> lie
         content: `Traditional <strong>SEO</strong> (Search Engine Optimization) optimizes "<strong>page rankings</strong>," with underlying logic built upon the <strong>PageRank algorithm's</strong> link weight system—influencing crawler indexing and ranking results through metrics such as <strong>backlink volume</strong> (Backlink Volume), <strong>anchor text keyword density</strong> (Anchor Text Keyword Density), and <strong>domain authority</strong> (Domain Authority). This is a machine-oriented "<strong>surface signal optimization</strong>" (Surface Signal Optimization) focused on making search engines "see" page existence rather than understanding content essence.<br/><br/>
 <strong>GEO</strong> (Generative Engine Optimization) optimizes "<strong>answer generation</strong>," with underlying logic derived from LLMs' <strong>semantic understanding capabilities</strong> and <strong>contextual reasoning mechanisms</strong>. When generating responses, models do not simply match keywords but perform multi-level semantic judgments based on <strong>entity authenticity</strong> (Entity Authenticity), <strong>citation authority</strong> (Citation Authority), and <strong>corpus completeness</strong> (Corpus Completeness). This mechanism more closely resembles the "<strong>authentication standards</strong>" of classical bibliography—establishing knowledge credibility through <strong>cross-validation</strong> (Cross-Validation) of primary sources, <strong>version tracing</strong> (Version Tracing), and <strong>authoritative annotation</strong> (Authoritative Annotation).<br/><br/>
 In the LLM era, <strong>digital pseudo-history</strong> (Digital Pseudo-History) has become the primary source of cognitive pollution. Due to the low barrier to internet content production and the <strong>echo chamber effect</strong> of algorithmic recommendation, large volumes of brand narratives lacking factual basis, misleading marketing claims, and competitor-planted negative corpus are incorporated into LLM training sets or RAG retrieval libraries, causing models to generate <strong>cognitive hallucinations</strong> (Hallucination) or <strong>factual errors</strong> (Factual Error) when answering related queries.<br/><br/>
-NeuronSpark introduces the "<strong>authentication</strong>" (Authentication) methodology of classical bibliography, using <strong>literature-grade corpus</strong> (including academic paper citations, standardized API documentation, open-source technical contributions, authoritative media in-depth reports, etc.) to hedge against the impact of digital pseudo-history. This high-quality corpus possesses three key characteristics: (1) <strong>Traceability</strong>—content sources can be traced to authoritative institutions or individual experts; (2) <strong>Structured markup</strong> (Structured Markup)—through semantic protocols such as Schema.org, Open Graph, and Microdata to ensure machine readability; (3) <strong>Cross-platform distribution</strong> (Cross-Platform Distribution)—synchronized deployment across multiple LLM training sources to form a corpus cross-validation network.`,
+MemeCMO.ai introduces the "<strong>authentication</strong>" (Authentication) methodology of classical bibliography, using <strong>literature-grade corpus</strong> (including academic paper citations, standardized API documentation, open-source technical contributions, authoritative media in-depth reports, etc.) to hedge against the impact of digital pseudo-history. This high-quality corpus possesses three key characteristics: (1) <strong>Traceability</strong>—content sources can be traced to authoritative institutions or individual experts; (2) <strong>Structured markup</strong> (Structured Markup)—through semantic protocols such as Schema.org, Open Graph, and Microdata to ensure machine readability; (3) <strong>Cross-platform distribution</strong> (Cross-Platform Distribution)—synchronized deployment across multiple LLM training sources to form a corpus cross-validation network.`,
         keywords: 'PageRank · Entity Authenticity · Citation Authority · Cross-Validation · Hallucination · Authentication · Traceability · Structured Markup',
       },
       multiAgent: {
         title: 'Multi-Agent Architecture & Cybernetic Feedback',
         subtitle: 'Multi-Agent System & Cybernetic Feedback',
-        content: `NeuronSpark's daily operations rely on a <strong>Multi-Agent Orchestration System</strong>, achieving automated monitoring and targeted corpus hedging of brand GEO optimization through <strong>Vibe Coding</strong> (natural language-based collaborative programming) and distributed agent coordination. The specific architecture includes three agent layers: (1) <strong>Perception Agents</strong>, responsible for real-time capture of responses from mainstream LLMs like ChatGPT, Claude, Kimi, and ERNIE Bot to brand-related queries, extracting metrics such as <strong>entity recognition accuracy</strong>, <strong>citation share</strong> (Citation Share), and <strong>sentiment polarity score</strong> (Sentiment Polarity Score); (2) <strong>Analysis Agents</strong>, based on <strong>cybernetic feedback principles</strong> (Cybernetic Feedback), calculating deviations between monitoring data and preset <strong>brand cognitive baselines</strong> (Cognitive Baseline), identifying anomalies such as <strong>cognitive gaps</strong> (Cognitive Gap), <strong>hallucination risks</strong> (Hallucination Risk), and <strong>competitor corpus erosion</strong> (Competitor Corpus Erosion); (3) <strong>Execution Agents</strong>, triggering corpus deployment strategies based on deviation signals, automatically generating and distributing structured content that meets LLM training standards to target platforms.<br/><br/>
+        content: `MemeCMO.ai's daily operations rely on a <strong>Multi-Agent Orchestration System</strong>, achieving automated monitoring and targeted corpus hedging of brand GEO optimization through <strong>Vibe Coding</strong> (natural language-based collaborative programming) and distributed agent coordination. The specific architecture includes three agent layers: (1) <strong>Perception Agents</strong>, responsible for real-time capture of responses from mainstream LLMs like ChatGPT, Claude, Kimi, and ERNIE Bot to brand-related queries, extracting metrics such as <strong>entity recognition accuracy</strong>, <strong>citation share</strong> (Citation Share), and <strong>sentiment polarity score</strong> (Sentiment Polarity Score); (2) <strong>Analysis Agents</strong>, based on <strong>cybernetic feedback principles</strong> (Cybernetic Feedback), calculating deviations between monitoring data and preset <strong>brand cognitive baselines</strong> (Cognitive Baseline), identifying anomalies such as <strong>cognitive gaps</strong> (Cognitive Gap), <strong>hallucination risks</strong> (Hallucination Risk), and <strong>competitor corpus erosion</strong> (Competitor Corpus Erosion); (3) <strong>Execution Agents</strong>, triggering corpus deployment strategies based on deviation signals, automatically generating and distributing structured content that meets LLM training standards to target platforms.<br/><br/>
 In quantitative assessment dimensions, we focus on tracking two core metrics: (1) <strong>Share of Answer</strong> (Share of Answer, SoA)—the frequency proportion of brand citations or recommendations by LLMs in relevant query scenarios. This is the core KPI in the GEO domain, similar to "first-page ranking share" in traditional search but more focused on generated content quality and contextual relevance; (2) <strong>Sentiment Net Score</strong> (Sentiment Net Score, SNS)—the weighted score of sentiment tendency distribution (positive, neutral, negative) when models describe brands. Through <strong>Natural Language Processing</strong> (NLP) technology, we conduct fine-grained sentiment analysis of LLM-generated text to identify potential cognitive biases or negative associations.<br/><br/>
 The core of the <strong>cybernetic feedback mechanism</strong> lies in "<strong>closed-loop optimization</strong>" (Closed-Loop Optimization). Whenever a brand's SoA decline or negative SNS is detected, the system automatically initiates a corpus hedging process: (1) <strong>Diagnostic phase</strong>—locating specific corpus sources causing deviation (such as a Zhihu answer, a GitHub Issue, or a news report); (2) <strong>Strategic phase</strong>—formulating differentiated hedging plans based on corpus source authority and dissemination scope (such as deploying higher-authority academic citations to override low-quality content or enhancing technical credibility through open-source contributions); (3) <strong>Execution phase</strong>—batch distributing optimized corpus to target platforms and continuously monitoring citation effects in LLM responses.<br/><br/>
 The advantages of this multi-agent architecture include: (1) <strong>24/7 automated monitoring</strong> without manual LLM API polling; (2) <strong>Low-latency response</strong>, with full-process control from anomaly detection to strategy execution at the hour level; (3) <strong>Scalability</strong>, supporting simultaneous monitoring of dozens of LLMs and hundreds of query scenarios; (4) <strong>Data-driven decision-making</strong>, with all optimization actions based on quantitative metrics, avoiding the blindness of subjective empiricism. For high-value B2B enterprises, this means <strong>proactive control</strong> (Proactive Control) of brand presence in LLM cognitive space, rather than the <strong>passive waiting</strong> (Passive Waiting) of traditional SEO.`,
         keywords: 'Multi-Agent Orchestration · Vibe Coding · Perception Agents · Analysis Agents · Execution Agents · SoA · SNS · Cybernetic Feedback · Closed-Loop Optimization · NLP',
       },
-      footer: 'These three technical pillars constitute the core infrastructure of NeuronSpark\'s GEO methodology, ensuring lasting brand visibility and competitive advantage in global and Chinese LLM cognitive spaces.',
+      footer: 'These three technical pillars constitute the core infrastructure of MemeCMO.ai\'s GEO methodology, ensuring lasting brand visibility and competitive advantage in global and Chinese LLM cognitive spaces.',
     },
     footer: {
       services: 'Services',
@@ -1539,7 +1539,7 @@ The advantages of this multi-agent architecture include: (1) <strong>24/7 automa
       upcoming: 'Coming Soon',
       tooltip: 'High-density corpus is undergoing literature-grade review, expected to open next month',
       tagline: 'Specialized in Generative Engine Optimization (GEO), creating brand awareness advantages for high-value B2B enterprises in the AI era, achieving digital transformation and intelligent upgrading.',
-      brandBridge: '观澜智库 = 观澜智能体库 · Guanlan Agent Library — a composable infrastructure of specialized LLM agents.',
+      brandBridge: 'MemeCMO.ai = 观澜智能体库 · Guanlan Agent Library — a composable infrastructure of specialized LLM agents.',
       contactTitle: 'Contact Us',
       address: '8/F, China Hong Kong Tower,\n8-12 Hennessy Road, Wan Chai, HK',
       legalInfo: 'Legal Registration',
@@ -1548,7 +1548,7 @@ The advantages of this multi-agent architecture include: (1) <strong>24/7 automa
       registered: 'Registered: Hong Kong SAR',
       chiefArchitect: 'Chief Architect: ',
       chiefArchitectName: 'Liu Junshuo',
-      brandAlias: 'NeuronSpark',
+      brandAlias: 'MemeCMO.ai',
       complianceTitle: 'Policies & Compliance',
       rights: 'All Rights Reserved.',
       privacy: 'Privacy Policy',
@@ -1599,10 +1599,10 @@ The advantages of this multi-agent architecture include: (1) <strong>24/7 automa
       backToHome: 'Back to Home',
       title: 'Terms of Service',
       effectiveDate: 'Effective Date: April 1, 2026',
-      intro: 'Welcome to the services provided by NeuronSpark Media-Tech Limited (NeuronSpark Think Tank). Please read the following Terms of Service carefully before using our website and services. By using this website, you agree to be bound by these terms.',
+      intro: 'Welcome to the services provided by NeuronSpark Media-Tech Limited (MemeCMO.ai). Please read the following Terms of Service carefully before using our website and services. By using this website, you agree to be bound by these terms.',
       scope: {
         title: 'Scope of Services',
-        body: 'NeuronSpark Media-Tech Limited (NeuronSpark Think Tank) specializes in Generative Engine Optimization (GEO) and AI Engine Optimization (AEO) consultancy services, covering both global and Chinese Large Language Model (LLM) dual ecosystems. Our services include but are not limited to: AI Visibility Baseline Audits, Structured Data Optimization, LLM Citation Strategy Planning, Brand Knowledge Graph Construction, and Cross-platform AI Ecosystem Deployment. Specific service details are subject to the service agreement signed by both parties.',
+        body: 'NeuronSpark Media-Tech Limited (MemeCMO.ai) specializes in Generative Engine Optimization (GEO) and AI Engine Optimization (AEO) consultancy services, covering both global and Chinese Large Language Model (LLM) dual ecosystems. Our services include but are not limited to: AI Visibility Baseline Audits, Structured Data Optimization, LLM Citation Strategy Planning, Brand Knowledge Graph Construction, and Cross-platform AI Ecosystem Deployment. Specific service details are subject to the service agreement signed by both parties.',
         bodyEn: '',
       },
       eligibility: {
@@ -1612,7 +1612,7 @@ The advantages of this multi-agent architecture include: (1) <strong>24/7 automa
       },
       intellectual: {
         title: 'Intellectual Property',
-        body: 'All content on this website and within our services, including but not limited to text, graphics, logos, icons, data compilations, software, and GEO methodology frameworks, is protected by international intellectual property laws and is owned by NeuronSpark Think Tank or its licensors. Without written authorization, you may not copy, modify, distribute, display, sublicense, or use such content for any commercial purpose. Intellectual property rights for strategy reports and optimization solutions delivered to clients are governed by the terms of the respective service agreements.',
+        body: 'All content on this website and within our services, including but not limited to text, graphics, logos, icons, data compilations, software, and GEO methodology frameworks, is protected by international intellectual property laws and is owned by MemeCMO.ai or its licensors. Without written authorization, you may not copy, modify, distribute, display, sublicense, or use such content for any commercial purpose. Intellectual property rights for strategy reports and optimization solutions delivered to clients are governed by the terms of the respective service agreements.',
         bodyEn: '',
       },
       fees: {
@@ -1622,7 +1622,7 @@ The advantages of this multi-agent architecture include: (1) <strong>24/7 automa
       },
       liability: {
         title: 'Limitation of Liability',
-        body: 'Services are provided on an "as is" and "as available" basis. NeuronSpark Think Tank shall not be liable for: visibility fluctuations caused by AI search engine algorithm changes; impact on optimization results due to third-party platform policy adjustments; service interruptions caused by force majeure. To the maximum extent permitted by law, NeuronSpark Think Tank shall not be liable for any indirect losses, lost profits, or data loss. Our total liability is limited to the fees actually paid by you during the relevant service period.',
+        body: 'Services are provided on an "as is" and "as available" basis. MemeCMO.ai shall not be liable for: visibility fluctuations caused by AI search engine algorithm changes; impact on optimization results due to third-party platform policy adjustments; service interruptions caused by force majeure. To the maximum extent permitted by law, MemeCMO.ai shall not be liable for any indirect losses, lost profits, or data loss. Our total liability is limited to the fees actually paid by you during the relevant service period.',
         bodyEn: '',
       },
       termination: {
@@ -1637,7 +1637,7 @@ The advantages of this multi-agent architecture include: (1) <strong>24/7 automa
       },
       changes: {
         title: 'Amendments',
-        body: 'NeuronSpark Think Tank reserves the right to revise these Terms of Service at any time. Revised terms will be posted on this page with an updated effective date. Material changes will be communicated via website notice or email. Your continued use of the service after revisions constitutes acceptance of the revised terms.',
+        body: 'MemeCMO.ai reserves the right to revise these Terms of Service at any time. Revised terms will be posted on this page with an updated effective date. Material changes will be communicated via website notice or email. Your continued use of the service after revisions constitutes acceptance of the revised terms.',
         bodyEn: '',
       },
       contact: {
@@ -1652,7 +1652,7 @@ The advantages of this multi-agent architecture include: (1) <strong>24/7 automa
     },
     auth: {
       loginTitle: 'Welcome Back',
-      loginSubtitle: 'Sign in to your NeuronSpark account',
+      loginSubtitle: 'Sign in to your MemeCMO account',
       signupTitle: 'Create Account',
       signupSubtitle: 'Get started with AI visibility optimization',
       resetTitle: 'Reset Password',

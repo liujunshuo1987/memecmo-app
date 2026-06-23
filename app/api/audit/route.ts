@@ -58,7 +58,7 @@ async function sendEmailNotifications(
           <div class="container">
             <div class="header">
               <h2>🚨 新高淨值線索</h2>
-              <p>觀瀾智庫 AI 能見度掃描系統</p>
+              <p>MemeCMO.ai AI 能見度掃描系統</p>
             </div>
             <div class="content">
               <div class="warning">
@@ -124,12 +124,12 @@ async function sendEmailNotifications(
         <body>
           <div class="container">
             <div class="header">
-              <h2 style="margin: 0; font-size: 24px;">觀瀾智庫</h2>
+              <h2 style="margin: 0; font-size: 24px;">MemeCMO.ai</h2>
               <p style="margin: 10px 0 0 0; font-size: 14px; opacity: 0.9;">AI 認知基線審計系統</p>
             </div>
             <div class="content">
               <h3 style="color: #1e40af; margin-top: 0;">尊敬的客戶您好，</h3>
-              <p>感謝您使用觀瀾智庫 AI 能見度體檢系統。</p>
+              <p>感謝您使用MemeCMO.ai AI 能見度體檢系統。</p>
               <div class="highlight">
                 <strong>您的 ${brandName} 大模型認知基線審計已啟動</strong>
               </div>
@@ -143,7 +143,7 @@ async function sendEmailNotifications(
               <p><strong>包含深度數據看板的完整版 PDF 報告將在 24 小時內發送至本郵箱，請注意查收。</strong></p>
               <p>如有任何問題，歡迎隨時與我們聯繫。</p>
               <div class="footer">
-                <p>觀瀾智庫 | AI 認知基線優化專家</p>
+                <p>MemeCMO.ai | AI 認知基線優化專家</p>
                 <p>本郵件由系統自動發送，如需回覆請聯繫 liujunshuo1987@gmail.com</p>
               </div>
             </div>
@@ -156,7 +156,7 @@ async function sendEmailNotifications(
       resend.emails.send({
         from: 'Acme <onboarding@resend.dev>',
         to: ['liujunshuo1987@gmail.com'],
-        subject: `🚨 [觀瀾智庫] 新高淨值線索：${brandName}`,
+        subject: `🚨 [MemeCMO.ai] 新高淨值線索：${brandName}`,
         html: adminEmailHtml,
       }).catch((error) => {
         console.error('Failed to send admin email:', error);

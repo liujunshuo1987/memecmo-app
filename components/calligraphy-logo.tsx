@@ -12,7 +12,7 @@ export default function CalligraphyLogo({ height = 40, className = '' }: Calligr
   return (
     <img
       src="/logo.svg"
-      alt="观澜智库书法标志"
+      alt="MemeCMO.ai书法标志"
       width={width}
       height={height}
       draggable={false}

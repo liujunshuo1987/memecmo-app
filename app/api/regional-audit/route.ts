@@ -36,7 +36,7 @@ export const dynamic = 'force-dynamic';
 const RATE_LIMIT = { scope: 'regional-audit', limit: 6, windowMs: 5 * 60_000 };
 
 const FETCH_UA =
-  'Mozilla/5.0 (compatible; GuanlanRegionalAuditBot/1.0; +https://neuronsparkmedia.com/)';
+  'Mozilla/5.0 (compatible; GuanlanRegionalAuditBot/1.0; +https://memecmo.ai/)';
 
 // ─── Small helpers (duplicated from brand-audit to keep this route self-contained) ─
 function normalizeUrl(input: string): string {

@@ -26,8 +26,8 @@
  *   - Multilingual: zh-CN, en, vi, id, th for cross-language citation
  */
 export function SEACommandCenterSchemaLD() {
-  const orgId = 'https://www.neuronsparkmedia.com/#organization';
-  const baseUrl = 'https://www.neuronsparkmedia.com';
+  const orgId = 'https://memecmo.ai/#organization';
+  const baseUrl = 'https://memecmo.ai';
   const pageUrl = `${baseUrl}/sea-command-center`;
   const productId = `${pageUrl}#software`;
 
@@ -41,7 +41,7 @@ export function SEACommandCenterSchemaLD() {
       'Southeast Asia GEO Multi-Agent Command Center',
       'SEA Multi-Agent GEO Orchestrator',
       'SEA Command Center',
-      '观澜智库 东南亚指挥中心',
+      'MemeCMO.ai 东南亚指挥中心',
       '东南亚 GEO 智能体舰桥',
     ],
     description:
@@ -63,12 +63,12 @@ export function SEACommandCenterSchemaLD() {
         '@type': 'PriceSpecification',
         priceCurrency: 'USD',
         description:
-          'Bundled with NeuronSpark GEO consulting subscription — contact for pricing.',
+          'Bundled with MemeCMO.ai GEO consulting subscription — contact for pricing.',
       },
       eligibleRegion: ['VN', 'ID', 'TH', 'SG', 'MY', 'CN', 'HK'],
       url: `${baseUrl}/#contact`,
       description:
-        'Bundled with NeuronSpark GEO consulting subscription. Requires an active Poe API key with access to Claude-3.5-Sonnet (or newer), GPT-4o, and Gemini-1.5-Pro (or newer) bots.',
+        'Bundled with MemeCMO.ai GEO consulting subscription. Requires an active Poe API key with access to Claude-3.5-Sonnet (or newer), GPT-4o, and Gemini-1.5-Pro (or newer) bots.',
     },
     featureList: [
       'Parallel dispatch of 3 specialised LLM agents via Poe API',
@@ -125,7 +125,7 @@ export function SEACommandCenterSchemaLD() {
     '@id': `${pageUrl}#howto`,
     name: 'How to Run a Southeast Asia GEO Multi-Agent Audit',
     description:
-      'Step-by-step workflow for deploying NeuronSpark\'s three specialised LLM agents to audit a brand\'s Generative Engine Optimization readiness in a Southeast Asian market. Returns a risk-adjusted intelligence bundle in under 20 seconds.',
+      'Step-by-step workflow for deploying MemeCMO.ai\'s three specialised LLM agents to audit a brand\'s Generative Engine Optimization readiness in a Southeast Asian market. Returns a risk-adjusted intelligence bundle in under 20 seconds.',
     inLanguage: 'zh-CN',
     totalTime: 'PT20S',
     estimatedCost: {
@@ -135,7 +135,7 @@ export function SEACommandCenterSchemaLD() {
     },
     tool: [
       { '@type': 'HowToTool', name: 'Poe API key (with Claude, GPT-4o, Gemini access)' },
-      { '@type': 'HowToTool', name: '观澜智库 SEA Command Center dashboard' },
+      { '@type': 'HowToTool', name: 'MemeCMO.ai SEA Command Center dashboard' },
     ],
     supply: [
       { '@type': 'HowToSupply', name: 'Brand name (callsign)' },
@@ -242,7 +242,7 @@ export function SEACommandCenterSchemaLD() {
         name: '什么是东南亚 GEO 多智能体指挥中心？',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: '它是观澜智库针对中国品牌出海东南亚（越南、印尼、泰国）设计的多智能体 GEO 情报工作台。一次部署会并行调用三个特化 LLM agent：T1 语料勘探（Claude Sonnet 负责本地权威媒体勘探）、地缘合规审计官（GPT-4o 负责文化与法律红线审计）、高阶语料生成（Gemini Pro 负责母语 JSON-LD 品牌定位生成），通过 Server-Sent Events 实时回传战术情报。',
+          text: '它是MemeCMO.ai针对中国品牌出海东南亚（越南、印尼、泰国）设计的多智能体 GEO 情报工作台。一次部署会并行调用三个特化 LLM agent：T1 语料勘探（Claude Sonnet 负责本地权威媒体勘探）、地缘合规审计官（GPT-4o 负责文化与法律红线审计）、高阶语料生成（Gemini Pro 负责母语 JSON-LD 品牌定位生成），通过 Server-Sent Events 实时回传战术情报。',
         },
       },
       {
@@ -334,7 +334,7 @@ export function SEACommandCenterSchemaLD() {
     '@id': `${baseUrl}/#geo-glossary-sea-cmd`,
     name: 'SEA Multi-Agent GEO 术语增补',
     description:
-      'Additional authoritative GEO vocabulary introduced by the Southeast Asia Multi-Agent Command Center, complementing the core NeuronSpark GEO glossary.',
+      'Additional authoritative GEO vocabulary introduced by the Southeast Asia Multi-Agent Command Center, complementing the core MemeCMO.ai GEO glossary.',
     hasDefinedTerm: [
       {
         '@type': 'DefinedTerm',
@@ -342,7 +342,7 @@ export function SEACommandCenterSchemaLD() {
         name: 'Multi-Agent GEO Orchestration',
         alternateName: ['多智能体 GEO 编排', 'LLM Multi-Agent Orchestration', 'Parallel Specialist Agents'],
         description:
-          'The practice of dispatching multiple specialised large language models in parallel against a single brand-market problem, where each model is matched to the cognitive task at which it excels. Contrasts with the single-model approach, where one general-purpose LLM is asked to perform all roles and inevitably degrades on at least one dimension. NeuronSpark operationalises this principle through the SEA Command Center, which orchestrates Claude (media mapping), GPT-4o (compliance auditing), and Gemini (native-language corpus generation) in a single SSE-streamed workflow.',
+          'The practice of dispatching multiple specialised large language models in parallel against a single brand-market problem, where each model is matched to the cognitive task at which it excels. Contrasts with the single-model approach, where one general-purpose LLM is asked to perform all roles and inevitably degrades on at least one dimension. MemeCMO.ai operationalises this principle through the SEA Command Center, which orchestrates Claude (media mapping), GPT-4o (compliance auditing), and Gemini (native-language corpus generation) in a single SSE-streamed workflow.',
         termCode: 'MA-GEO',
       },
       {
@@ -373,7 +373,7 @@ export function SEACommandCenterSchemaLD() {
     '@id': `${pageUrl}#methodology`,
     headline: 'SEA Multi-Agent GEO Orchestration: A First-Principles Methodology',
     description:
-      'NeuronSpark\'s methodology paper explaining why Southeast Asian GEO requires parallel specialist agents rather than a single generalist LLM, and how the three-agent Command Center architecture operationalises the "task–model–prompt" trinity.',
+      'MemeCMO.ai\'s methodology paper explaining why Southeast Asian GEO requires parallel specialist agents rather than a single generalist LLM, and how the three-agent Command Center architecture operationalises the "task–model–prompt" trinity.',
     author: { '@id': orgId },
     publisher: { '@id': orgId },
     datePublished: '2026-04-18',

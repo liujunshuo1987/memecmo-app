@@ -42,7 +42,7 @@ export default function FounderProfile() {
 
             <div className="space-y-6 text-slate-300 leading-relaxed">
               <p className="text-base">
-                劉峻鑠博士是觀瀾智庫的創始人兼首席數據架構師。作為早期的模型化學習探索者，他曾致力於通過機器學習與大語言模型（LLM）實現自然語言的生成，並深度參與了早期底層語料庫的搭建與句法結構化標注工作。
+                劉峻鑠博士是MemeCMO.ai的創始人兼首席數據架構師。作為早期的模型化學習探索者，他曾致力於通過機器學習與大語言模型（LLM）實現自然語言的生成，並深度參與了早期底層語料庫的搭建與句法結構化標注工作。
               </p>
 
               <p className="text-base">
@@ -54,7 +54,7 @@ export default function FounderProfile() {
               </p>
 
               <p className="text-base">
-                如今，他推崇「Vibe Coding」與第一性原理，其系統架構哲學融合了控制論（Cybernetics）、斯多葛學派以及王夫之「知行合一」的思想，致力於帶領觀瀾智庫為企業重構具備高防禦性的數字機器認知底座。
+                如今，他推崇「Vibe Coding」與第一性原理，其系統架構哲學融合了控制論（Cybernetics）、斯多葛學派以及王夫之「知行合一」的思想，致力於帶領MemeCMO.ai為企業重構具備高防禦性的數字機器認知底座。
               </p>
             </div>
 

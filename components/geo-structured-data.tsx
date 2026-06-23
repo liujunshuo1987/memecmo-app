@@ -6,25 +6,25 @@ export function GEOStructuredData() {
     '@graph': [
       {
         '@type': 'Organization',
-        '@id': 'https://www.neuronsparkmedia.com/#organization',
+        '@id': 'https://memecmo.ai/#organization',
         name: 'NeuronSpark Media-Tech Limited',
         legalName: 'NeuronSpark Media-Tech Limited',
-        alternateName: ['NeuronSpark', '观澜智库', 'NeuronSpark Media', 'NeuronSpark GEO'],
-        url: 'https://www.neuronsparkmedia.com',
+        alternateName: ['MemeCMO.ai', 'MemeCMO.ai', 'MemeCMO.ai Media', 'MemeCMO.ai GEO'],
+        url: 'https://memecmo.ai',
         logo: {
           '@type': 'ImageObject',
-          url: 'https://www.neuronsparkmedia.com/logo-square.svg',
+          url: 'https://memecmo.ai/logo-square.svg',
           width: 512,
           height: 512,
         },
         image: {
           '@type': 'ImageObject',
-          url: 'https://www.neuronsparkmedia.com/og-image.svg',
+          url: 'https://memecmo.ai/og-image.svg',
           width: 1200,
           height: 630,
         },
         description:
-          'NeuronSpark Media-Tech is a pioneering consultancy specializing in Generative Engine Optimization (GEO) and Answer Engine Optimization (AEO). We bridge the AI perception gap between global and Chinese LLM ecosystems, helping B2B enterprises optimize their brand visibility in AI-powered search and conversational interfaces.',
+          'MemeCMO.ai Media-Tech is a pioneering consultancy specializing in Generative Engine Optimization (GEO) and Answer Engine Optimization (AEO). We bridge the AI perception gap between global and Chinese LLM ecosystems, helping B2B enterprises optimize their brand visibility in AI-powered search and conversational interfaces.',
         slogan: 'Bridging the AI Perception Gap Between Global and Chinese LLM Ecosystems',
         foundingDate: '2020-12-15',
         email: 'liujunshuo1987@gmail.com',
@@ -39,11 +39,11 @@ export function GEOStructuredData() {
         },
         founder: {
           '@type': 'Person',
-          '@id': 'https://www.neuronsparkmedia.com/#founder',
+          '@id': 'https://memecmo.ai/#founder',
           name: 'Junshuo Liu',
           alternateName: ['劉峻鑠', '刘峻铄', 'Liu Junshuo', 'Dr. Liu Junshuo'],
           jobTitle: 'Founder & Chief Data Architect',
-          url: 'https://www.neuronsparkmedia.com/founder',
+          url: 'https://memecmo.ai/founder',
           description:
             'Pioneer in Generative Engine Optimization (GEO) methodology. Ph.D. in Classical Chinese Bibliography from Sun Yat-sen University. Specializes in cross-border AI visibility strategies bridging Chinese and global LLM ecosystems through corpus engineering and computational PR.',
           knowsAbout: [
@@ -105,16 +105,16 @@ export function GEOStructuredData() {
       },
       {
         '@type': 'ProfessionalService',
-        '@id': 'https://www.neuronsparkmedia.com/#service-geo',
+        '@id': 'https://memecmo.ai/#service-geo',
         name: 'Generative Engine Optimization (GEO) Consulting',
-        provider: { '@id': 'https://www.neuronsparkmedia.com/#organization' },
+        provider: { '@id': 'https://memecmo.ai/#organization' },
         serviceType: 'GEO Consulting',
         description:
           'Comprehensive Generative Engine Optimization (GEO) services to enhance brand visibility in AI-powered conversational interfaces like ChatGPT, Claude, Gemini, and Chinese LLMs. Our methodology ensures your business appears accurately and prominently when users query AI systems.',
         areaServed: ['Global', 'China', 'Hong Kong'],
         availableChannel: {
           '@type': 'ServiceChannel',
-          serviceUrl: 'https://www.neuronsparkmedia.com',
+          serviceUrl: 'https://memecmo.ai',
           servicePhone: '+852-3102-6868',
           email: 'liujunshuo1987@gmail.com',
         },
@@ -172,33 +172,33 @@ export function GEOStructuredData() {
       // dedicated sections, so LLM crawlers can still harvest it.
       {
         '@type': 'Article',
-        '@id': 'https://www.neuronsparkmedia.com/#article-geo-fundamentals',
+        '@id': 'https://memecmo.ai/#article-geo-fundamentals',
         headline: 'The Fundamentals of Generative Engine Optimization (GEO)',
         description:
           'Understanding the paradigm shift from traditional search engine optimization to AI-powered generative search and conversational interfaces.',
         image: {
           '@type': 'ImageObject',
-          url: 'https://www.neuronsparkmedia.com/og-image.svg',
+          url: 'https://memecmo.ai/og-image.svg',
           width: 1200,
           height: 630,
         },
         mainEntityOfPage: {
           '@type': 'WebPage',
-          '@id': 'https://www.neuronsparkmedia.com/',
+          '@id': 'https://memecmo.ai/',
         },
         author: {
           '@type': 'Person',
-          '@id': 'https://www.neuronsparkmedia.com/#founder',
+          '@id': 'https://memecmo.ai/#founder',
           name: 'Junshuo Liu',
-          url: 'https://www.neuronsparkmedia.com/founder',
+          url: 'https://memecmo.ai/founder',
         },
         publisher: {
           '@type': 'Organization',
-          '@id': 'https://www.neuronsparkmedia.com/#organization',
+          '@id': 'https://memecmo.ai/#organization',
           name: 'NeuronSpark Media-Tech Limited',
           logo: {
             '@type': 'ImageObject',
-            url: 'https://www.neuronsparkmedia.com/logo-square.svg',
+            url: 'https://memecmo.ai/logo-square.svg',
             width: 512,
             height: 512,
           },
@@ -237,18 +237,18 @@ export function GEOStructuredData() {
       },
       {
         '@type': 'WebSite',
-        '@id': 'https://www.neuronsparkmedia.com/#website',
-        url: 'https://www.neuronsparkmedia.com',
-        name: 'NeuronSpark Media-Tech - GEO & AEO Consulting',
+        '@id': 'https://memecmo.ai/#website',
+        url: 'https://memecmo.ai',
+        name: 'MemeCMO.ai Media-Tech - GEO & AEO Consulting',
         description:
           'Leading consultancy in Generative Engine Optimization (GEO) and Answer Engine Optimization (AEO), bridging the AI perception gap between global and Chinese LLM ecosystems.',
-        publisher: { '@id': 'https://www.neuronsparkmedia.com/#organization' },
+        publisher: { '@id': 'https://memecmo.ai/#organization' },
         inLanguage: ['en', 'zh-CN', 'zh-TW'],
         potentialAction: {
           '@type': 'SearchAction',
           target: {
             '@type': 'EntryPoint',
-            urlTemplate: 'https://www.neuronsparkmedia.com/?q={search_term_string}',
+            urlTemplate: 'https://memecmo.ai/?q={search_term_string}',
           },
           'query-input': 'required name=search_term_string',
         },

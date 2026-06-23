@@ -10,10 +10,28 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "观澜智库 | NeuronSpark Media-Tech",
-  description: "打穿双引擎壁垒，重塑大模型时代的数字认知基建。生成式引擎优化（GEO）与文献级语料工程服务。",
+  metadataBase: new URL("https://app.memecmo.ai"),
+  title: {
+    default: "MemeCMO.ai — Make your brand the answer in AI",
+    template: "%s | MemeCMO.ai",
+  },
+  description: "Generative Engine Optimization (GEO) platform for Southeast Asia. Multi-agent monitoring across ChatGPT, Perplexity, Gemini, Claude — for Vietnam, Indonesia, Thailand, Philippines, Singapore, Malaysia.",
+  applicationName: "MemeCMO.ai",
+  authors: [{ name: "MemeCMO.ai", url: "https://memecmo.ai" }],
   icons: {
     icon: "/logo.svg",
+  },
+  openGraph: {
+    type: "website",
+    url: "https://app.memecmo.ai",
+    siteName: "MemeCMO.ai",
+    title: "MemeCMO.ai — Make your brand the answer in AI",
+    description: "GEO multi-agent platform for SE Asia.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "MemeCMO.ai",
+    description: "GEO multi-agent platform for SE Asia.",
   },
   other: {
     "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https: http:; style-src 'self' 'unsafe-inline' https: http:; img-src 'self' data: blob: https: http:; font-src 'self' data: https: http:; connect-src 'self' https: http: wss: ws:; frame-src 'self' https: http:; object-src 'none';",
@@ -26,7 +44,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN" className={`${inter.variable} h-full antialiased`}>
+    <html lang="en" className={`${inter.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-[#0a1628] text-white">
         <LanguageProvider>
           <AuthProvider>

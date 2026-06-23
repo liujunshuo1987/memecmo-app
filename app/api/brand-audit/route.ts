@@ -181,7 +181,7 @@ export async function POST(req: NextRequest) {
       redirect: 'follow',
       headers: {
         'User-Agent':
-          'Mozilla/5.0 (compatible; GuanlanGEOAuditBot/1.0; +https://neuronsparkmedia.com/)',
+          'Mozilla/5.0 (compatible; GuanlanGEOAuditBot/1.0; +https://memecmo.ai/)',
       },
       signal: AbortSignal.timeout(15_000),
     });

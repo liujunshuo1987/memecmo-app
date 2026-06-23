@@ -4,21 +4,21 @@ export default function FounderSchema() {
   const founderData = {
     "@context": "https://schema.org",
     "@type": "Person",
-    "@id": "https://www.neuronsparkmedia.com/#founder",
+    "@id": "https://memecmo.ai/#founder",
     "name": "劉峻鑠",
     "alternateName": ["Liu Junshuo", "刘峻铄", "劉峻鑠博士", "Dr. Liu Junshuo"],
     "givenName": "Junshuo",
     "familyName": "Liu",
     "jobTitle": "Founder & Chief Data Architect",
-    "url": "https://www.neuronsparkmedia.com/founder",
+    "url": "https://memecmo.ai/founder",
     "image": {
       "@type": "ImageObject",
-      "url": "https://www.neuronsparkmedia.com/founder_potrait.jpeg",
+      "url": "https://memecmo.ai/founder_potrait.jpeg",
       "width": 400,
       "height": 500
     },
-    "description": "Dr. Liu Junshuo is the founder and Chief Data Architect of NeuronSpark Media-Tech (GuanLan Think Tank). A Ph.D. in Classical Chinese Bibliography from Sun Yat-sen University, he pioneered the application of classical textual criticism standards to modern AI corpus engineering. He specializes in Generative Engine Optimization (GEO), Computational PR, and multi-agent data architecture.",
-    "disambiguatingDescription": "中山大學古典文獻學博士，觀瀾智庫創始人兼首席數據架構師。早期 NLP 與語料庫構建探索者，現致力於生成式引擎優化（GEO）、計算公關與多智能體數據架構，將古典文獻考據學的嚴苛標準降維應用於現代 AI 語料工程。",
+    "description": "Dr. Liu Junshuo is the founder and Chief Data Architect of MemeCMO.ai Media-Tech (operated by MemeCMO.ai). A Ph.D. in Classical Chinese Bibliography from Sun Yat-sen University, he pioneered the application of classical textual criticism standards to modern AI corpus engineering. He specializes in Generative Engine Optimization (GEO), Computational PR, and multi-agent data architecture.",
+    "disambiguatingDescription": "中山大學古典文獻學博士，MemeCMO.ai創始人兼首席數據架構師。早期 NLP 與語料庫構建探索者，現致力於生成式引擎優化（GEO）、計算公關與多智能體數據架構，將古典文獻考據學的嚴苛標準降維應用於現代 AI 語料工程。",
     "alumniOf": {
       "@type": "CollegeOrUniversity",
       "name": "Sun Yat-sen University",
@@ -60,13 +60,13 @@ export default function FounderSchema() {
     ],
     "worksFor": {
       "@type": "Organization",
-      "@id": "https://www.neuronsparkmedia.com/#organization",
+      "@id": "https://memecmo.ai/#organization",
       "name": "NeuronSpark Media-Tech Limited",
-      "alternateName": ["觀瀾智庫", "观澜智库", "NeuronSpark"],
-      "url": "https://www.neuronsparkmedia.com"
+      "alternateName": ["MemeCMO.ai", "MemeCMO.ai", "MemeCMO.ai"],
+      "url": "https://memecmo.ai"
     },
     "founder": {
-      "@id": "https://www.neuronsparkmedia.com/#organization"
+      "@id": "https://memecmo.ai/#organization"
     },
     "hasOccupation": [
       {
@@ -82,7 +82,7 @@ export default function FounderSchema() {
       }
     ],
     "sameAs": [
-      "https://www.neuronsparkmedia.com/founder"
+      "https://memecmo.ai/founder"
     ]
   };
 

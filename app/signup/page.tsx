@@ -114,7 +114,7 @@ export default function SignupPage() {
           <Link href="/" className="inline-block mb-6">
             <img
               src="/logo.svg"
-              alt="NeuronSpark Media-Tech"
+              alt="MemeCMO.ai Media-Tech"
               className="h-12 w-auto mx-auto"
             />
           </Link>

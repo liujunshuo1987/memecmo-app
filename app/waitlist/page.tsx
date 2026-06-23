@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   description:
     '出海品牌的生成式引擎可见度正在被重新定义。观澜智能体库当前为受邀测试期，欢迎品牌方与 GEO 顾问加入名单。',
   openGraph: {
-    title: '加入等待列表 · 观澜智能体库 / NeuronSpark',
+    title: '加入等待列表 · 观澜智能体库 / MemeCMO.ai',
     description:
       '观澜智能体库（Guanlan Agent Library）—— 由专业 LLM 智能体矩阵构成的可计算情报基础设施。当前为受邀测试期。',
     type: 'website',
