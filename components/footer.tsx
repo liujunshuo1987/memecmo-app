@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { MapPin, Mail, Phone, Building2, Shield, FileText } from 'lucide-react';
-import CalligraphyLogo from './calligraphy-logo';
+import MemeCMOLogo from './memecmo-logo';
 import { useLanguage } from '@/contexts/language-context';
 
 export default function Footer() {
@@ -14,9 +14,9 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-8">
           <div className="lg:col-span-1 space-y-5">
             <div className="flex flex-col gap-2">
-              <CalligraphyLogo height={32} className="opacity-80" />
+              <MemeCMOLogo height={32} className="opacity-90" showWordmark />
               <p className="text-xs tracking-[0.2em] text-gray-500 uppercase mt-1">
-                NeuronSpark Media-Tech Limited
+                by NeuronSpark Media-Tech Limited
               </p>
             </div>
             <p className="text-sm text-gray-400 leading-relaxed max-w-xs">

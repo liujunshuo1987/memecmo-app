@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Globe, Menu, X } from 'lucide-react';
-import CalligraphyLogo from './calligraphy-logo';
+import MemeCMOLogo from './memecmo-logo';
 import { useLanguage } from '@/contexts/language-context';
 import { useAuth } from '@/contexts/auth-context';
 
@@ -41,7 +41,7 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center gap-3 group">
-              <CalligraphyLogo height={26} className="opacity-90 group-hover:opacity-100 transition-opacity duration-300" />
+              <MemeCMOLogo height={30} className="opacity-90 group-hover:opacity-100 transition-opacity duration-300" showWordmark />
             </Link>
           </div>
 
