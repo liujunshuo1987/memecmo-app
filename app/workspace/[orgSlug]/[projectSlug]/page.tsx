@@ -1,0 +1,47 @@
+// Server component: load the project on the server (RLS-protected),
+// then mount the client-side workspace UI.
+
+import { redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
+import { getProjectBySlug, getRecentRuns } from '@/lib/workspace';
+import WorkspaceClient from './workspace-client';
+
+interface PageProps {
+  params: { orgSlug: string; projectSlug: string };
+}
+
+export default async function WorkspacePage({ params }: PageProps) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    redirect('/login?next=' + encodeURIComponent(`/workspace/${params.orgSlug}/${params.projectSlug}`));
+  }
+
+  const projectAndOrg = await getProjectBySlug(params.orgSlug, params.projectSlug);
+  if (!projectAndOrg) {
+    return (
+      <div className="min-h-screen bg-[#0a1628] text-white flex items-center justify-center px-4">
+        <div className="max-w-md text-center space-y-3">
+          <h1 className="text-2xl font-semibold">Project not found</h1>
+          <p className="text-sm text-gray-400">
+            Either <code className="text-gray-300">{params.orgSlug}/{params.projectSlug}</code> doesn&apos;t exist,
+            or your account doesn&apos;t have access. If you think this is wrong, contact your org admin.
+          </p>
+          <a href="/" className="inline-block text-sm text-blue-400 hover:underline">← Back home</a>
+        </div>
+      </div>
+    );
+  }
+
+  const recentRuns = await getRecentRuns(projectAndOrg.project.id, 25);
+
+  return (
+    <WorkspaceClient
+      project={projectAndOrg.project}
+      organization={projectAndOrg.organization}
+      initialRuns={recentRuns}
+    />
+  );
+}
