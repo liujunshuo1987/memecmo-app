@@ -76,35 +76,51 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
     activityEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activity, runStatus]);
 
-  // SSE subscription
+  // Poll the read-only run observer while a run is active. Execution happens
+  // in Inngest (server-side, durable) — this only reads status + new events.
   useEffect(() => {
     if (!activeRunId) return;
-    const es = new EventSource(`/api/workspace/agent-runs/${activeRunId}/stream`);
+    let cancelled = false;
+    let cursor = '1970-01-01T00:00:00Z';
+    const seen = new Set<string>();
 
-    es.addEventListener('hello', (e) => {
-      console.log('[SSE] hello', JSON.parse((e as MessageEvent).data));
-    });
-
-    es.addEventListener('event', (e) => {
-      const ev = JSON.parse((e as MessageEvent).data) as ActivityEvent;
-      setActivity((prev) => [...prev, ev]);
-    });
-
-    es.addEventListener('run', (e) => {
-      const r = JSON.parse((e as MessageEvent).data);
-      setRunStatus(r);
-    });
-
-    es.addEventListener('done', () => {
-      es.close();
-    });
-
-    es.onerror = () => {
-      // Stream closed (normal at run completion or 5-min cap)
-      es.close();
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+        const res = await fetch(
+          `/api/workspace/agent-runs/${activeRunId}?since=${encodeURIComponent(cursor)}`,
+          { cache: 'no-store' },
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (data.events?.length) {
+            const fresh = (data.events as ActivityEvent[]).filter((e) => !seen.has(e.id));
+            fresh.forEach((e) => seen.add(e.id));
+            if (fresh.length) setActivity((prev) => [...prev, ...fresh]);
+            cursor = data.cursor || cursor;
+          }
+          if (data.run) {
+            setRunStatus({
+              status: data.run.status,
+              progress_pct: data.run.progress_pct,
+              summary: data.run.summary,
+            });
+          }
+          if (data.terminal) {
+            cancelled = true;
+            return;
+          }
+        }
+      } catch {
+        // transient — keep polling
+      }
+      if (!cancelled) setTimeout(tick, 1000);
     };
 
-    return () => es.close();
+    void tick();
+    return () => {
+      cancelled = true;
+    };
   }, [activeRunId]);
 
   const handleSend = async () => {

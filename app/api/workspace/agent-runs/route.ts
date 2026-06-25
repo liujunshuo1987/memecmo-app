@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { V05_AGENT_IDS } from '@/lib/agents/registry';
+import { inngest } from '@/lib/inngest/client';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -73,6 +74,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { error: runError?.message || 'Failed to create run' },
       { status: 500 },
+    );
+  }
+
+  // Hand off to Inngest for durable background execution. This is fully
+  // decoupled from this HTTP request — Inngest invokes /api/inngest
+  // server-to-server, so the run completes regardless of whether the client
+  // stays connected.
+  try {
+    await inngest.send({
+      name: 'agent/run.requested',
+      data: { runId: run.id, agentId: body.agentId, projectId: body.projectId },
+    });
+  } catch (err) {
+    // If the event can't be enqueued, mark the run failed so it doesn't sit
+    // in 'queued' forever.
+    const msg = err instanceof Error ? err.message : String(err);
+    await supabase
+      .from('agent_runs')
+      .update({ status: 'failed', error_message: `Enqueue failed: ${msg}` })
+      .eq('id', run.id);
+    return NextResponse.json(
+      { error: `Failed to enqueue run: ${msg}` },
+      { status: 502 },
     );
   }
 
