@@ -4,8 +4,6 @@
 // This mock emits realistic-looking events so the workspace UI can be
 // exercised end-to-end without burning LLM tokens.
 
-import { createClient } from '@supabase/supabase-js';
-
 type EventEmitter = (event: {
   event_type:
     | 'log'
@@ -159,22 +157,5 @@ export async function runDiscoveryAgent(
   return {
     summary: `Drafted prompt set across 4 categories (${finalOutput.promptCountSampled} sample prompts). Industry: ${finalOutput.industry}.`,
     output: finalOutput,
-  };
-}
-
-// ─── Helper for persisting events from the API route ───────────────────────
-// Service-role client bypasses RLS so the background runner can write
-// regardless of who triggered it.
-export function makeEventPersister(runId: string): EventEmitter {
-  const sb = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-  return async (event) => {
-    await sb.from('agent_run_events').insert({
-      agent_run_id: runId,
-      event_type: event.event_type,
-      payload: event.payload,
-    });
   };
 }
