@@ -9,6 +9,7 @@
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { AGENTS } from './registry';
 import { runDiscoveryAgent } from './discovery';
+import { runMonitorAgent } from './monitor';
 
 export type AgentEvent = {
   event_type:
@@ -91,6 +92,39 @@ export async function executeAgentRun(
         },
         persistAndEmit,
       );
+    } else if (agentId === 'monitor') {
+      // Monitor measures the latest Discovery prompt set against AI engines.
+      const { data: psAsset } = await sb
+        .from('assets')
+        .select('content')
+        .eq('project_id', project.id)
+        .eq('type', 'prompt_set')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!psAsset?.content) {
+        throw new Error('No Discovery prompt set found for this project. Run Discovery first.');
+      }
+      let promptSet: { category: string; label: string; prompts: string[] }[] = [];
+      try {
+        promptSet = JSON.parse(psAsset.content)?.promptSet ?? [];
+      } catch {
+        throw new Error('Discovery prompt set asset is corrupted — re-run Discovery.');
+      }
+      if (!promptSet.length) {
+        throw new Error('Discovery prompt set is empty — re-run Discovery.');
+      }
+      result = await runMonitorAgent(
+        {
+          brandName: project.brand_name,
+          brandUrl: project.brand_url,
+          targetCountry: project.target_country,
+          targetLanguage: project.target_language,
+          industry: project.industry,
+          promptSet,
+        },
+        persistAndEmit,
+      );
     } else {
       const def = AGENTS[agentId];
       await persistAndEmit({
@@ -121,6 +155,16 @@ export async function executeAgentRun(
         agent_run_id: runId,
         type: 'prompt_set',
         title: `${project.brand_name} — Discovery prompt set`,
+        format: 'json',
+        content: JSON.stringify(result.output, null, 2),
+        meta: { brand: project.brand_name, country: project.target_country },
+      });
+    } else if (agentId === 'monitor') {
+      await sb.from('assets').insert({
+        project_id: project.id,
+        agent_run_id: runId,
+        type: 'geo_scorecard',
+        title: `${project.brand_name} — GEO visibility scorecard`,
         format: 'json',
         content: JSON.stringify(result.output, null, 2),
         meta: { brand: project.brand_name, country: project.target_country },

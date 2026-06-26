@@ -297,8 +297,8 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
               </button>
             </div>
             <p className="text-[10px] text-gray-600 leading-snug">
-              v0.5 — Discovery is real (mock data); Monitor &amp; Report are stubs that complete instantly.
-              Real LLM + AIGVR engine wires in v0.6.
+              v0.7 — Discovery (real LLM) &amp; Monitor (live ChatGPT / Gemini / Perplexity
+              share-of-voice) are wired. Report composer is next.
             </p>
           </div>
         </section>
