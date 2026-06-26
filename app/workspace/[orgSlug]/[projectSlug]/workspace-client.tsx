@@ -67,6 +67,7 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
     return m;
   });
   const [intent, setIntent] = useState('');
+  const [readingLang, setReadingLang] = useState<'orig' | 'zh' | 'en'>('orig');
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [runStatus, setRunStatus] = useState<{
@@ -203,9 +204,9 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
   };
 
   return (
-    <div className="min-h-screen bg-[#0a1628] text-white flex flex-col">
+    <div className="h-screen overflow-hidden bg-[#0a1628] text-white flex flex-col">
       {/* Top bar */}
-      <header className="border-b border-white/5 px-6 py-3 flex items-center justify-between bg-[#0a1628]/95 backdrop-blur sticky top-0 z-10">
+      <header className="border-b border-white/5 px-6 py-3 flex items-center justify-between bg-[#0a1628]/95 backdrop-blur z-10 shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           <a href="/dashboard" className="text-xs tracking-[0.2em] text-gray-500 uppercase hover:text-gray-300">MemeCMO.ai</a>
           <span className="text-gray-600">/</span>
@@ -222,6 +223,17 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <div className="flex items-center rounded-md border border-white/10 overflow-hidden text-[11px]">
+            {([['orig', '原文'], ['zh', '中文'], ['en', 'EN']] as const).map(([v, label]) => (
+              <button
+                key={v}
+                onClick={() => setReadingLang(v)}
+                className={`px-2 py-1 transition ${readingLang === v ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           {headlineAigvr != null && (
             <div className="text-right leading-none">
               <div className={`text-lg font-semibold ${headlineAigvr >= 67 ? 'text-emerald-300' : headlineAigvr >= 34 ? 'text-amber-300' : 'text-red-300'}`}>{headlineAigvr}</div>
@@ -240,86 +252,81 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
         </div>
       </header>
 
-      {/* Outcome-first body */}
-      <main className="max-w-3xl mx-auto w-full px-6 py-6 space-y-6">
-        {/* Primary action */}
-        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-          <div className="flex flex-col sm:flex-row gap-2">
+      {/* Three-zone shell: nav rail | stage | context */}
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)_300px] min-h-0">
+        {/* LEFT — deliverables nav */}
+        <aside className="lg:border-r border-white/5 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
+          <div className="space-y-2">
             <button
               onClick={() => dispatchAgent('full_scan')}
               disabled={sending}
-              className="shrink-0 inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 text-sm font-medium transition"
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 text-sm font-medium transition"
             >
               ⚡ Run full GEO scan
             </button>
             <input
               value={intent}
               onChange={(e) => setIntent(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && intent.trim()) { e.preventDefault(); dispatchAgent('full_scan', intent.trim()); setIntent(''); }
-              }}
-              placeholder="…or tell the agents what to focus on"
+              onKeyDown={(e) => { if (e.key === 'Enter' && intent.trim()) { e.preventDefault(); dispatchAgent('full_scan', intent.trim()); setIntent(''); } }}
+              placeholder="…focus the agents"
               disabled={sending}
-              className="flex-1 bg-white/[0.03] border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400/50"
+              className="w-full bg-white/[0.03] border border-white/10 rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-blue-400/50"
             />
           </div>
-          <p className="text-[11px] text-gray-500 mt-2">
-            One click runs Discovery → Monitor (AIGVR) → Report. Or open / run any deliverable below.
-          </p>
-        </div>
-
-        {/* Deliverables hub */}
-        {DELIVERABLE_GROUPS.map((group) => (
-          <div key={group.label}>
-            <div className="text-[11px] uppercase tracking-widest text-gray-500 mb-2">{group.label}</div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {group.items.map((aid) => (
-                <DeliverableCard
-                  key={aid}
-                  agentId={aid}
-                  run={runsByAgent[aid]}
-                  running={sending && runStatus?.agentId === aid && !isTerminal}
-                  isViewing={!!runsByAgent[aid] && runsByAgent[aid].runId === activeRunId}
-                  onView={viewRun}
-                  onRun={dispatchAgent}
-                  disabled={sending}
-                />
-              ))}
+          {DELIVERABLE_GROUPS.map((group) => (
+            <div key={group.label}>
+              <div className="text-[10px] uppercase tracking-widest text-gray-600 mb-1.5">{group.label}</div>
+              <div className="space-y-1">
+                {group.items.map((aid) => (
+                  <NavItem
+                    key={aid}
+                    agentId={aid}
+                    run={runsByAgent[aid]}
+                    running={sending && runStatus?.agentId === aid && !isTerminal}
+                    isViewing={(!!runsByAgent[aid] && runsByAgent[aid].runId === activeRunId) || (runStatus?.agentId === aid && !runsByAgent[aid])}
+                    onView={viewRun}
+                    onRun={dispatchAgent}
+                    disabled={sending}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </aside>
 
-        {/* Detail panel — active run / viewed result */}
-        {runStatus && (
-          <div ref={resultTopRef} className="rounded-xl border border-white/10 bg-[#070f1d] overflow-hidden">
-            <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-sm font-medium truncate">
-                  {AGENTS[runStatus.agentId ?? '']?.emoji} {AGENTS[runStatus.agentId ?? '']?.displayName ?? 'Agent run'}
+        {/* CENTER — stage */}
+        <main ref={resultTopRef} className="overflow-y-auto px-6 py-5 min-h-0 min-w-0">
+          {!runStatus ? (
+            <div className="h-full flex flex-col items-center justify-center text-center text-gray-500 gap-2 py-16">
+              <div className="text-3xl">📡</div>
+              <div className="text-sm text-gray-300">Pick a deliverable on the left, or run a full GEO scan.</div>
+              <div className="text-xs text-gray-600 max-w-sm">Full Scan runs Discovery → Monitor → Report; then build AEO presence with Site / Content / Distribute / Encyclopedia.</div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium truncate">
+                    {AGENTS[runStatus.agentId ?? '']?.emoji} {AGENTS[runStatus.agentId ?? '']?.displayName ?? 'Agent run'}
+                  </div>
+                  <div className="text-[11px] text-gray-500">{runStatus.status} · {runStatus.progress_pct ?? 0}%</div>
                 </div>
-                <div className="text-[11px] text-gray-500">{runStatus.status} · {runStatus.progress_pct ?? 0}%</div>
+                <div className="w-24 h-1.5 bg-white/5 rounded-full overflow-hidden shrink-0">
+                  <div className={`h-full transition-all ${runStatus.status === 'failed' ? 'bg-red-500' : 'bg-emerald-400'}`} style={{ width: `${runStatus.progress_pct ?? 0}%` }} />
+                </div>
               </div>
-              <div className="w-24 h-1.5 bg-white/5 rounded-full overflow-hidden shrink-0">
-                <div
-                  className={`h-full transition-all ${runStatus.status === 'failed' ? 'bg-red-500' : 'bg-emerald-400'}`}
-                  style={{ width: `${runStatus.progress_pct ?? 0}%` }}
-                />
-              </div>
-            </div>
 
-            <div className="px-4 py-4 max-h-[70vh] overflow-y-auto">
               {isTerminal && runStatus.output ? (
                 <div className="space-y-4">
                   {runStatus.summary && (
-                    <div className="p-3 rounded border border-emerald-500/30 bg-emerald-500/5 text-sm text-emerald-100 leading-relaxed">
-                      {runStatus.summary}
-                    </div>
+                    <div className="p-3 rounded border border-emerald-500/30 bg-emerald-500/5 text-sm text-emerald-100 leading-relaxed">{runStatus.summary}</div>
+                  )}
+                  {readingLang !== 'orig' && (
+                    <TranslatedView output={runStatus.output} summary={runStatus.summary} to={readingLang} />
                   )}
                   <RunResult agentId={runStatus.agentId} output={runStatus.output} />
                   <details className="rounded border border-white/5 bg-white/[0.02]">
-                    <summary className="cursor-pointer px-3 py-2 text-[11px] uppercase tracking-widest text-gray-500 select-none hover:text-gray-300">
-                      Process log · {activity.length} steps
-                    </summary>
+                    <summary className="cursor-pointer px-3 py-2 text-[11px] uppercase tracking-widest text-gray-500 select-none hover:text-gray-300">Process log · {activity.length} steps</summary>
                     <div className="px-3 pb-3 font-mono text-xs space-y-2 border-t border-white/5 pt-2">
                       {activity.map((ev) => (<ActivityRow key={ev.id} ev={ev} />))}
                     </div>
@@ -335,20 +342,19 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
                 </div>
               )}
             </div>
-          </div>
-        )}
+          )}
+        </main>
 
-        <p className="text-[10px] text-gray-600 leading-snug pt-2">
-          v1.1 — outcome-first workspace. Full Scan orchestrates Discovery → Monitor → Report;
-          execution agents (Site / Content / Distribute / Encyclopedia) build AEO presence; all
-          share one canonical Brand Profile.
-        </p>
-      </main>
+        {/* RIGHT — at-a-glance context */}
+        <aside className="hidden lg:block lg:border-l border-white/5 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
+          <ContextPanel headlineAigvr={headlineAigvr} scoreRun={scoreRun} runsByAgent={runsByAgent} totalAgents={DELIVERABLE_GROUPS.reduce((n, g) => n + g.items.length, 0)} />
+        </aside>
+      </div>
     </div>
   );
 }
 
-function DeliverableCard({
+function NavItem({
   agentId, run, running, isViewing, onView, onRun, disabled,
 }: {
   agentId: string;
@@ -362,43 +368,102 @@ function DeliverableCard({
   const a = AGENTS[agentId];
   const ready = !!run && run.status === 'completed';
   return (
-    <div
+    <button
       onClick={() => (ready ? onView(run!.runId, agentId) : onRun(agentId))}
-      className={`group rounded-lg border bg-white/[0.02] p-3 cursor-pointer transition ${
-        isViewing ? 'border-emerald-400/40' : 'border-white/10 hover:border-blue-400/40'
+      disabled={disabled && !ready}
+      title={a?.description}
+      className={`w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-md border transition disabled:opacity-50 ${
+        isViewing ? 'bg-emerald-500/10 border-emerald-400/30' : 'border-transparent hover:bg-white/[0.04]'
       }`}
     >
-      <div className="flex items-center gap-2">
-        <span className="text-base leading-none">{a?.emoji ?? '•'}</span>
-        <span className="text-sm font-medium text-gray-100 truncate">{a?.shortName ?? agentId}</span>
-        <span className="ml-auto shrink-0">
-          {running ? (
-            <span className="text-[10px] text-blue-300">running…</span>
-          ) : ready ? (
-            <span className="text-[10px] text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded">ready</span>
-          ) : (
-            <span className="text-[10px] text-gray-500">not run</span>
-          )}
-        </span>
+      <span className="text-sm leading-none shrink-0">{a?.emoji ?? '•'}</span>
+      <span className="text-[13px] text-gray-200 truncate flex-1">{a?.shortName ?? agentId}</span>
+      {running ? (
+        <span className="text-[10px] text-blue-300 shrink-0">…</span>
+      ) : ready ? (
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block shrink-0" title="ready" />
+      ) : (
+        <span className="text-[10px] text-gray-600 shrink-0">run</span>
+      )}
+    </button>
+  );
+}
+
+function TranslatedView({ output, summary, to }: { output: any; summary: string | null; to: 'zh' | 'en' }) {
+  const text =
+    output?.fullMarkdown ||
+    output?.markdown ||
+    output?.report?.markdown ||
+    [summary, output?.executiveSummary, output?.description, output?.definition].filter(Boolean).join('\n\n') ||
+    '';
+  const [state, setState] = useState<{ loading: boolean; text: string; err: string | null }>({ loading: false, text: '', err: null });
+  useEffect(() => {
+    if (!text.trim()) { setState({ loading: false, text: '', err: 'No translatable text in this result.' }); return; }
+    let cancelled = false;
+    setState({ loading: true, text: '', err: null });
+    fetch('/api/workspace/translate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, to }) })
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled) setState({ loading: false, text: d.translated || '', err: d.error || null }); })
+      .catch((e) => { if (!cancelled) setState({ loading: false, text: '', err: String(e) }); });
+    return () => { cancelled = true; };
+  }, [text, to]);
+  return (
+    <div className="rounded-lg border border-blue-500/30 bg-blue-500/[0.06] p-3">
+      <div className="text-[10px] uppercase tracking-widest text-blue-300 mb-1.5">
+        {to === 'zh' ? '中文译文' : 'English translation'} · 审阅用,非交付原文
       </div>
-      <div className="text-[11px] text-gray-500 mt-1.5 line-clamp-2 min-h-[28px]">
-        {ready ? run!.summary : a?.description}
+      {state.loading ? (
+        <div className="text-[12px] text-gray-400">翻译中…</div>
+      ) : state.err ? (
+        <div className="text-[12px] text-amber-300">{state.err}</div>
+      ) : (
+        <div className="text-[13px] text-gray-200 leading-relaxed whitespace-pre-wrap max-h-[50vh] overflow-y-auto">{state.text}</div>
+      )}
+    </div>
+  );
+}
+
+function ContextMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between text-[12px]">
+      <span className="text-gray-500">{label}</span>
+      <span className="text-gray-200 font-medium">{value}</span>
+    </div>
+  );
+}
+
+function ContextPanel({ headlineAigvr, scoreRun, runsByAgent, totalAgents }: {
+  headlineAigvr: number | null;
+  scoreRun?: LatestRun;
+  runsByAgent: Record<string, LatestRun>;
+  totalAgents: number;
+}) {
+  const sc = scoreRun?.output?.scorecard ?? scoreRun?.output;
+  const readyCount = Object.values(runsByAgent).filter((r) => r.status === 'completed').length;
+  const presence = sc?.dimensions?.presence;
+  const gaps = (sc?.gaps || []).length;
+  const rank = sc?.brandRank;
+  const benchN = (sc?.competitorBenchmark || []).length;
+  const sources = (sc?.sourceAuthority?.ranking || []).length;
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 text-center">
+        <div className="text-[10px] uppercase tracking-widest text-gray-500 mb-1">AIGVR</div>
+        <div className={`text-3xl font-semibold leading-none ${headlineAigvr == null ? 'text-gray-600' : headlineAigvr >= 67 ? 'text-emerald-300' : headlineAigvr >= 34 ? 'text-amber-300' : 'text-red-300'}`}>{headlineAigvr ?? '—'}</div>
+        <div className="text-[10px] text-gray-600 mt-1">/ 100</div>
       </div>
-      <div className="mt-2 flex items-center gap-3 text-[11px]">
-        {ready ? (
-          <>
-            <span className="text-blue-300 group-hover:underline">View →</span>
-            <button
-              onClick={(e) => { e.stopPropagation(); if (!disabled) onRun(agentId); }}
-              disabled={disabled}
-              className="text-gray-500 hover:text-gray-200 disabled:opacity-40"
-            >
-              ↻ re-run
-            </button>
-          </>
-        ) : (
-          <span className="text-blue-300 group-hover:underline">Run →</span>
-        )}
+      {sc && (
+        <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3 space-y-2">
+          <div className="text-[10px] uppercase tracking-widest text-gray-500">Latest scan</div>
+          <ContextMetric label="Presence (SoV)" value={presence != null ? `${presence}%` : '—'} />
+          <ContextMetric label="Brand rank" value={rank ? `#${rank} of ${benchN}` : '—'} />
+          <ContextMetric label="High-intent gaps" value={String(gaps)} />
+          <ContextMetric label="Cited sources" value={String(sources)} />
+        </div>
+      )}
+      <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+        <div className="text-[10px] uppercase tracking-widest text-gray-500 mb-1">Deliverables</div>
+        <div className="text-sm text-gray-200">{readyCount} / {totalAgents} ready</div>
       </div>
     </div>
   );
