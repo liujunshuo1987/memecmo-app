@@ -11,6 +11,7 @@ import { AGENTS } from './registry';
 import { runDiscoveryAgent } from './discovery';
 import { runMonitorAgent } from './monitor';
 import { runReportAgent } from './report';
+import { runOptimizeAgent } from './optimize';
 
 export type AgentEvent = {
   event_type:
@@ -210,6 +211,73 @@ export async function executeAgentRun(
         },
         persistAndEmit,
       );
+    } else if (agentId === 'optimize') {
+      // Optimize turns the top measured gap into a publish-ready content asset.
+      const { data: scAsset } = await sb
+        .from('assets')
+        .select('content')
+        .eq('project_id', project.id)
+        .eq('type', 'geo_scorecard')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!scAsset?.content) {
+        throw new Error('No Monitor scorecard found. Run Monitor (or Full Scan) first.');
+      }
+      let scorecard: any;
+      try {
+        scorecard = JSON.parse(scAsset.content);
+      } catch {
+        throw new Error('Scorecard asset corrupted — re-run Monitor.');
+      }
+
+      const order = ['discovery', 'consideration', 'evaluation', 'competitive', 'trust'];
+      const rank = (s: string) => {
+        const i = order.indexOf(s);
+        return i < 0 ? 99 : i;
+      };
+      const gaps = (scorecard.gaps || []) as { prompt: string; stage: string; competitorsPresent?: string[] }[];
+      let target: { query: string; stage: string; competitors?: string[] };
+      if (gaps.length) {
+        const g = [...gaps].sort((a, b) => rank(a.stage) - rank(b.stage))[0];
+        target = { query: g.prompt, stage: g.stage, competitors: g.competitorsPresent };
+      } else {
+        // No gap → target the lowest-presence stage's first prompt.
+        const { data: psAsset } = await sb
+          .from('assets')
+          .select('content')
+          .eq('project_id', project.id)
+          .eq('type', 'prompt_set')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const perStage = (scorecard.metrics?.perStage || []) as { stage: string; presence: number }[];
+        const weakest = [...perStage].sort((a, b) => a.presence - b.presence)[0];
+        let q = '';
+        if (psAsset?.content) {
+          try {
+            const ps = (JSON.parse(psAsset.content).promptSet || []) as { category: string; prompts: string[] }[];
+            const cat = ps.find((c) => c.category === weakest?.stage) || ps[0];
+            q = cat?.prompts?.[0] || '';
+          } catch {
+            /* ignore */
+          }
+        }
+        if (!q) throw new Error('No gap and no prompt available to optimize. Run Discovery + Monitor first.');
+        target = { query: q, stage: weakest?.stage || 'discovery' };
+      }
+
+      result = await runOptimizeAgent(
+        {
+          brandName: project.brand_name,
+          brandUrl: project.brand_url,
+          targetCountry: project.target_country,
+          targetLanguage: project.target_language,
+          industry: project.industry,
+          target,
+        },
+        persistAndEmit,
+      );
     } else {
       const def = AGENTS[agentId];
       await persistAndEmit({
@@ -263,6 +331,16 @@ export async function executeAgentRun(
         format: 'markdown',
         content: (result.output as { markdown?: string }).markdown ?? JSON.stringify(result.output, null, 2),
         meta: { brand: project.brand_name, country: project.target_country },
+      });
+    } else if (agentId === 'optimize') {
+      await sb.from('assets').insert({
+        project_id: project.id,
+        agent_run_id: runId,
+        type: 'content_draft',
+        title: `${project.brand_name} — ${(result.output as { title?: string }).title ?? 'GEO content draft'}`,
+        format: 'markdown',
+        content: (result.output as { fullMarkdown?: string }).fullMarkdown ?? JSON.stringify(result.output, null, 2),
+        meta: { brand: project.brand_name, targetQuery: (result.output as { targetQuery?: string }).targetQuery },
       });
     }
   } catch (err: unknown) {

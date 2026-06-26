@@ -44,6 +44,14 @@ export const AGENTS: Record<string, AgentDef> = {
     description: 'Synthesizes monitor + audit data into a stakeholder-ready weekly / monthly report.',
     typicalDurationSec: 90,
   },
+  optimize: {
+    id: 'optimize',
+    displayName: 'Content Optimize Agent',
+    shortName: 'Optimize',
+    emoji: '✍️',
+    description: 'Turns the top measured gap into a publish-ready, AI-retrieval-optimized page + FAQ schema in the target language.',
+    typicalDurationSec: 60,
+  },
 };
 
 export const V05_AGENT_IDS = Object.keys(AGENTS);

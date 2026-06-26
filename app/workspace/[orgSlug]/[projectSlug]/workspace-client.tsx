@@ -575,9 +575,58 @@ function RunResult({ agentId, output }: { agentId?: string; output: Record<strin
         <MonitorResult o={output} />
       ) : agentId === 'report' ? (
         <ReportResult o={output} />
+      ) : agentId === 'optimize' ? (
+        <ContentResult o={output} />
       ) : agentId === 'discovery' ? (
         <DiscoveryResult o={output} />
       ) : null}
+    </div>
+  );
+}
+
+function ContentResult({ o }: { o: Record<string, any> }) {
+  const faq: any[] = o.faq || [];
+  const copy = (text?: string) => { if (text) navigator.clipboard?.writeText(text).catch(() => {}); };
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-white">Content draft</h3>
+          {o.targetQuery && (
+            <p className="text-[11px] text-gray-500 mt-0.5">
+              targets: <span className="text-amber-300">{o.targetQuery}</span>
+              {o.stage && <span className="text-gray-600"> · {o.stage}</span>}
+            </p>
+          )}
+        </div>
+        <div className="flex gap-2 shrink-0">
+          <button onClick={() => copy(o.fullMarkdown)} className="text-[11px] px-2 py-0.5 rounded border border-white/10 text-gray-400 hover:border-blue-400/40 hover:text-blue-200 transition">Copy page</button>
+          <button onClick={() => copy(JSON.stringify(o.schemaJsonLd, null, 2))} className="text-[11px] px-2 py-0.5 rounded border border-white/10 text-gray-400 hover:border-blue-400/40 hover:text-blue-200 transition">Copy schema</button>
+        </div>
+      </div>
+
+      {o.title && <div className="text-[15px] font-semibold text-white leading-snug">{o.title}</div>}
+      {o.metaDescription && <div className="text-[12px] text-gray-500 italic">{o.metaDescription}</div>}
+
+      {o.articleMarkdown && (
+        <div className="text-[13px] text-gray-300 leading-relaxed whitespace-pre-wrap max-h-80 overflow-y-auto border border-white/5 rounded-md p-3 bg-black/20">
+          {o.articleMarkdown}
+        </div>
+      )}
+
+      {faq.length > 0 && (
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-gray-500 mb-1.5">FAQ ({faq.length}) · FAQPage schema generated</div>
+          <ul className="space-y-2">
+            {faq.map((f, i) => (
+              <li key={i} className="text-[12px] leading-snug">
+                <div className="text-gray-200 font-medium">{f.question}</div>
+                <div className="text-gray-500">{f.answer}</div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
