@@ -150,6 +150,10 @@ export async function executeAgentRun(
 ): Promise<void> {
   const sb = svc();
 
+  // The user's typed instruction (intent box / chat) — steers Discovery.
+  const { data: runRow } = await sb.from('agent_runs').select('input_prompt').eq('id', runId).maybeSingle();
+  const userPrompt: string | undefined = runRow?.input_prompt || undefined;
+
   // step.run when running under Inngest, else a passthrough (direct call/test).
   // IMPORTANT: everything with a side effect inside a cascade must live INSIDE a
   // step — Inngest re-executes code OUTSIDE steps on every resume, which would
@@ -196,6 +200,7 @@ export async function executeAgentRun(
         targetCountry: project.target_country,
         targetLanguage: project.target_language,
         industry: project.industry,
+        userPrompt,
       };
 
       // Each phase is one Inngest step → its own short invocation, durable
@@ -253,6 +258,7 @@ export async function executeAgentRun(
           targetCountry: project.target_country,
           targetLanguage: project.target_language,
           industry: project.industry,
+          userPrompt,
         },
         persistAndEmit,
       );

@@ -204,7 +204,7 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
   };
 
   return (
-    <div className="h-screen overflow-hidden bg-[#0a1628] text-white flex flex-col">
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden bg-[#0a1628] text-white flex flex-col">
       {/* Top bar */}
       <header className="border-b border-white/5 px-6 py-3 flex items-center justify-between bg-[#0a1628]/95 backdrop-blur z-10 shrink-0">
         <div className="flex items-center gap-3 min-w-0">
@@ -255,7 +255,7 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
       {/* Three-zone shell: nav rail | stage | context */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)_300px] min-h-0">
         {/* LEFT — deliverables nav */}
-        <aside className="lg:border-r border-white/5 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
+        <aside className="lg:border-r border-white/5 lg:overflow-y-auto px-4 py-4 space-y-4 lg:min-h-0">
           <div className="space-y-2">
             <button
               onClick={() => dispatchAgent('full_scan')}
@@ -295,7 +295,7 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
         </aside>
 
         {/* CENTER — stage */}
-        <main ref={resultTopRef} className="overflow-y-auto px-6 py-5 min-h-0 min-w-0">
+        <main ref={resultTopRef} className="lg:overflow-y-auto px-6 py-5 lg:min-h-0 min-w-0">
           {!runStatus ? (
             <div className="h-full flex flex-col items-center justify-center text-center text-gray-500 gap-2 py-16">
               <div className="text-3xl">📡</div>
@@ -311,8 +311,19 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
                   </div>
                   <div className="text-[11px] text-gray-500">{runStatus.status} · {runStatus.progress_pct ?? 0}%</div>
                 </div>
-                <div className="w-24 h-1.5 bg-white/5 rounded-full overflow-hidden shrink-0">
-                  <div className={`h-full transition-all ${runStatus.status === 'failed' ? 'bg-red-500' : 'bg-emerald-400'}`} style={{ width: `${runStatus.progress_pct ?? 0}%` }} />
+                <div className="flex items-center gap-3 shrink-0">
+                  {isTerminal && runStatus.agentId && (
+                    <button
+                      onClick={() => dispatchAgent(runStatus.agentId!)}
+                      disabled={sending}
+                      className="text-[11px] px-2.5 py-1 rounded border border-white/10 text-gray-300 hover:border-blue-400/40 hover:text-blue-200 disabled:opacity-40 transition"
+                    >
+                      ↻ Re-run
+                    </button>
+                  )}
+                  <div className="w-24 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                    <div className={`h-full transition-all ${runStatus.status === 'failed' ? 'bg-red-500' : 'bg-emerald-400'}`} style={{ width: `${runStatus.progress_pct ?? 0}%` }} />
+                  </div>
                 </div>
               </div>
 
@@ -346,7 +357,7 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
         </main>
 
         {/* RIGHT — at-a-glance context */}
-        <aside className="hidden lg:block lg:border-l border-white/5 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
+        <aside className="hidden lg:block lg:border-l border-white/5 lg:overflow-y-auto px-4 py-4 space-y-4 lg:min-h-0">
           <ContextPanel headlineAigvr={headlineAigvr} scoreRun={scoreRun} runsByAgent={runsByAgent} totalAgents={DELIVERABLE_GROUPS.reduce((n, g) => n + g.items.length, 0)} />
         </aside>
       </div>
