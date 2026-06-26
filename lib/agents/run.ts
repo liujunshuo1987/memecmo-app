@@ -43,6 +43,61 @@ function svc() {
   );
 }
 
+function domainOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
+// Persist this scan's citations to the Source-Authority Index and return the
+// CROSS-SCAN ranking (which domains the engines cite most for this project,
+// across all scans so far). The compounding GEO-native authority signal.
+async function recordCitationsAndIndex(
+  sb: ReturnType<typeof svc>,
+  projectId: string,
+  agentRunId: string,
+  brandDomain: string,
+  rawSamples: { engine?: string; stage?: string; citations?: string[] }[],
+): Promise<{ ranking: { domain: string; citations: number; engines: number; isBrand: boolean }[]; totalCitations: number }> {
+  const rows: Record<string, unknown>[] = [];
+  for (const s of rawSamples || []) {
+    for (const url of s.citations || []) {
+      const dom = domainOf(url);
+      if (!dom) continue;
+      rows.push({
+        project_id: projectId,
+        agent_run_id: agentRunId,
+        engine: s.engine ?? 'unknown',
+        stage: s.stage ?? null,
+        domain: dom,
+        url,
+        is_brand_domain: !!brandDomain && dom === brandDomain,
+      });
+    }
+  }
+  if (rows.length) await sb.from('geo_citations').insert(rows);
+
+  const { data } = await sb
+    .from('geo_citations')
+    .select('domain,engine,is_brand_domain')
+    .eq('project_id', projectId);
+  const map = new Map<string, { citations: number; engines: Set<string>; isBrand: boolean }>();
+  for (const r of data || []) {
+    const e = map.get(r.domain) || { citations: 0, engines: new Set<string>(), isBrand: false };
+    e.citations++;
+    e.engines.add(r.engine);
+    e.isBrand = e.isBrand || r.is_brand_domain;
+    map.set(r.domain, e);
+  }
+  const ranking = Array.from(map.entries())
+    .map(([domain, e]) => ({ domain, citations: e.citations, engines: e.engines.size, isBrand: e.isBrand }))
+    .sort((a, b) => b.citations - a.citations)
+    .slice(0, 20);
+  return { ranking, totalCitations: (data || []).length };
+}
+
 // Atomically claim a queued run (queued → running). Returns true if we won
 // the claim (and should run the agent), false if someone else already did.
 export async function claimRun(runId: string): Promise<boolean> {
@@ -140,6 +195,8 @@ export async function executeAgentRun(
         const promptSet = ((disc.output as { promptSet?: unknown[] }).promptSet as { category: string; label: string; prompts: string[] }[]) || [];
         // No nested stepper: this whole phase is already one step.
         const m = await runMonitorAgent({ ...base, promptSet }, bandedEmit(33, 33));
+        const sa = await recordCitationsAndIndex(sb, project.id, runId, domainOf(project.brand_url || ''), (m.output as { rawSamples?: any[] }).rawSamples || []);
+        (m.output as Record<string, unknown>).sourceAuthority = sa;
         await sb.from('assets').insert({
           project_id: project.id, agent_run_id: runId, type: 'geo_scorecard',
           title: `${project.brand_name} — GEO visibility scorecard`, format: 'json',
@@ -209,6 +266,8 @@ export async function executeAgentRun(
         },
         persistAndEmit,
       );
+      const sa = await recordCitationsAndIndex(sb, project.id, runId, domainOf(project.brand_url || ''), (result.output as { rawSamples?: any[] }).rawSamples || []);
+      (result.output as Record<string, unknown>).sourceAuthority = sa;
     } else if (agentId === 'report') {
       // Report turns the latest Monitor scorecard into a client deliverable.
       const { data: scAsset } = await sb

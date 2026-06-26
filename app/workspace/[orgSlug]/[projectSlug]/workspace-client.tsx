@@ -820,6 +820,29 @@ function MonitorResult({ o }: { o: Record<string, any> }) {
         </div>
       )}
 
+      {/* Source-Authority Index — which domains the engines actually cite */}
+      {o.sourceAuthority?.ranking?.length > 0 && (
+        <div>
+          <SectionLabel>Sources AI engines cite · AEO targets</SectionLabel>
+          <p className="text-[10px] text-gray-600 mb-1.5">
+            {o.sourceAuthority.totalCitations} citations indexed across this project&apos;s scans — get featured on these.
+          </p>
+          <div className="space-y-1">
+            {o.sourceAuthority.ranking.slice(0, 10).map((d: any, i: number) => (
+              <div key={i} className={`flex items-center gap-2.5 rounded-md px-2 py-1 ${d.isBrand ? 'bg-emerald-500/10 ring-1 ring-emerald-500/30' : ''}`}>
+                <span className="w-4 text-[10px] text-gray-600 tabular-nums">{i + 1}</span>
+                <span className={`flex-1 truncate text-[11px] ${d.isBrand ? 'text-emerald-200 font-semibold' : 'text-gray-300'}`}>
+                  {d.isBrand && <span className="mr-0.5">★</span>}{d.domain}
+                  {d.isBrand && <span className="ml-1 text-[9px] text-emerald-400/70 uppercase">you</span>}
+                </span>
+                <span className="text-[10px] text-gray-500">{d.engines} eng</span>
+                <span className="w-9 text-right text-[11px] tabular-nums text-gray-300 font-medium">{d.citations}×</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {o.citations && (
         <div className="text-[11px] text-gray-500 pt-1 border-t border-white/5">
           Brand domain cited <span className="text-gray-300 font-medium">{o.citations.brandCitedCount ?? 0}×</span> across AI answers.
