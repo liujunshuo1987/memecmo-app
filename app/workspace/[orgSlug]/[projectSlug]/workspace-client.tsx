@@ -10,7 +10,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { AGENTS, V05_AGENT_IDS } from '@/lib/agents/registry';
+import { AGENTS } from '@/lib/agents/registry';
 import type { AgentRun, Organization, Project } from '@/lib/workspace';
 
 interface Props {
@@ -45,23 +45,28 @@ const COUNTRY_FLAG: Record<string, string> = {
   Malaysia: '🇲🇾',
 };
 
+// Outcome-first deliverable groups. Each item maps to an agent; cards show the
+// latest completed run of that agent (view it) or offer to run it.
+const DELIVERABLE_GROUPS: { label: string; items: string[] }[] = [
+  { label: 'Setup', items: ['profile', 'discovery'] },
+  { label: 'Measure', items: ['monitor', 'report'] },
+  { label: 'Act — build AEO presence', items: ['site', 'optimize', 'distribute', 'encyclopedia'] },
+];
+
+type LatestRun = { runId: string; summary: string | null; status: string; output: any; createdAt: string };
+
 export default function WorkspaceClient({ project, organization, initialRuns }: Props) {
-  const [turns, setTurns] = useState<ChatTurn[]>(() =>
-    initialRuns
-      .slice()
-      .reverse()
-      .map((r) => ({
-        id: 'init-' + r.id,
-        role: 'system',
-        content: `Previous run · ${AGENTS[r.agent_id]?.shortName ?? r.agent_id} · ${r.status}` +
-          (r.summary ? ` — ${r.summary}` : ''),
-        agentId: r.agent_id,
-        runId: r.id,
-        ts: r.created_at,
-      })),
-  );
-  const [draft, setDraft] = useState('');
-  const [selectedAgent, setSelectedAgent] = useState<string>('discovery');
+  const [runsByAgent, setRunsByAgent] = useState<Record<string, LatestRun>>(() => {
+    const m: Record<string, LatestRun> = {};
+    for (const r of initialRuns) {
+      // initialRuns is newest-first; keep the first (latest) completed per agent.
+      if (r.status === 'completed' && !m[r.agent_id]) {
+        m[r.agent_id] = { runId: r.id, summary: r.summary, status: r.status, output: r.output, createdAt: r.created_at };
+      }
+    }
+    return m;
+  });
+  const [intent, setIntent] = useState('');
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [runStatus, setRunStatus] = useState<{
@@ -74,8 +79,15 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
   const [sending, setSending] = useState(false);
   const activityEndRef = useRef<HTMLDivElement>(null);
   const resultTopRef = useRef<HTMLDivElement>(null);
+  const freshRunRef = useRef(false);
 
   const isTerminal = !!runStatus && ['completed', 'failed', 'canceled'].includes(runStatus.status);
+
+  // Headline AIGVR — from the most recent monitor / full_scan run.
+  const scoreRun = [runsByAgent['monitor'], runsByAgent['full_scan']]
+    .filter((r) => r && r.output?.aigvrScore != null)
+    .sort((a, b) => (b!.createdAt || '').localeCompare(a!.createdAt || ''))[0];
+  const headlineAigvr: number | null = scoreRun?.output?.aigvrScore ?? null;
 
   // While running, follow the live stream to the bottom. Once terminal, stop
   // chasing the log — we converge to the deliverable instead.
@@ -123,6 +135,20 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
             });
           }
           if (data.terminal) {
+            // A freshly-dispatched run that finished updates the deliverable hub.
+            if (freshRunRef.current && data.run?.agent_id && activeRunId) {
+              freshRunRef.current = false;
+              setRunsByAgent((prev) => ({
+                ...prev,
+                [data.run.agent_id]: {
+                  runId: activeRunId,
+                  summary: data.run.summary,
+                  status: data.run.status,
+                  output: data.run.output ?? null,
+                  createdAt: data.run.created_at || prev[data.run.agent_id]?.createdAt || '',
+                },
+              }));
+            }
             cancelled = true;
             return;
           }
@@ -139,71 +165,39 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
     };
   }, [activeRunId]);
 
-  // Load a past run (from history) into the activity/result panel — reuses the
-  // same poller, which fetches all its events + output and stops (terminal).
-  const loadRun = (runId: string, agentId?: string) => {
+  // View a completed run's result (read-only). Reuses the poller, which fetches
+  // its events + output and stops (terminal).
+  const viewRun = (runId: string, agentId?: string) => {
     if (runId === activeRunId) return;
+    freshRunRef.current = false;
     setActivity([]);
     setRunStatus({ status: 'loading', progress_pct: 0, summary: null, agentId, output: null });
     setActiveRunId(runId);
   };
 
-  const handleSend = async () => {
-    if (!draft.trim() || sending) return;
-    const userMsg: ChatTurn = {
-      id: 'u-' + Date.now(),
-      role: 'user',
-      content: draft.trim(),
-      ts: new Date().toISOString(),
-    };
-    setTurns((p) => [...p, userMsg]);
-    const prompt = draft.trim();
-    setDraft('');
+  // Dispatch an agent (or the full-scan cascade) and watch it.
+  const dispatchAgent = async (agentId: string, inputPrompt?: string) => {
+    if (sending) return;
     setSending(true);
-
+    freshRunRef.current = true;
+    setActivity([]);
+    setRunStatus({ status: 'queued', progress_pct: 0, summary: null, agentId, output: null });
+    setActiveRunId(null);
     try {
       const res = await fetch('/api/workspace/agent-runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId: project.id,
-          agentId: selectedAgent,
-          inputPrompt: prompt,
-          triggerMethod: 'chat',
-        }),
+        body: JSON.stringify({ projectId: project.id, agentId, inputPrompt: inputPrompt || undefined, triggerMethod: 'chat' }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setTurns((p) => [
-          ...p,
-          {
-            id: 'e-' + Date.now(),
-            role: 'system',
-            content: `Error: ${data.error || res.statusText}`,
-            ts: new Date().toISOString(),
-          },
-        ]);
+        setRunStatus({ status: 'failed', progress_pct: 0, summary: data.error || res.statusText, agentId, output: null });
         setSending(false);
         return;
       }
-      const assistantMsg: ChatTurn = {
-        id: 'a-' + data.run.id,
-        role: 'assistant',
-        content: `${AGENTS[selectedAgent]?.emoji ?? '🤖'} ${AGENTS[selectedAgent]?.displayName ?? selectedAgent} dispatched. Watch progress on the right →`,
-        agentId: selectedAgent,
-        runId: data.run.id,
-        ts: data.run.created_at,
-      };
-      setTurns((p) => [...p, assistantMsg]);
-      setActivity([]);
-      setRunStatus({ status: 'queued', progress_pct: 0, summary: null, agentId: selectedAgent, output: null });
       setActiveRunId(data.run.id);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setTurns((p) => [
-        ...p,
-        { id: 'e-' + Date.now(), role: 'system', content: `Network error: ${msg}`, ts: new Date().toISOString() },
-      ]);
+      setRunStatus({ status: 'failed', progress_pct: 0, summary: err instanceof Error ? err.message : String(err), agentId, output: null });
     }
     setSending(false);
   };
@@ -227,7 +221,13 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {headlineAigvr != null && (
+            <div className="text-right leading-none">
+              <div className={`text-lg font-semibold ${headlineAigvr >= 67 ? 'text-emerald-300' : headlineAigvr >= 34 ? 'text-amber-300' : 'text-red-300'}`}>{headlineAigvr}</div>
+              <div className="text-[9px] text-gray-500 uppercase tracking-wider">AIGVR</div>
+            </div>
+          )}
           <span
             className={`text-[10px] px-2 py-1 rounded-full uppercase tracking-wider ${
               project.status === 'active'
@@ -240,174 +240,165 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
         </div>
       </header>
 
-      {/* Two-panel body */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_1fr] min-h-0">
-        {/* ─── Left: chat ──────────────────────────────────────── */}
-        <section className="border-r border-white/5 flex flex-col min-h-0">
-          <div className="px-6 py-4 border-b border-white/5">
-            <h2 className="text-sm font-semibold tracking-wide">Workspace</h2>
-            <p className="text-xs text-gray-500">
-              Tell an agent what to do. Default action = run Discovery on this brand.
-            </p>
+      {/* Outcome-first body */}
+      <main className="max-w-3xl mx-auto w-full px-6 py-6 space-y-6">
+        {/* Primary action */}
+        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <button
+              onClick={() => dispatchAgent('full_scan')}
+              disabled={sending}
+              className="shrink-0 inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 text-sm font-medium transition"
+            >
+              ⚡ Run full GEO scan
+            </button>
+            <input
+              value={intent}
+              onChange={(e) => setIntent(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && intent.trim()) { e.preventDefault(); dispatchAgent('full_scan', intent.trim()); setIntent(''); }
+              }}
+              placeholder="…or tell the agents what to focus on"
+              disabled={sending}
+              className="flex-1 bg-white/[0.03] border border-white/10 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-400/50"
+            />
           </div>
+          <p className="text-[11px] text-gray-500 mt-2">
+            One click runs Discovery → Monitor (AIGVR) → Report. Or open / run any deliverable below.
+          </p>
+        </div>
 
-          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
-            {turns.length === 0 && (
-              <div className="text-xs text-gray-500 italic">
-                No history yet. Type a message below and pick an agent to dispatch.
-              </div>
-            )}
-            {turns.map((t) => {
-              const clickable = !!t.runId;
-              const isActive = t.runId && t.runId === activeRunId;
-              return (
-                <div
-                  key={t.id}
-                  className={`flex ${t.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    onClick={clickable ? () => loadRun(t.runId!, t.agentId) : undefined}
-                    className={`max-w-[80%] rounded-lg px-3 py-2 text-sm leading-relaxed ${
-                      clickable ? 'cursor-pointer hover:border-blue-400/40' : ''
-                    } ${
-                      t.role === 'user'
-                        ? 'bg-blue-600/30 text-blue-50 border border-blue-500/30'
-                        : t.role === 'assistant'
-                        ? 'bg-white/[0.03] text-gray-100 border border-white/10'
-                        : `bg-transparent text-gray-500 border italic text-xs ${
-                            isActive ? 'border-emerald-400/40 text-gray-300' : 'border-white/5'
-                          }`
-                    }`}
-                  >
-                    {t.content}
-                    {clickable && t.role === 'system' && (
-                      <span className="ml-2 not-italic text-[10px] text-blue-400">view →</span>
-                    )}
-                  </div>
+        {/* Deliverables hub */}
+        {DELIVERABLE_GROUPS.map((group) => (
+          <div key={group.label}>
+            <div className="text-[11px] uppercase tracking-widest text-gray-500 mb-2">{group.label}</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {group.items.map((aid) => (
+                <DeliverableCard
+                  key={aid}
+                  agentId={aid}
+                  run={runsByAgent[aid]}
+                  running={sending && runStatus?.agentId === aid && !isTerminal}
+                  isViewing={!!runsByAgent[aid] && runsByAgent[aid].runId === activeRunId}
+                  onView={viewRun}
+                  onRun={dispatchAgent}
+                  disabled={sending}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+
+        {/* Detail panel — active run / viewed result */}
+        {runStatus && (
+          <div ref={resultTopRef} className="rounded-xl border border-white/10 bg-[#070f1d] overflow-hidden">
+            <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-sm font-medium truncate">
+                  {AGENTS[runStatus.agentId ?? '']?.emoji} {AGENTS[runStatus.agentId ?? '']?.displayName ?? 'Agent run'}
                 </div>
-              );
-            })}
-          </div>
-
-          <div className="border-t border-white/5 px-6 py-4 space-y-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              {V05_AGENT_IDS.map((aid) => {
-                const a = AGENTS[aid];
-                const active = selectedAgent === aid;
-                return (
-                  <button
-                    key={aid}
-                    onClick={() => setSelectedAgent(aid)}
-                    className={`text-xs px-3 py-1.5 rounded-full border transition ${
-                      active
-                        ? 'bg-blue-500/20 border-blue-400/50 text-blue-100'
-                        : 'bg-transparent border-white/10 text-gray-400 hover:border-white/30'
-                    }`}
-                    title={a.description}
-                  >
-                    <span className="mr-1">{a.emoji}</span>
-                    {a.shortName}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="flex gap-2">
-              <input
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                placeholder={`Ask ${AGENTS[selectedAgent]?.shortName ?? 'an agent'} to…`}
-                className="flex-1 bg-white/[0.03] border border-white/10 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-blue-400/50"
-                disabled={sending}
-              />
-              <button
-                onClick={handleSend}
-                disabled={sending || !draft.trim()}
-                className="px-4 py-2 text-sm rounded-md bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 transition"
-              >
-                {sending ? '…' : 'Send'}
-              </button>
-            </div>
-            <p className="text-[10px] text-gray-600 leading-snug">
-              v1.0 — ⚡ Full Scan runs Discovery → Monitor (AIGVR across ChatGPT / Gemini /
-              Perplexity / Claude) → Report in one click. On completion it converges to the
-              report; the process log collapses. Click a past run to view its result.
-            </p>
-          </div>
-        </section>
-
-        {/* ─── Right: activity stream ────────────────────────── */}
-        <section className="flex flex-col min-h-0 bg-[#070f1d]">
-          <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-semibold tracking-wide">Agent activity</h2>
-              <p className="text-xs text-gray-500">
-                {activeRunId
-                  ? `Run ${activeRunId.slice(0, 8)} · ${runStatus?.status ?? 'connecting…'} · ${runStatus?.progress_pct ?? 0}%`
-                  : 'Idle — dispatch an agent from the left to see live activity.'}
-              </p>
-            </div>
-            {runStatus && (
-              <div className="w-24 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                <div className="text-[11px] text-gray-500">{runStatus.status} · {runStatus.progress_pct ?? 0}%</div>
+              </div>
+              <div className="w-24 h-1.5 bg-white/5 rounded-full overflow-hidden shrink-0">
                 <div
-                  className={`h-full transition-all ${
-                    runStatus.status === 'failed' ? 'bg-red-500' : 'bg-emerald-400'
-                  }`}
-                  style={{ width: `${runStatus.progress_pct}%` }}
+                  className={`h-full transition-all ${runStatus.status === 'failed' ? 'bg-red-500' : 'bg-emerald-400'}`}
+                  style={{ width: `${runStatus.progress_pct ?? 0}%` }}
                 />
               </div>
-            )}
-          </div>
+            </div>
 
-          <div className="flex-1 overflow-y-auto px-6 py-4">
-            {!activeRunId && (
-              <div className="font-mono text-xs text-gray-600 italic">— Awaiting dispatch —</div>
-            )}
-
-            {activeRunId && isTerminal && runStatus?.output ? (
-              /* Converged view: deliverable first, process log collapsed. */
-              <div className="space-y-4">
-                <div ref={resultTopRef} />
-                {runStatus.summary && (
-                  <div className="p-3 rounded border border-emerald-500/30 bg-emerald-500/5">
-                    <div className="text-[10px] uppercase tracking-widest text-emerald-400 mb-1">Result</div>
-                    <div className="text-sm text-emerald-100 leading-relaxed">{runStatus.summary}</div>
-                  </div>
-                )}
-                <RunResult agentId={runStatus.agentId} output={runStatus.output} />
-                <details className="rounded border border-white/5 bg-white/[0.02]">
-                  <summary className="cursor-pointer px-3 py-2 text-[11px] uppercase tracking-widest text-gray-500 select-none hover:text-gray-300">
-                    Process log · {activity.length} steps
-                  </summary>
-                  <div className="px-3 pb-3 font-mono text-xs space-y-2 border-t border-white/5 pt-2">
-                    {activity.map((ev) => (
-                      <ActivityRow key={ev.id} ev={ev} />
-                    ))}
-                  </div>
-                </details>
-              </div>
-            ) : (
-              /* Live view: stream the process as it runs. */
-              <div className="font-mono text-xs space-y-2">
-                {activity.map((ev) => (
-                  <ActivityRow key={ev.id} ev={ev} />
-                ))}
-                {isTerminal && runStatus?.summary && (
-                  <div className="mt-4 p-3 rounded border border-emerald-500/30 bg-emerald-500/5">
-                    <div className="text-[10px] uppercase tracking-widest text-emerald-400 mb-1">Result</div>
-                    <div className="text-emerald-100 leading-relaxed">{runStatus.summary}</div>
-                  </div>
-                )}
-                <div ref={activityEndRef} />
-              </div>
-            )}
+            <div className="px-4 py-4 max-h-[70vh] overflow-y-auto">
+              {isTerminal && runStatus.output ? (
+                <div className="space-y-4">
+                  {runStatus.summary && (
+                    <div className="p-3 rounded border border-emerald-500/30 bg-emerald-500/5 text-sm text-emerald-100 leading-relaxed">
+                      {runStatus.summary}
+                    </div>
+                  )}
+                  <RunResult agentId={runStatus.agentId} output={runStatus.output} />
+                  <details className="rounded border border-white/5 bg-white/[0.02]">
+                    <summary className="cursor-pointer px-3 py-2 text-[11px] uppercase tracking-widest text-gray-500 select-none hover:text-gray-300">
+                      Process log · {activity.length} steps
+                    </summary>
+                    <div className="px-3 pb-3 font-mono text-xs space-y-2 border-t border-white/5 pt-2">
+                      {activity.map((ev) => (<ActivityRow key={ev.id} ev={ev} />))}
+                    </div>
+                  </details>
+                </div>
+              ) : isTerminal && runStatus.status === 'failed' ? (
+                <div className="text-sm text-red-300">{runStatus.summary || 'Run failed.'}</div>
+              ) : (
+                <div className="font-mono text-xs space-y-2">
+                  {activity.length === 0 && <div className="text-gray-600 italic">starting…</div>}
+                  {activity.map((ev) => (<ActivityRow key={ev.id} ev={ev} />))}
+                  <div ref={activityEndRef} />
+                </div>
+              )}
+            </div>
           </div>
-        </section>
+        )}
+
+        <p className="text-[10px] text-gray-600 leading-snug pt-2">
+          v1.1 — outcome-first workspace. Full Scan orchestrates Discovery → Monitor → Report;
+          execution agents (Site / Content / Distribute / Encyclopedia) build AEO presence; all
+          share one canonical Brand Profile.
+        </p>
+      </main>
+    </div>
+  );
+}
+
+function DeliverableCard({
+  agentId, run, running, isViewing, onView, onRun, disabled,
+}: {
+  agentId: string;
+  run?: LatestRun;
+  running: boolean;
+  isViewing: boolean;
+  onView: (runId: string, agentId: string) => void;
+  onRun: (agentId: string) => void;
+  disabled: boolean;
+}) {
+  const a = AGENTS[agentId];
+  const ready = !!run && run.status === 'completed';
+  return (
+    <div
+      onClick={() => (ready ? onView(run!.runId, agentId) : onRun(agentId))}
+      className={`group rounded-lg border bg-white/[0.02] p-3 cursor-pointer transition ${
+        isViewing ? 'border-emerald-400/40' : 'border-white/10 hover:border-blue-400/40'
+      }`}
+    >
+      <div className="flex items-center gap-2">
+        <span className="text-base leading-none">{a?.emoji ?? '•'}</span>
+        <span className="text-sm font-medium text-gray-100 truncate">{a?.shortName ?? agentId}</span>
+        <span className="ml-auto shrink-0">
+          {running ? (
+            <span className="text-[10px] text-blue-300">running…</span>
+          ) : ready ? (
+            <span className="text-[10px] text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded">ready</span>
+          ) : (
+            <span className="text-[10px] text-gray-500">not run</span>
+          )}
+        </span>
+      </div>
+      <div className="text-[11px] text-gray-500 mt-1.5 line-clamp-2 min-h-[28px]">
+        {ready ? run!.summary : a?.description}
+      </div>
+      <div className="mt-2 flex items-center gap-3 text-[11px]">
+        {ready ? (
+          <>
+            <span className="text-blue-300 group-hover:underline">View →</span>
+            <button
+              onClick={(e) => { e.stopPropagation(); if (!disabled) onRun(agentId); }}
+              disabled={disabled}
+              className="text-gray-500 hover:text-gray-200 disabled:opacity-40"
+            >
+              ↻ re-run
+            </button>
+          </>
+        ) : (
+          <span className="text-blue-300 group-hover:underline">Run →</span>
+        )}
       </div>
     </div>
   );
