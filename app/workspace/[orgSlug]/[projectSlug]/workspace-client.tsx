@@ -581,6 +581,8 @@ function RunResult({ agentId, output }: { agentId?: string; output: Record<strin
         <DistributionResult o={output} />
       ) : agentId === 'site' ? (
         <SiteResult o={output} />
+      ) : agentId === 'encyclopedia' ? (
+        <EncyclopediaResult o={output} />
       ) : agentId === 'discovery' ? (
         <DiscoveryResult o={output} />
       ) : null}
@@ -629,6 +631,83 @@ function ContentResult({ o }: { o: Record<string, any> }) {
               </li>
             ))}
           </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EncyclopediaResult({ o }: { o: Record<string, any> }) {
+  const n = o.notability || {};
+  const cites: any[] = o.citationPlan || [];
+  const targets: any[] = o.existingArticleTargets || [];
+  const da = o.draftArticle || {};
+  const copy = (t?: string) => { if (t) navigator.clipboard?.writeText(t).catch(() => {}); };
+  const vColor = n.verdict === 'likely' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+    : n.verdict === 'borderline' ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+    : 'bg-red-500/20 text-red-300 border-red-500/40';
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-white">Encyclopedia entry &amp; path</h3>
+          <p className="text-[11px] text-gray-500 mt-0.5">{o.targetWiki}</p>
+        </div>
+        <button onClick={() => copy(o.fullMarkdown)} className="text-[11px] px-2 py-0.5 rounded border border-white/10 text-gray-400 hover:border-blue-400/40 hover:text-blue-200 transition shrink-0">Copy plan</button>
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className={`text-[10px] px-2 py-0.5 rounded border uppercase tracking-wide ${vColor}`}>notability: {n.verdict || '—'}</span>
+        {o.recommendedApproach && <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 border border-white/10 text-gray-300">{String(o.recommendedApproach).replace(/_/g, ' ')}</span>}
+      </div>
+      {n.reasoning && <p className="text-[12px] text-gray-400 leading-snug">{n.reasoning}</p>}
+
+      {n.evidenceNeeded?.length > 0 && (
+        <div>
+          <SectionLabel>Evidence needed to qualify</SectionLabel>
+          <ul className="space-y-0.5">{n.evidenceNeeded.map((e: string, i: number) => <li key={i} className="text-[12px] text-gray-400">· {e}</li>)}</ul>
+        </div>
+      )}
+
+      {da.title && (
+        <div>
+          <SectionLabel>Draft — {da.title}</SectionLabel>
+          {da.lead && <p className="text-[12px] text-gray-300 leading-relaxed">{da.lead}</p>}
+          {(da.sections || []).map((s: any, i: number) => (
+            <div key={i} className="mt-1.5">
+              <div className="text-[12px] text-gray-200 font-medium">{s.heading}</div>
+              <div className="text-[12px] text-gray-400 leading-snug">{s.content}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {cites.length > 0 && (
+        <div>
+          <SectionLabel>Citation plan</SectionLabel>
+          <ul className="space-y-0.5">
+            {cites.map((c, i) => (
+              <li key={i} className="text-[12px] leading-snug">
+                <span className={c.status === 'have' ? 'text-emerald-400' : 'text-amber-400'}>{c.status === 'have' ? '✓' : '○'}</span>
+                <span className="text-gray-300"> {c.claim}</span>
+                <span className="text-gray-600"> — {c.sourceType}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {targets.length > 0 && (
+        <div>
+          <SectionLabel>Get mentioned in existing articles</SectionLabel>
+          <div className="space-y-1.5">
+            {targets.map((t, i) => (
+              <div key={i} className="text-[12px] leading-snug">
+                <span className="text-purple-200 font-medium">{t.article}: </span>
+                <span className="text-gray-400">{t.howToGetMentioned}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

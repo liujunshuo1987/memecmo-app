@@ -14,6 +14,7 @@ import { runReportAgent } from './report';
 import { runOptimizeAgent } from './optimize';
 import { runDistributeAgent } from './distribute';
 import { runSiteAgent } from './site';
+import { runEncyclopediaAgent } from './encyclopedia';
 
 export type AgentEvent = {
   event_type:
@@ -411,6 +412,36 @@ export async function executeAgentRun(
         },
         persistAndEmit,
       );
+    } else if (agentId === 'encyclopedia') {
+      // Encyclopedia: notability assessment + entry/path. Grounds notability on
+      // the Source-Authority sources if a scorecard exists (optional).
+      const { data: scAsset } = await sb
+        .from('assets')
+        .select('content')
+        .eq('project_id', project.id)
+        .eq('type', 'geo_scorecard')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      let sources: { domain: string; citations: number; isBrand: boolean }[] = [];
+      if (scAsset?.content) {
+        try {
+          sources = JSON.parse(scAsset.content)?.sourceAuthority?.ranking ?? [];
+        } catch {
+          /* optional grounding — ignore */
+        }
+      }
+      result = await runEncyclopediaAgent(
+        {
+          brandName: project.brand_name,
+          brandUrl: project.brand_url,
+          targetCountry: project.target_country,
+          targetLanguage: project.target_language,
+          industry: project.industry,
+          sources,
+        },
+        persistAndEmit,
+      );
     } else {
       const def = AGENTS[agentId];
       await persistAndEmit({
@@ -491,6 +522,16 @@ export async function executeAgentRun(
         agent_run_id: runId,
         type: 'site_optimization',
         title: `${project.brand_name} — homepage AEO upgrade`,
+        format: 'markdown',
+        content: (result.output as { fullMarkdown?: string }).fullMarkdown ?? JSON.stringify(result.output, null, 2),
+        meta: { brand: project.brand_name, country: project.target_country },
+      });
+    } else if (agentId === 'encyclopedia') {
+      await sb.from('assets').insert({
+        project_id: project.id,
+        agent_run_id: runId,
+        type: 'encyclopedia_entry',
+        title: `${project.brand_name} — encyclopedia entry & path`,
         format: 'markdown',
         content: (result.output as { fullMarkdown?: string }).fullMarkdown ?? JSON.stringify(result.output, null, 2),
         meta: { brand: project.brand_name, country: project.target_country },

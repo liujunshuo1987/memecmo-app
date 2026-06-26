@@ -68,6 +68,14 @@ export const AGENTS: Record<string, AgentDef> = {
     description: 'Fetches the brand homepage and returns paste-in JSON-LD + concrete AEO edits (entity clarity, structure) for AI retrieval & Google rich results.',
     typicalDurationSec: 60,
   },
+  encyclopedia: {
+    id: 'encyclopedia',
+    displayName: 'Encyclopedia Agent',
+    shortName: 'Encyclopedia',
+    emoji: '📚',
+    description: 'Honest Wikipedia notability check, then a neutral citation-scaffolded entry — or the realistic path (build coverage, get mentioned in existing articles).',
+    typicalDurationSec: 60,
+  },
 };
 
 export const V05_AGENT_IDS = Object.keys(AGENTS);
