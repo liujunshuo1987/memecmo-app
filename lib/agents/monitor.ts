@@ -1,14 +1,14 @@
-// Monitor Agent (v0.7 — real multi-engine GEO visibility measurement)
+// Monitor Agent (v0.8 — deep multi-engine AIGVR measurement)
 //
-// Takes the Discovery prompt set and runs a sample of it against the real AI
-// answer engines (ChatGPT / Gemini / Perplexity) via Poe. For each answer it
-// detects whether the brand and its competitors are mentioned, and whether the
-// brand is cited (Perplexity returns source URLs). It aggregates this into a
-// GEO scorecard: overall Share-of-Voice, per-engine and per-funnel-stage SoV,
-// a competitor benchmark with the brand's rank, and a list of high-intent gaps
-// (queries where the brand is absent but a competitor appears).
-//
-// This is the measurement that turns Discovery's prompt list into a deliverable.
+// Takes the Discovery prompt set and runs a stage-balanced sample against the
+// real AI answer engines (ChatGPT / Gemini / Perplexity / Claude) via Poe.
+// For each answer a judge pass scores how the brand appears, and competitors
+// are extracted from the answers themselves (self-calibrating). It aggregates
+// the AIGVR five-dimension index into a 0-100 score:
+//   presence · prominence · sentiment · citation · competitive share
+// plus per-engine and per-funnel-stage breakdowns, a competitor benchmark, and
+// the high-intent gap list (queries where competitors appear and the brand
+// doesn't). This is the measurement that turns prompts into a deliverable.
 
 import { poeChat, parseJsonFromLLM } from '@/lib/llm/poe';
 
@@ -45,10 +45,14 @@ const ENGINES: { key: string; label: string; model: string }[] = [
   { key: 'chatgpt', label: 'ChatGPT', model: 'GPT-4o' },
   { key: 'gemini', label: 'Gemini', model: 'Gemini-2.5-Pro' },
   { key: 'perplexity', label: 'Perplexity', model: 'Perplexity-Sonar' },
+  { key: 'claude', label: 'Claude', model: 'Claude-Sonnet-4.5' },
 ];
 
-const SAMPLE_CAP = 12; // prompts sampled across stages (cost/latency bound)
-const QUERY_CONCURRENCY = 4;
+const SAMPLE_CAP = 16; // prompts sampled across stages (cost/latency bound)
+const QUERY_CONCURRENCY = 5;
+
+// AIGVR composite weights (sum = 1.0).
+const WEIGHTS = { presence: 0.3, prominence: 0.25, sentiment: 0.15, citation: 0.1, competitiveShare: 0.2 };
 
 // ── text utilities ───────────────────────────────────────────────────────────
 
@@ -104,8 +108,11 @@ function pct(n: number, d: number): number {
   return d === 0 ? 0 : Math.round((n / d) * 100);
 }
 
-// Evenly sample up to `cap` prompts across funnel stages, so the scorecard
-// isn't dominated by one stage.
+function round(n: number): number {
+  return Math.round(n);
+}
+
+// Evenly sample up to `cap` prompts across funnel stages.
 function sampleAcrossStages(
   promptSet: PromptCategory[],
   cap: number,
@@ -117,7 +124,6 @@ function sampleAcrossStages(
     }
   }
   if (flat.length <= cap) return flat;
-  // round-robin by stage
   const byStage = new Map<string, typeof flat>();
   for (const f of flat) {
     if (!byStage.has(f.stage)) byStage.set(f.stage, []);
@@ -136,18 +142,13 @@ function sampleAcrossStages(
 
 // ── competitor identification (from real answers, not a cold guess) ───────────
 
-// Extract the competitor brands the engines ACTUALLY named in their answers.
-// This self-calibrates the benchmark to the real market: if buyers ask "best X
-// companies" and the engines list Chicilon/Goldsun, those are the real rivals —
-// far more accurate than guessing competitor names before seeing any data.
 async function extractCompetitorsFromAnswers(
   answers: { text: string }[],
   input: MonitorInput,
 ): Promise<string[]> {
-  // Build a bounded corpus from the answers.
   let corpus = '';
   for (const a of answers) {
-    if (corpus.length > 6000) break;
+    if (corpus.length > 8000) break;
     corpus += a.text.slice(0, 800) + '\n---\n';
   }
   const res = await poeChat({
@@ -160,7 +161,7 @@ async function extractCompetitorsFromAnswers(
           `${input.industry || 'this industry'} in ${input.targetCountry}.\n\n` +
           `List the distinct competitor COMPANY/BRAND names that appear in these answers, ` +
           `EXCLUDING "${input.brandName}". Order by how frequently/prominently they appear. ` +
-          `Use the exact names as written. Return ONLY a JSON array of 4-10 strings.\n\n` +
+          `Use the exact names as written. Return ONLY a JSON array of 4-12 strings.\n\n` +
           `ANSWERS:\n${corpus}`,
       },
     ],
@@ -170,7 +171,6 @@ async function extractCompetitorsFromAnswers(
   try {
     const arr = parseJsonFromLLM<string[]>(res.content);
     if (!Array.isArray(arr)) return [];
-    // Dedupe (case-insensitive), drop the brand itself and junk.
     const seen = new Set<string>();
     const out: string[] = [];
     for (const raw of arr) {
@@ -183,20 +183,83 @@ async function extractCompetitorsFromAnswers(
       seen.add(k);
       out.push(name);
     }
-    return out.slice(0, 10);
+    return out.slice(0, 12);
   } catch {
     return [];
   }
 }
 
-// ── main ─────────────────────────────────────────────────────────────────────
+// ── judge pass (prominence + sentiment) ──────────────────────────────────────
+
+type Sentiment = 'positive' | 'neutral' | 'negative' | 'none';
+
+interface Verdict {
+  brandMentioned: boolean;
+  prominence: number; // 0 absent · 1 passing · 2 one-of-several · 3 featured/top
+  sentiment: Sentiment;
+  competitors: string[];
+}
+
+// Batched judge over one engine's answers — one LLM call, indexed output.
+async function judgeEngineAnswers(
+  answers: { prompt: string; text: string }[],
+  brand: string,
+  competitors: string[],
+): Promise<(Verdict | null)[]> {
+  const items = answers
+    .map((a, i) => `[${i}] Q: ${a.prompt}\nA: ${a.text.slice(0, 700)}`)
+    .join('\n\n');
+  const res = await poeChat({
+    model: 'Claude-Sonnet-4.5',
+    messages: [
+      { role: 'system', content: 'You are a strict evaluator of brand visibility in AI answers. Output JSON only.' },
+      {
+        role: 'user',
+        content:
+          `Brand: "${brand}"\n` +
+          `Competitors to track: ${competitors.length ? competitors.join(', ') : '(none)'}\n\n` +
+          `For each numbered AI answer below, judge how the BRAND appears:\n` +
+          `- brandMentioned: true/false\n` +
+          `- prominence: 0 (absent), 1 (mentioned in passing), 2 (one of several options listed), 3 (featured / top recommendation)\n` +
+          `- sentiment: "positive" | "neutral" | "negative" | "none" (none if not mentioned)\n` +
+          `- competitors: array of the tracked competitor names that appear in THIS answer\n\n` +
+          `Return ONLY a JSON array with one object per item: ` +
+          `{"i": <index>, "brandMentioned": bool, "prominence": int, "sentiment": str, "competitors": [str]}.\n\n` +
+          `ANSWERS:\n${items}`,
+      },
+    ],
+    maxTokens: 1800,
+    temperature: 0.1,
+  });
+  const out: (Verdict | null)[] = new Array(answers.length).fill(null);
+  try {
+    const arr = parseJsonFromLLM<any[]>(res.content);
+    if (!Array.isArray(arr)) return out;
+    for (const v of arr) {
+      const i = typeof v?.i === 'number' ? v.i : -1;
+      if (i < 0 || i >= answers.length) continue;
+      const sent: Sentiment = ['positive', 'neutral', 'negative', 'none'].includes(v.sentiment) ? v.sentiment : 'none';
+      out[i] = {
+        brandMentioned: !!v.brandMentioned,
+        prominence: Math.max(0, Math.min(3, Number(v.prominence) || 0)),
+        sentiment: sent,
+        competitors: Array.isArray(v.competitors) ? v.competitors.filter((x: unknown) => typeof x === 'string') : [],
+      };
+    }
+  } catch {
+    /* fall back to nulls → caller uses string-match */
+  }
+  return out;
+}
+
+// ── scoring ──────────────────────────────────────────────────────────────────
 
 interface RawAnswer {
   engine: string;
   stage: string;
   prompt: string;
   text: string;
-  brandPresent: boolean;
+  brandPresentStr: boolean; // string-match fallback
   citations: string[];
   brandCited: boolean;
 }
@@ -206,11 +269,51 @@ interface Sample {
   stage: string;
   prompt: string;
   brandPresent: boolean;
+  prominence: number;
+  sentiment: Sentiment;
   competitorsPresent: string[];
   citations: string[];
   brandCited: boolean;
   snippet: string;
 }
+
+const SENTIMENT_VALUE: Record<Sentiment, number> = { positive: 1, neutral: 0.5, negative: 0, none: 0 };
+
+// Compute the AIGVR five dimensions (each 0-100) + composite for a sample set.
+function computeDimensions(samples: Sample[]) {
+  const queries = samples.length;
+  const mentioned = samples.filter((s) => s.brandPresent);
+  const brandHits = mentioned.length;
+
+  const presence = pct(brandHits, queries);
+  const prominence = brandHits ? (mentioned.reduce((a, s) => a + s.prominence, 0) / brandHits / 3) * 100 : 0;
+  const sentiment = brandHits
+    ? (mentioned.reduce((a, s) => a + SENTIMENT_VALUE[s.sentiment], 0) / brandHits) * 100
+    : 0;
+  const citation = pct(samples.filter((s) => s.brandCited).length, queries);
+  const competitorMentions = samples.reduce((a, s) => a + s.competitorsPresent.length, 0);
+  const competitiveShare = brandHits + competitorMentions ? (brandHits / (brandHits + competitorMentions)) * 100 : 0;
+
+  const aigvr =
+    WEIGHTS.presence * presence +
+    WEIGHTS.prominence * prominence +
+    WEIGHTS.sentiment * sentiment +
+    WEIGHTS.citation * citation +
+    WEIGHTS.competitiveShare * competitiveShare;
+
+  return {
+    queries,
+    brandHits,
+    presence: round(presence),
+    prominence: round(prominence),
+    sentiment: round(sentiment),
+    citation: round(citation),
+    competitiveShare: round(competitiveShare),
+    aigvr: round(aigvr),
+  };
+}
+
+// ── main ─────────────────────────────────────────────────────────────────────
 
 export async function runMonitorAgent(
   input: MonitorInput,
@@ -219,15 +322,12 @@ export async function runMonitorAgent(
   const { brandName, brandUrl, targetCountry } = input;
   const brandDomain = brandUrl ? domainOf(brandUrl) : '';
 
-  await emit({ event_type: 'milestone', payload: { label: 'Monitor started', step: 1, totalSteps: 4 } });
+  await emit({ event_type: 'milestone', payload: { label: 'Monitor started', step: 1, totalSteps: 5 } });
 
   // 1. Sample prompts (stage-balanced, bounded)
   const totalPrompts = input.promptSet.reduce((n, c) => n + (c.prompts?.length || 0), 0);
   const sampled = sampleAcrossStages(input.promptSet, SAMPLE_CAP);
-  await emit({
-    event_type: 'milestone',
-    payload: { label: 'Sampling prompt set', step: 2, totalSteps: 4 },
-  });
+  await emit({ event_type: 'milestone', payload: { label: 'Sampling prompt set', step: 2, totalSteps: 5 } });
   await emit({
     event_type: 'log',
     payload: {
@@ -235,8 +335,8 @@ export async function runMonitorAgent(
     },
   });
 
-  // 2. Query engines — collect raw answers (full text kept in-memory only).
-  const raw: RawAnswer[] = [];
+  // 2. Query engines — collect raw answers (full text in-memory only).
+  const rawByEngine = new Map<string, RawAnswer[]>();
   const totalQueries = sampled.length * ENGINES.length;
   let done = 0;
 
@@ -246,7 +346,7 @@ export async function runMonitorAgent(
       payload: { tool: 'engine.query', engine: engine.label, model: engine.model, prompts: sampled.length },
     });
     try {
-      const engineAnswers = await mapLimit(sampled, QUERY_CONCURRENCY, async (s) => {
+      const answers = await mapLimit(sampled, QUERY_CONCURRENCY, async (s) => {
         const resp = await poeChat({
           model: engine.model,
           messages: [{ role: 'user', content: s.prompt }],
@@ -256,29 +356,27 @@ export async function runMonitorAgent(
         });
         const text = resp.content || '';
         const urls = extractUrls(text);
-        const answer: RawAnswer = {
+        const a: RawAnswer = {
           engine: engine.label,
           stage: s.stage,
           prompt: s.prompt,
           text,
-          brandPresent: mentions(text, brandName),
+          brandPresentStr: mentions(text, brandName),
           citations: urls,
           brandCited: !!brandDomain && urls.some((u) => domainOf(u) === brandDomain),
         };
         done++;
-        if (done % 4 === 0 || done === totalQueries) {
-          await emit({ event_type: 'progress', payload: { pct: 5 + Math.round((done / totalQueries) * 75) } });
+        if (done % 5 === 0 || done === totalQueries) {
+          await emit({ event_type: 'progress', payload: { pct: 5 + Math.round((done / totalQueries) * 60) } });
         }
-        return answer;
+        return a;
       });
-      raw.push(...engineAnswers);
-      const hits = engineAnswers.filter((a) => a.brandPresent).length;
+      rawByEngine.set(engine.label, answers);
       await emit({
         event_type: 'tool_result',
-        payload: { tool: 'engine.query', engine: engine.label, brandSoVPct: pct(hits, engineAnswers.length) },
+        payload: { tool: 'engine.query', engine: engine.label, brandSoVPct: pct(answers.filter((a) => a.brandPresentStr).length, answers.length) },
       });
     } catch (err) {
-      // Resilient: one engine failing doesn't sink the whole scan.
       await emit({
         event_type: 'log',
         payload: { text: `${engine.label} unavailable: ${err instanceof Error ? err.message : String(err)}` },
@@ -286,80 +384,89 @@ export async function runMonitorAgent(
     }
   }
 
-  if (raw.length === 0) {
-    throw new Error('All engines failed — no measurements collected.');
-  }
+  const allRaw = Array.from(rawByEngine.values()).flat();
+  if (allRaw.length === 0) throw new Error('All engines failed — no measurements collected.');
 
-  // 3. Identify competitors from the REAL answers (self-calibrating benchmark).
-  await emit({ event_type: 'milestone', payload: { label: 'Identifying competitors from answers', step: 3, totalSteps: 4 } });
-  const competitors = await extractCompetitorsFromAnswers(raw, input);
+  // 3. Identify competitors from the REAL answers (self-calibrating).
+  await emit({ event_type: 'milestone', payload: { label: 'Identifying competitors', step: 3, totalSteps: 5 } });
+  const competitors = await extractCompetitorsFromAnswers(allRaw, input);
   await emit({
     event_type: 'log',
-    payload: {
-      text: competitors.length
-        ? `Competitors named by the engines: ${competitors.join(', ')}`
-        : 'No competitor brands surfaced in the answers.',
-    },
+    payload: { text: competitors.length ? `Competitors named by the engines: ${competitors.join(', ')}` : 'No competitor brands surfaced.' },
   });
 
-  // Now score competitor presence per answer and drop full text → snippet.
-  const samples: Sample[] = raw.map((a) => ({
-    engine: a.engine,
-    stage: a.stage,
-    prompt: a.prompt,
-    brandPresent: a.brandPresent,
-    competitorsPresent: competitors.filter((c) => mentions(a.text, c)),
-    citations: a.citations,
-    brandCited: a.brandCited,
-    snippet: a.text.slice(0, 400),
-  }));
+  // 4. Judge pass — prominence + sentiment, per engine (one call each).
+  await emit({ event_type: 'milestone', payload: { label: 'Scoring prominence & sentiment', step: 4, totalSteps: 5 } });
+  const samples: Sample[] = [];
+  let judgedEngines = 0;
+  for (const engine of ENGINES) {
+    const answers = rawByEngine.get(engine.label);
+    if (!answers || !answers.length) continue;
+    let verdicts: (Verdict | null)[] = new Array(answers.length).fill(null);
+    try {
+      verdicts = await judgeEngineAnswers(answers, brandName, competitors);
+    } catch {
+      /* fall back to string-match below */
+    }
+    judgedEngines++;
+    await emit({ event_type: 'progress', payload: { pct: 65 + Math.round((judgedEngines / ENGINES.length) * 25) } });
+    answers.forEach((a, i) => {
+      const v = verdicts[i];
+      const brandPresent = v ? v.brandMentioned : a.brandPresentStr;
+      const competitorsPresent = v && v.competitors.length
+        ? competitors.filter((c) => v.competitors.some((vc) => mentions(vc, c) || mentions(c, vc)))
+        : competitors.filter((c) => mentions(a.text, c));
+      samples.push({
+        engine: a.engine,
+        stage: a.stage,
+        prompt: a.prompt,
+        brandPresent,
+        prominence: v ? v.prominence : brandPresent ? 2 : 0,
+        sentiment: v ? v.sentiment : brandPresent ? 'neutral' : 'none',
+        competitorsPresent,
+        citations: a.citations,
+        brandCited: a.brandCited,
+        snippet: a.text.slice(0, 400),
+      });
+    });
+  }
 
-  // 4. Aggregate scorecard
-  await emit({ event_type: 'milestone', payload: { label: 'Computing scorecard', step: 4, totalSteps: 4 } });
+  // 5. Aggregate scorecard
+  await emit({ event_type: 'milestone', payload: { label: 'Computing AIGVR scorecard', step: 5, totalSteps: 5 } });
 
-  const brandHits = samples.filter((s) => s.brandPresent).length;
-  const overallSoVPct = pct(brandHits, samples.length);
+  const overall = computeDimensions(samples);
 
   const enginesUsed = Array.from(new Set(samples.map((s) => s.engine)));
-  const perEngine = enginesUsed.map((eng) => {
-    const subset = samples.filter((s) => s.engine === eng);
-    return { engine: eng, queries: subset.length, brandHits: subset.filter((s) => s.brandPresent).length, sovPct: pct(subset.filter((s) => s.brandPresent).length, subset.length) };
-  });
+  const perEngine = enginesUsed.map((eng) => ({ engine: eng, ...computeDimensions(samples.filter((s) => s.engine === eng)) }));
 
   const stages = Array.from(new Set(samples.map((s) => s.stage)));
-  const perStage = stages.map((st) => {
-    const subset = samples.filter((s) => s.stage === st);
-    return { stage: st, queries: subset.length, brandHits: subset.filter((s) => s.brandPresent).length, sovPct: pct(subset.filter((s) => s.brandPresent).length, subset.length) };
-  });
+  const perStage = stages.map((st) => ({ stage: st, ...computeDimensions(samples.filter((s) => s.stage === st)) }));
 
-  // Competitor benchmark — appearance rate across all samples, brand included.
+  // Competitor benchmark — presence rate across all samples, brand included.
   const bench = competitors.map((c) => {
     const hits = samples.filter((s) => s.competitorsPresent.includes(c)).length;
     return { name: c, hits, sovPct: pct(hits, samples.length), isBrand: false };
   });
-  bench.push({ name: brandName, hits: brandHits, sovPct: overallSoVPct, isBrand: true });
+  bench.push({ name: brandName, hits: overall.brandHits, sovPct: overall.presence, isBrand: true });
   bench.sort((a, b) => b.sovPct - a.sovPct || b.hits - a.hits);
   const brandRank = bench.findIndex((b) => b.isBrand) + 1;
 
-  // Citations (AEO signal)
   const brandCitedCount = samples.filter((s) => s.brandCited).length;
   const allSources = Array.from(new Set(samples.flatMap((s) => s.citations))).slice(0, 25);
 
-  // Gaps: brand absent but ≥1 competitor present — the actionable targets.
   const gaps = samples
     .filter((s) => !s.brandPresent && s.competitorsPresent.length > 0)
     .map((s) => ({ stage: s.stage, prompt: s.prompt, engine: s.engine, competitorsPresent: s.competitorsPresent }));
 
-  const bestEngine = [...perEngine].sort((a, b) => b.sovPct - a.sovPct)[0];
-  const worstEngine = [...perEngine].sort((a, b) => a.sovPct - b.sovPct)[0];
+  const bestEngine = [...perEngine].sort((a, b) => b.aigvr - a.aigvr)[0];
+  const worstEngine = [...perEngine].sort((a, b) => a.aigvr - b.aigvr)[0];
 
-  for (const e of perEngine) {
-    await emit({ event_type: 'output_chunk', payload: { kind: 'engine_sov', value: e } });
-  }
+  await emit({ event_type: 'output_chunk', payload: { kind: 'aigvr_overall', value: overall } });
+  for (const e of perEngine) await emit({ event_type: 'output_chunk', payload: { kind: 'engine_score', value: e } });
   await emit({ event_type: 'output_chunk', payload: { kind: 'competitor_benchmark', value: bench } });
 
   await emit({ event_type: 'progress', payload: { pct: 100 } });
-  await emit({ event_type: 'milestone', payload: { label: 'Scorecard ready', step: 4, totalSteps: 4 } });
+  await emit({ event_type: 'milestone', payload: { label: 'AIGVR scorecard ready', step: 5, totalSteps: 5 } });
 
   const output = {
     brand: brandName,
@@ -367,10 +474,19 @@ export async function runMonitorAgent(
     country: targetCountry,
     language: (input.targetLanguage || 'en').toLowerCase(),
     industry: input.industry ?? null,
+    aigvrScore: overall.aigvr,
+    dimensions: {
+      presence: overall.presence,
+      prominence: overall.prominence,
+      sentiment: overall.sentiment,
+      citation: overall.citation,
+      competitiveShare: overall.competitiveShare,
+    },
+    weights: WEIGHTS,
     competitors,
     engines: enginesUsed,
     sampled: { total: totalPrompts, used: sampled.length, queries: samples.length },
-    metrics: { overallSoVPct, perEngine, perStage },
+    metrics: { overall, perEngine, perStage },
     competitorBenchmark: bench,
     brandRank,
     citations: { brandCited: brandCitedCount > 0, brandCitedCount, sampleSources: allSources },
@@ -379,11 +495,12 @@ export async function runMonitorAgent(
     generatedBy: `poe:${ENGINES.map((e) => e.model).join('+')}`,
   };
 
-  const rankStr = `#${brandRank} of ${bench.length}`;
   const summary =
-    `${brandName} appears in ${overallSoVPct}% of AI answers (SoV rank ${rankStr}). ` +
-    `Strongest on ${bestEngine?.engine} (${bestEngine?.sovPct}%), weakest on ${worstEngine?.engine} (${worstEngine?.sovPct}%). ` +
-    `${gaps.length} high-intent gaps where competitors appear and you don't.`;
+    `${brandName} — AIGVR ${overall.aigvr}/100. ` +
+    `Appears in ${overall.presence}% of AI answers (rank #${brandRank} of ${bench.length}); ` +
+    `prominence ${overall.prominence}, sentiment ${overall.sentiment}, competitive share ${overall.competitiveShare}. ` +
+    `Strongest on ${bestEngine?.engine} (${bestEngine?.aigvr}), weakest on ${worstEngine?.engine} (${worstEngine?.aigvr}). ` +
+    `${gaps.length} high-intent gaps.`;
 
   return { summary, output };
 }
