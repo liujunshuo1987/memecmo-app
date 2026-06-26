@@ -67,6 +67,8 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
     status: string;
     progress_pct: number;
     summary: string | null;
+    agentId?: string;
+    output?: Record<string, any> | null;
   } | null>(null);
   const [sending, setSending] = useState(false);
   const activityEndRef = useRef<HTMLDivElement>(null);
@@ -104,6 +106,8 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
               status: data.run.status,
               progress_pct: data.run.progress_pct,
               summary: data.run.summary,
+              agentId: data.run.agent_id,
+              output: data.run.output ?? null,
             });
           }
           if (data.terminal) {
@@ -122,6 +126,15 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
       cancelled = true;
     };
   }, [activeRunId]);
+
+  // Load a past run (from history) into the activity/result panel — reuses the
+  // same poller, which fetches all its events + output and stops (terminal).
+  const loadRun = (runId: string, agentId?: string) => {
+    if (runId === activeRunId) return;
+    setActivity([]);
+    setRunStatus({ status: 'loading', progress_pct: 0, summary: null, agentId, output: null });
+    setActiveRunId(runId);
+  };
 
   const handleSend = async () => {
     if (!draft.trim() || sending) return;
@@ -171,7 +184,7 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
       };
       setTurns((p) => [...p, assistantMsg]);
       setActivity([]);
-      setRunStatus({ status: 'queued', progress_pct: 0, summary: null });
+      setRunStatus({ status: 'queued', progress_pct: 0, summary: null, agentId: selectedAgent, output: null });
       setActiveRunId(data.run.id);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -232,24 +245,36 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
                 No history yet. Type a message below and pick an agent to dispatch.
               </div>
             )}
-            {turns.map((t) => (
-              <div
-                key={t.id}
-                className={`flex ${t.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
+            {turns.map((t) => {
+              const clickable = !!t.runId;
+              const isActive = t.runId && t.runId === activeRunId;
+              return (
                 <div
-                  className={`max-w-[80%] rounded-lg px-3 py-2 text-sm leading-relaxed ${
-                    t.role === 'user'
-                      ? 'bg-blue-600/30 text-blue-50 border border-blue-500/30'
-                      : t.role === 'assistant'
-                      ? 'bg-white/[0.03] text-gray-100 border border-white/10'
-                      : 'bg-transparent text-gray-500 border border-white/5 italic text-xs'
-                  }`}
+                  key={t.id}
+                  className={`flex ${t.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  {t.content}
+                  <div
+                    onClick={clickable ? () => loadRun(t.runId!, t.agentId) : undefined}
+                    className={`max-w-[80%] rounded-lg px-3 py-2 text-sm leading-relaxed ${
+                      clickable ? 'cursor-pointer hover:border-blue-400/40' : ''
+                    } ${
+                      t.role === 'user'
+                        ? 'bg-blue-600/30 text-blue-50 border border-blue-500/30'
+                        : t.role === 'assistant'
+                        ? 'bg-white/[0.03] text-gray-100 border border-white/10'
+                        : `bg-transparent text-gray-500 border italic text-xs ${
+                            isActive ? 'border-emerald-400/40 text-gray-300' : 'border-white/5'
+                          }`
+                    }`}
+                  >
+                    {t.content}
+                    {clickable && t.role === 'system' && (
+                      <span className="ml-2 not-italic text-[10px] text-blue-400">view →</span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="border-t border-white/5 px-6 py-4 space-y-3">
@@ -297,8 +322,8 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
               </button>
             </div>
             <p className="text-[10px] text-gray-600 leading-snug">
-              v0.7 — Discovery (real LLM) &amp; Monitor (live ChatGPT / Gemini / Perplexity
-              share-of-voice) are wired. Report composer is next.
+              v0.9 — Discovery → Monitor (AIGVR across ChatGPT / Gemini / Perplexity / Claude)
+              → Report, all live. Click a past run on the left to view its result.
             </p>
           </div>
         </section>
@@ -342,6 +367,9 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
                 </div>
                 <div className="text-emerald-100 leading-relaxed">{runStatus.summary}</div>
               </div>
+            )}
+            {runStatus?.output && (
+              <RunResult agentId={runStatus.agentId} output={runStatus.output} />
             )}
             <div ref={activityEndRef} />
           </div>
@@ -391,6 +419,245 @@ function ActivityRow({ ev }: { ev: ActivityEvent }) {
         {label}
       </span>
       <span className="text-gray-200 break-words flex-1">{body}</span>
+    </div>
+  );
+}
+
+// ── Rich result renderers ────────────────────────────────────────────────────
+
+function Bar({ value, color = 'bg-emerald-400' }: { value: number; color?: string }) {
+  return (
+    <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+      <div className={`h-full ${color}`} style={{ width: `${Math.max(0, Math.min(100, value || 0))}%` }} />
+    </div>
+  );
+}
+
+function RunResult({ agentId, output }: { agentId?: string; output: Record<string, any> }) {
+  return (
+    <div className="mt-4 font-sans text-sm text-gray-200">
+      {agentId === 'monitor' ? (
+        <MonitorResult o={output} />
+      ) : agentId === 'report' ? (
+        <ReportResult o={output} />
+      ) : agentId === 'discovery' ? (
+        <DiscoveryResult o={output} />
+      ) : null}
+    </div>
+  );
+}
+
+function DiscoveryResult({ o }: { o: Record<string, any> }) {
+  const cats: any[] = o.promptSet || [];
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-3">
+      <div className="flex items-baseline justify-between">
+        <h3 className="text-sm font-semibold text-white">Discovery — prompt set</h3>
+        <span className="text-xs text-gray-400">{o.promptCount ?? '—'} prompts · {cats.length} stages</span>
+      </div>
+      {o.industry && <div className="text-xs text-gray-400">Industry: <span className="text-gray-200">{o.industry}</span></div>}
+      {Array.isArray(o.subVerticals) && o.subVerticals.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {o.subVerticals.map((s: string, i: number) => (
+            <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-gray-300">{s}</span>
+          ))}
+        </div>
+      )}
+      <div className="space-y-2">
+        {cats.map((c, i) => (
+          <details key={i} className="rounded border border-white/5 bg-white/[0.02]">
+            <summary className="cursor-pointer px-3 py-2 text-xs text-gray-300 select-none">
+              <span className="text-purple-300">{c.label || c.category}</span>
+              <span className="text-gray-600"> · {(c.prompts || []).length}</span>
+            </summary>
+            <ul className="px-4 pb-2 space-y-1">
+              {(c.prompts || []).map((p: string, j: number) => (
+                <li key={j} className="text-[12px] text-gray-400 leading-snug">· {p}</li>
+              ))}
+            </ul>
+          </details>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MonitorResult({ o }: { o: Record<string, any> }) {
+  const d = o.dimensions || {};
+  const dims: { k: string; label: string }[] = [
+    { k: 'presence', label: 'Presence (SoV)' },
+    { k: 'prominence', label: 'Prominence' },
+    { k: 'sentiment', label: 'Sentiment' },
+    { k: 'citation', label: 'Citation (AEO)' },
+    { k: 'competitiveShare', label: 'Competitive share' },
+  ];
+  const stages: any[] = o.metrics?.perStage || [];
+  const bench: any[] = o.competitorBenchmark || [];
+  const gaps: any[] = o.gaps || [];
+  const score = o.aigvrScore ?? 0;
+  const scoreColor = score >= 67 ? 'text-emerald-300' : score >= 34 ? 'text-amber-300' : 'text-red-300';
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-white">AIGVR Scorecard</h3>
+          <p className="text-[11px] text-gray-500">{(o.engines || []).join(' · ')} · {o.sampled?.queries ?? '—'} queries</p>
+        </div>
+        <div className="text-right">
+          <div className={`text-3xl font-bold leading-none ${scoreColor}`}>{score}</div>
+          <div className="text-[10px] text-gray-500 uppercase tracking-wider">/ 100 · rank #{o.brandRank ?? '—'}</div>
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        {dims.map((dim) => (
+          <div key={dim.k} className="grid grid-cols-[110px_1fr_32px] items-center gap-2">
+            <span className="text-[11px] text-gray-400">{dim.label}</span>
+            <Bar value={d[dim.k]} />
+            <span className="text-[11px] text-gray-300 text-right">{d[dim.k] ?? '—'}</span>
+          </div>
+        ))}
+      </div>
+
+      {stages.length > 0 && (
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-gray-500 mb-1.5">Funnel-stage visibility</div>
+          <div className="space-y-1.5">
+            {stages.map((s, i) => (
+              <div key={i} className="grid grid-cols-[110px_1fr_60px] items-center gap-2">
+                <span className="text-[11px] text-gray-400 capitalize">{s.stage}</span>
+                <Bar value={s.presence} color={s.presence === 0 ? 'bg-red-500/70' : s.presence < 50 ? 'bg-amber-400' : 'bg-emerald-400'} />
+                <span className="text-[11px] text-gray-300 text-right">{s.presence}% ({s.brandHits}/{s.queries})</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {bench.length > 0 && (
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-gray-500 mb-1.5">Competitive benchmark</div>
+          <div className="space-y-1">
+            {bench.map((b, i) => (
+              <div key={i} className={`flex items-center justify-between text-[12px] px-2 py-1 rounded ${b.isBrand ? 'bg-emerald-500/10 border border-emerald-500/30' : ''}`}>
+                <span className={b.isBrand ? 'text-emerald-200 font-medium' : 'text-gray-400'}>{b.isBrand ? '★ ' : ''}{b.name}</span>
+                <span className={b.isBrand ? 'text-emerald-200' : 'text-gray-400'}>{b.sovPct}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {gaps.length > 0 && (
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-gray-500 mb-1.5">High-intent gaps ({gaps.length})</div>
+          <ul className="space-y-1.5">
+            {gaps.slice(0, 8).map((g, i) => (
+              <li key={i} className="text-[12px] leading-snug border-l-2 border-red-500/40 pl-2">
+                <span className="text-gray-300">{g.prompt}</span>
+                <span className="text-gray-600"> · {g.engine}/{g.stage} → </span>
+                <span className="text-amber-300">{(g.competitorsPresent || []).join(', ')}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {o.citations && (
+        <div className="text-[11px] text-gray-500">
+          Citations: brand domain cited {o.citations.brandCitedCount ?? 0}× across answers.
+        </div>
+      )}
+    </div>
+  );
+}
+
+const PRIORITY_STYLE: Record<string, string> = {
+  P0: 'bg-red-500/20 text-red-300 border-red-500/40',
+  P1: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+  P2: 'bg-gray-500/20 text-gray-300 border-gray-500/40',
+};
+
+function ReportResult({ o }: { o: Record<string, any> }) {
+  const findings: any[] = o.keyFindings || [];
+  const recs: any[] = (o.recommendations || []).slice().sort((a: any, b: any) => {
+    const r: Record<string, number> = { P0: 0, P1: 1, P2: 2 };
+    return (r[a.priority] ?? 9) - (r[b.priority] ?? 9);
+  });
+  const quickWins: string[] = o.quickWins || [];
+  const copyMarkdown = () => {
+    if (o.markdown) navigator.clipboard?.writeText(o.markdown).catch(() => {});
+  };
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-white">GEO Visibility Report</h3>
+        <div className="flex items-center gap-2">
+          {typeof o.aigvrScore === 'number' && (
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-gray-300">AIGVR {o.aigvrScore}</span>
+          )}
+          {o.markdown && (
+            <button onClick={copyMarkdown} className="text-[11px] px-2 py-0.5 rounded border border-white/10 text-gray-400 hover:border-blue-400/40 hover:text-blue-200 transition">
+              Copy Markdown
+            </button>
+          )}
+        </div>
+      </div>
+
+      {o.executiveSummary && (
+        <p className="text-[13px] text-gray-300 leading-relaxed">{o.executiveSummary}</p>
+      )}
+
+      {findings.length > 0 && (
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-gray-500 mb-1.5">Key findings</div>
+          <ul className="space-y-2">
+            {findings.map((f, i) => (
+              <li key={i} className="text-[12px] leading-snug">
+                <div className="text-gray-200 font-medium">{f.finding}</div>
+                {f.evidence && <div className="text-gray-500">{f.evidence}</div>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {recs.length > 0 && (
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-gray-500 mb-1.5">Recommendations</div>
+          <div className="space-y-3">
+            {recs.map((rec, i) => (
+              <div key={i} className="rounded border border-white/5 bg-white/[0.02] p-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded border ${PRIORITY_STYLE[rec.priority] || PRIORITY_STYLE.P2}`}>{rec.priority}</span>
+                  <span className="text-[13px] font-medium text-white">{rec.title}</span>
+                </div>
+                {rec.targetStage && <div className="text-[10px] text-gray-500 mb-1">→ {rec.targetStage}</div>}
+                {rec.rationale && <p className="text-[12px] text-gray-400 leading-snug mb-1.5">{rec.rationale}</p>}
+                {Array.isArray(rec.actions) && (
+                  <ul className="space-y-0.5 mb-1.5">
+                    {rec.actions.map((a: string, j: number) => (
+                      <li key={j} className="text-[12px] text-gray-300 leading-snug">• {a}</li>
+                    ))}
+                  </ul>
+                )}
+                {rec.expectedImpact && <div className="text-[11px] text-emerald-300/80">Impact: {rec.expectedImpact}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {quickWins.length > 0 && (
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-gray-500 mb-1.5">Quick wins</div>
+          <ul className="space-y-1">
+            {quickWins.map((q, i) => (
+              <li key={i} className="text-[12px] text-gray-300 leading-snug">✓ {q}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
