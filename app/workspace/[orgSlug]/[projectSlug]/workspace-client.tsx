@@ -9,6 +9,7 @@
 // spawns a run; the activity panel subscribes to its SSE stream.
 
 import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { AGENTS, V05_AGENT_IDS } from '@/lib/agents/registry';
 import type { AgentRun, Organization, Project } from '@/lib/workspace';
 
@@ -201,9 +202,9 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
       {/* Top bar */}
       <header className="border-b border-white/5 px-6 py-3 flex items-center justify-between bg-[#0a1628]/95 backdrop-blur sticky top-0 z-10">
         <div className="flex items-center gap-3 min-w-0">
-          <a href="/" className="text-xs tracking-[0.2em] text-gray-500 uppercase hover:text-gray-300">MemeCMO.ai</a>
+          <a href="/dashboard" className="text-xs tracking-[0.2em] text-gray-500 uppercase hover:text-gray-300">MemeCMO.ai</a>
           <span className="text-gray-600">/</span>
-          <span className="text-xs text-gray-400">{organization.name}</span>
+          <a href="/dashboard" className="text-xs text-gray-400 hover:text-gray-200">{organization.name}</a>
           <span className="text-gray-600">/</span>
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-lg leading-none">{COUNTRY_FLAG[project.target_country] || '🌐'}</span>
@@ -425,18 +426,119 @@ function ActivityRow({ ev }: { ev: ActivityEvent }) {
 
 // ── Rich result renderers ────────────────────────────────────────────────────
 
-function Bar({ value, color = 'bg-emerald-400' }: { value: number; color?: string }) {
+// value→hex (red→amber→emerald) for SVG strokes / dynamic text colors.
+function toneColor(v: number): string {
+  return v >= 67 ? '#34d399' : v >= 34 ? '#fbbf24' : '#f87171';
+}
+
+// Auto-coloring meter bar: red at/near 0, amber mid, emerald high. Pass an
+// explicit Tailwind `color` class to override the value-based tint.
+function Bar({ value, color }: { value: number; color?: string }) {
+  const v = Math.max(0, Math.min(100, value || 0));
+  const cls = color ?? (v <= 0 ? 'bg-red-500/80' : v < 34 ? 'bg-red-400' : v < 67 ? 'bg-amber-400' : 'bg-emerald-400');
   return (
-    <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-      <div className={`h-full ${color}`} style={{ width: `${Math.max(0, Math.min(100, value || 0))}%` }} />
+    <div className="h-2 bg-white/[0.06] rounded-full overflow-hidden">
+      <div className={`h-full rounded-full ${cls} transition-all duration-500`} style={{ width: `${v}%` }} />
     </div>
+  );
+}
+
+// Small accented section heading used across result cards.
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 mb-2">
+      <span className="w-1 h-3 rounded-full bg-emerald-400/70" />
+      <span className="text-[10px] uppercase tracking-[0.18em] text-gray-400">{children}</span>
+    </div>
+  );
+}
+
+// Donut gauge for the 0-100 AIGVR headline.
+function ScoreGauge({ score, size = 96 }: { score: number; size?: number }) {
+  const s = Math.max(0, Math.min(100, Math.round(score || 0)));
+  const sw = 8;
+  const r = (size - sw) / 2;
+  const c = 2 * Math.PI * r;
+  const off = c * (1 - s / 100);
+  const col = toneColor(s);
+  const mid = size / 2;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0">
+      <circle cx={mid} cy={mid} r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={sw} />
+      <circle
+        cx={mid}
+        cy={mid}
+        r={r}
+        fill="none"
+        stroke={col}
+        strokeWidth={sw}
+        strokeLinecap="round"
+        strokeDasharray={c}
+        strokeDashoffset={off}
+        transform={`rotate(-90 ${mid} ${mid})`}
+        style={{ transition: 'stroke-dashoffset 0.7s ease' }}
+      />
+      <text x="50%" y="45%" textAnchor="middle" dominantBaseline="middle" fontSize="27" fontWeight="700" fill={col}>{s}</text>
+      <text x="50%" y="64%" textAnchor="middle" dominantBaseline="middle" fontSize="9" letterSpacing="2" fill="rgba(255,255,255,0.4)">AIGVR</text>
+    </svg>
+  );
+}
+
+// Pentagon radar for the 5 AIGVR dimensions (each 0-100). Extra horizontal
+// canvas room so the side labels don't clip.
+function RadarChart({ data }: { data: { label: string; value: number }[] }) {
+  const W = 212;
+  const H = 184;
+  const cx = W / 2;
+  const cy = H / 2 + 2;
+  const maxR = 62;
+  const n = data.length;
+  const ang = (i: number) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
+  const pt = (i: number, rr: number): [number, number] => [cx + rr * Math.cos(ang(i)), cy + rr * Math.sin(ang(i))];
+  const ringPoly = (rr: number) => data.map((_, i) => pt(i, rr).join(',')).join(' ');
+  const dataPts = data.map((dm, i) => pt(i, maxR * (Math.max(0, Math.min(100, dm.value || 0)) / 100)));
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="shrink-0">
+      {[0.25, 0.5, 0.75, 1].map((f) => (
+        <polygon key={f} points={ringPoly(maxR * f)} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={1} />
+      ))}
+      {data.map((_, i) => {
+        const [x, y] = pt(i, maxR);
+        return <line key={i} x1={cx} y1={cy} x2={x} y2={y} stroke="rgba(255,255,255,0.07)" strokeWidth={1} />;
+      })}
+      <polygon
+        points={dataPts.map((p) => p.join(',')).join(' ')}
+        fill="rgba(52,211,153,0.18)"
+        stroke="#34d399"
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
+      {dataPts.map((p, i) => (
+        <circle key={i} cx={p[0]} cy={p[1]} r={2.6} fill="#34d399" />
+      ))}
+      {data.map((dm, i) => {
+        const [x, y] = pt(i, maxR + 15);
+        const co = Math.cos(ang(i));
+        const anchor = co > 0.3 ? 'start' : co < -0.3 ? 'end' : 'middle';
+        return (
+          <text key={i} x={x} y={y} dy="0.32em" textAnchor={anchor} fontSize="9" letterSpacing="0.5" fill="rgba(255,255,255,0.5)">
+            {dm.label}
+          </text>
+        );
+      })}
+    </svg>
   );
 }
 
 function RunResult({ agentId, output }: { agentId?: string; output: Record<string, any> }) {
   return (
-    <div className="mt-4 font-sans text-sm text-gray-200">
-      {agentId === 'monitor' ? (
+    <div className="mt-4 font-sans text-sm text-gray-200 space-y-4">
+      {agentId === 'full_scan' ? (
+        <>
+          {output.scorecard && <MonitorResult o={output.scorecard} />}
+          {output.report && <ReportResult o={output.report} />}
+        </>
+      ) : agentId === 'monitor' ? (
         <MonitorResult o={output} />
       ) : agentId === 'report' ? (
         <ReportResult o={output} />
@@ -450,29 +552,40 @@ function RunResult({ agentId, output }: { agentId?: string; output: Record<strin
 function DiscoveryResult({ o }: { o: Record<string, any> }) {
   const cats: any[] = o.promptSet || [];
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-3">
-      <div className="flex items-baseline justify-between">
-        <h3 className="text-sm font-semibold text-white">Discovery — prompt set</h3>
-        <span className="text-xs text-gray-400">{o.promptCount ?? '—'} prompts · {cats.length} stages</span>
+    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-white tracking-wide">Discovery — prompt set</h3>
+          {o.industry && <p className="text-[11px] text-gray-500 mt-0.5 truncate">{o.industry}</p>}
+        </div>
+        <div className="text-right shrink-0">
+          <div className="text-2xl font-bold text-white leading-none tabular-nums">{o.promptCount ?? '—'}</div>
+          <div className="text-[10px] text-gray-500 uppercase tracking-wider mt-0.5">prompts · {cats.length} stages</div>
+        </div>
       </div>
-      {o.industry && <div className="text-xs text-gray-400">Industry: <span className="text-gray-200">{o.industry}</span></div>}
+
       {Array.isArray(o.subVerticals) && o.subVerticals.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {o.subVerticals.map((s: string, i: number) => (
-            <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-gray-300">{s}</span>
+            <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-200/90">{s}</span>
           ))}
         </div>
       )}
-      <div className="space-y-2">
+
+      <div className="space-y-1.5">
         {cats.map((c, i) => (
-          <details key={i} className="rounded border border-white/5 bg-white/[0.02]">
-            <summary className="cursor-pointer px-3 py-2 text-xs text-gray-300 select-none">
-              <span className="text-purple-300">{c.label || c.category}</span>
-              <span className="text-gray-600"> · {(c.prompts || []).length}</span>
+          <details key={i} className="group rounded-lg border border-white/5 bg-white/[0.02] open:bg-white/[0.03]">
+            <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden px-3 py-2.5 flex items-center gap-2 select-none rounded-lg hover:bg-white/[0.02]">
+              <span className="text-gray-600 text-[9px] transition-transform group-open:rotate-90">▶</span>
+              <span className="text-[12px] font-medium text-purple-200/90 flex-1 min-w-0 truncate">{c.label || c.category}</span>
+              <span className="text-[10px] text-gray-400 px-1.5 py-0.5 rounded-full bg-white/5 tabular-nums">{(c.prompts || []).length}</span>
             </summary>
-            <ul className="px-4 pb-2 space-y-1">
+            <ul className="px-3 pb-2.5 pt-1.5 space-y-1.5 border-t border-white/5">
               {(c.prompts || []).map((p: string, j: number) => (
-                <li key={j} className="text-[12px] text-gray-400 leading-snug">· {p}</li>
+                <li key={j} className="flex gap-2 text-[12px] text-gray-400 leading-snug">
+                  <span className="text-gray-600 flex-none tabular-nums">{j + 1}.</span>
+                  <span>{p}</span>
+                </li>
               ))}
             </ul>
           </details>
@@ -491,72 +604,131 @@ function MonitorResult({ o }: { o: Record<string, any> }) {
     { k: 'citation', label: 'Citation (AEO)' },
     { k: 'competitiveShare', label: 'Competitive share' },
   ];
+  const radar = [
+    { label: 'Presence', value: d.presence ?? 0 },
+    { label: 'Prom.', value: d.prominence ?? 0 },
+    { label: 'Sent.', value: d.sentiment ?? 0 },
+    { label: 'Cite', value: d.citation ?? 0 },
+    { label: 'Share', value: d.competitiveShare ?? 0 },
+  ];
   const stages: any[] = o.metrics?.perStage || [];
+  const engines: any[] = o.metrics?.perEngine || [];
   const bench: any[] = o.competitorBenchmark || [];
+  const maxSov = Math.max(1, ...bench.map((b) => b.sovPct || 0));
   const gaps: any[] = o.gaps || [];
   const score = o.aigvrScore ?? 0;
-  const scoreColor = score >= 67 ? 'text-emerald-300' : score >= 34 ? 'text-amber-300' : 'text-red-300';
+
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-semibold text-white">AIGVR Scorecard</h3>
-          <p className="text-[11px] text-gray-500">{(o.engines || []).join(' · ')} · {o.sampled?.queries ?? '—'} queries</p>
+    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 space-y-5">
+      {/* Header: title + headline gauge */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-white tracking-wide">AIGVR Scorecard</h3>
+          <p className="text-[11px] text-gray-500 mt-0.5">{(o.engines || []).join(' · ')} · {o.sampled?.queries ?? '—'} queries</p>
         </div>
-        <div className="text-right">
-          <div className={`text-3xl font-bold leading-none ${scoreColor}`}>{score}</div>
-          <div className="text-[10px] text-gray-500 uppercase tracking-wider">/ 100 · rank #{o.brandRank ?? '—'}</div>
-        </div>
-      </div>
-
-      <div className="space-y-1.5">
-        {dims.map((dim) => (
-          <div key={dim.k} className="grid grid-cols-[110px_1fr_32px] items-center gap-2">
-            <span className="text-[11px] text-gray-400">{dim.label}</span>
-            <Bar value={d[dim.k]} />
-            <span className="text-[11px] text-gray-300 text-right">{d[dim.k] ?? '—'}</span>
+        <div className="flex flex-col items-center shrink-0">
+          <ScoreGauge score={score} />
+          <div className="text-[10px] text-gray-500 mt-1">
+            Rank <span className="text-gray-200 font-semibold">#{o.brandRank ?? '—'}</span> of {bench.length || '—'}
           </div>
-        ))}
+        </div>
       </div>
 
+      {/* Radar + per-dimension breakdown */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <RadarChart data={radar} />
+        <div className="flex-1 min-w-[200px] space-y-2">
+          {dims.map((dim) => {
+            const v = Math.round(d[dim.k] ?? 0);
+            return (
+              <div key={dim.k} className="grid grid-cols-[100px_1fr_30px] items-center gap-2.5">
+                <span className="text-[11px] text-gray-400 truncate">{dim.label}</span>
+                <Bar value={v} />
+                <span className="text-[11px] font-semibold text-gray-200 text-right tabular-nums">{v}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Per-engine scores */}
+      {engines.length > 0 && (
+        <div>
+          <SectionLabel>By engine</SectionLabel>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {engines.map((e, i) => (
+              <div key={i} className="rounded-lg border border-white/5 bg-white/[0.02] px-2.5 py-2">
+                <div className="flex items-baseline justify-between gap-1">
+                  <span className="text-[11px] text-gray-300 truncate">{e.engine}</span>
+                  <span className="text-[13px] font-bold tabular-nums" style={{ color: toneColor(e.aigvr || 0) }}>{e.aigvr ?? '—'}</span>
+                </div>
+                <div className="mt-1.5"><Bar value={e.aigvr} /></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Funnel-stage visibility */}
       {stages.length > 0 && (
         <div>
-          <div className="text-[10px] uppercase tracking-widest text-gray-500 mb-1.5">Funnel-stage visibility</div>
-          <div className="space-y-1.5">
+          <SectionLabel>Funnel-stage visibility</SectionLabel>
+          <div className="space-y-2">
             {stages.map((s, i) => (
-              <div key={i} className="grid grid-cols-[110px_1fr_60px] items-center gap-2">
-                <span className="text-[11px] text-gray-400 capitalize">{s.stage}</span>
-                <Bar value={s.presence} color={s.presence === 0 ? 'bg-red-500/70' : s.presence < 50 ? 'bg-amber-400' : 'bg-emerald-400'} />
-                <span className="text-[11px] text-gray-300 text-right">{s.presence}% ({s.brandHits}/{s.queries})</span>
+              <div key={i} className="grid grid-cols-[96px_1fr_72px] items-center gap-2.5">
+                <span className="text-[11px] text-gray-400 capitalize truncate">{s.stage}</span>
+                <Bar value={s.presence} />
+                <span className="text-[11px] text-gray-400 text-right tabular-nums">
+                  <span className="text-gray-200 font-semibold">{s.presence}%</span>
+                  <span className="text-gray-600"> {s.brandHits}/{s.queries}</span>
+                </span>
               </div>
             ))}
           </div>
         </div>
       )}
 
+      {/* Competitive share-of-voice bar chart */}
       {bench.length > 0 && (
         <div>
-          <div className="text-[10px] uppercase tracking-widest text-gray-500 mb-1.5">Competitive benchmark</div>
+          <SectionLabel>Share of voice</SectionLabel>
           <div className="space-y-1">
             {bench.map((b, i) => (
-              <div key={i} className={`flex items-center justify-between text-[12px] px-2 py-1 rounded ${b.isBrand ? 'bg-emerald-500/10 border border-emerald-500/30' : ''}`}>
-                <span className={b.isBrand ? 'text-emerald-200 font-medium' : 'text-gray-400'}>{b.isBrand ? '★ ' : ''}{b.name}</span>
-                <span className={b.isBrand ? 'text-emerald-200' : 'text-gray-400'}>{b.sovPct}%</span>
+              <div
+                key={i}
+                className={`flex items-center gap-2.5 rounded-md px-2 py-1 ${b.isBrand ? 'bg-emerald-500/10 ring-1 ring-emerald-500/30' : ''}`}
+              >
+                <span className={`w-28 shrink-0 truncate text-[11px] ${b.isBrand ? 'text-emerald-200 font-semibold' : 'text-gray-400'}`}>
+                  {b.isBrand && <span className="mr-0.5">★</span>}{b.name}
+                </span>
+                <div className="flex-1 h-2.5 bg-white/[0.05] rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${b.isBrand ? 'bg-emerald-400' : 'bg-sky-400/50'} transition-all duration-500`}
+                    style={{ width: `${((b.sovPct || 0) / maxSov) * 100}%` }}
+                  />
+                </div>
+                <span className={`w-9 text-right text-[11px] tabular-nums ${b.isBrand ? 'text-emerald-200 font-semibold' : 'text-gray-400'}`}>{b.sovPct}%</span>
               </div>
             ))}
           </div>
         </div>
       )}
 
+      {/* High-intent gaps */}
       {gaps.length > 0 && (
         <div>
-          <div className="text-[10px] uppercase tracking-widest text-gray-500 mb-1.5">High-intent gaps ({gaps.length})</div>
-          <ul className="space-y-1.5">
+          <SectionLabel>High-intent gaps ({gaps.length})</SectionLabel>
+          <ul className="space-y-2">
             {gaps.slice(0, 8).map((g, i) => (
-              <li key={i} className="text-[12px] leading-snug border-l-2 border-red-500/40 pl-2">
-                <span className="text-gray-300">{g.prompt}</span>
-                <span className="text-gray-600"> · {g.engine}/{g.stage} → </span>
-                <span className="text-amber-300">{(g.competitorsPresent || []).join(', ')}</span>
+              <li key={i} className="rounded-md border border-white/5 border-l-2 border-l-red-500/50 bg-red-500/[0.04] pl-2.5 pr-2 py-1.5">
+                <div className="text-[12px] text-gray-200 leading-snug">{g.prompt}</div>
+                <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] text-gray-500 uppercase tracking-wide">{g.engine} · {g.stage}</span>
+                  {(g.competitorsPresent || []).length > 0 && <span className="text-gray-600 text-[10px]">→</span>}
+                  {(g.competitorsPresent || []).map((c: string, j: number) => (
+                    <span key={j} className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300/90 border border-amber-500/20">{c}</span>
+                  ))}
+                </div>
               </li>
             ))}
           </ul>
@@ -564,8 +736,8 @@ function MonitorResult({ o }: { o: Record<string, any> }) {
       )}
 
       {o.citations && (
-        <div className="text-[11px] text-gray-500">
-          Citations: brand domain cited {o.citations.brandCitedCount ?? 0}× across answers.
+        <div className="text-[11px] text-gray-500 pt-1 border-t border-white/5">
+          Brand domain cited <span className="text-gray-300 font-medium">{o.citations.brandCitedCount ?? 0}×</span> across AI answers.
         </div>
       )}
     </div>
@@ -576,6 +748,12 @@ const PRIORITY_STYLE: Record<string, string> = {
   P0: 'bg-red-500/20 text-red-300 border-red-500/40',
   P1: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
   P2: 'bg-gray-500/20 text-gray-300 border-gray-500/40',
+};
+
+const PRIORITY_RAIL: Record<string, string> = {
+  P0: 'border-l-red-500',
+  P1: 'border-l-amber-400',
+  P2: 'border-l-gray-500',
 };
 
 function ReportResult({ o }: { o: Record<string, any> }) {
@@ -589,15 +767,21 @@ function ReportResult({ o }: { o: Record<string, any> }) {
     if (o.markdown) navigator.clipboard?.writeText(o.markdown).catch(() => {});
   };
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-white">GEO Visibility Report</h3>
-        <div className="flex items-center gap-2">
+    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 space-y-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-white tracking-wide">GEO Visibility Report</h3>
+          <p className="text-[11px] text-gray-500 mt-0.5">AI Generative Visibility analysis</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
           {typeof o.aigvrScore === 'number' && (
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-gray-300">AIGVR {o.aigvrScore}</span>
+            <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: toneColor(o.aigvrScore) }} />
+              <span className="text-[11px] text-gray-400">AIGVR <span className="font-semibold" style={{ color: toneColor(o.aigvrScore) }}>{o.aigvrScore}</span></span>
+            </div>
           )}
           {o.markdown && (
-            <button onClick={copyMarkdown} className="text-[11px] px-2 py-0.5 rounded border border-white/10 text-gray-400 hover:border-blue-400/40 hover:text-blue-200 transition">
+            <button onClick={copyMarkdown} className="text-[11px] px-2 py-1 rounded border border-white/10 text-gray-400 hover:border-blue-400/40 hover:text-blue-200 transition">
               Copy Markdown
             </button>
           )}
@@ -605,17 +789,23 @@ function ReportResult({ o }: { o: Record<string, any> }) {
       </div>
 
       {o.executiveSummary && (
-        <p className="text-[13px] text-gray-300 leading-relaxed">{o.executiveSummary}</p>
+        <div className="rounded-lg border border-white/5 border-l-2 border-l-emerald-400/50 bg-white/[0.02] px-3.5 py-3">
+          <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-400/70 mb-1.5">Executive summary</div>
+          <p className="text-[13px] text-gray-200 leading-relaxed">{o.executiveSummary}</p>
+        </div>
       )}
 
       {findings.length > 0 && (
         <div>
-          <div className="text-[10px] uppercase tracking-widest text-gray-500 mb-1.5">Key findings</div>
-          <ul className="space-y-2">
+          <SectionLabel>Key findings</SectionLabel>
+          <ul className="space-y-2.5">
             {findings.map((f, i) => (
-              <li key={i} className="text-[12px] leading-snug">
-                <div className="text-gray-200 font-medium">{f.finding}</div>
-                {f.evidence && <div className="text-gray-500">{f.evidence}</div>}
+              <li key={i} className="flex gap-2.5">
+                <span className="mt-0.5 flex-none w-5 h-5 rounded-full bg-white/[0.04] border border-white/10 text-[10px] font-semibold text-gray-400 flex items-center justify-center tabular-nums">{i + 1}</span>
+                <div className="min-w-0">
+                  <div className="text-[12.5px] text-gray-100 font-medium leading-snug">{f.finding}</div>
+                  {f.evidence && <div className="text-[11.5px] text-gray-500 leading-snug mt-0.5">{f.evidence}</div>}
+                </div>
               </li>
             ))}
           </ul>
@@ -624,24 +814,32 @@ function ReportResult({ o }: { o: Record<string, any> }) {
 
       {recs.length > 0 && (
         <div>
-          <div className="text-[10px] uppercase tracking-widest text-gray-500 mb-1.5">Recommendations</div>
-          <div className="space-y-3">
+          <SectionLabel>Recommendations</SectionLabel>
+          <div className="space-y-2.5">
             {recs.map((rec, i) => (
-              <div key={i} className="rounded border border-white/5 bg-white/[0.02] p-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded border ${PRIORITY_STYLE[rec.priority] || PRIORITY_STYLE.P2}`}>{rec.priority}</span>
-                  <span className="text-[13px] font-medium text-white">{rec.title}</span>
+              <div key={i} className={`rounded-lg border border-white/5 border-l-[3px] ${PRIORITY_RAIL[rec.priority] || PRIORITY_RAIL.P2} bg-white/[0.02] p-3.5`}>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${PRIORITY_STYLE[rec.priority] || PRIORITY_STYLE.P2}`}>{rec.priority}</span>
+                  <span className="text-[13px] font-semibold text-white leading-tight">{rec.title}</span>
+                  {rec.targetStage && <span className="ml-auto shrink-0 text-[10px] text-gray-400 px-1.5 py-0.5 rounded bg-white/5 capitalize">{rec.targetStage}</span>}
                 </div>
-                {rec.targetStage && <div className="text-[10px] text-gray-500 mb-1">→ {rec.targetStage}</div>}
-                {rec.rationale && <p className="text-[12px] text-gray-400 leading-snug mb-1.5">{rec.rationale}</p>}
-                {Array.isArray(rec.actions) && (
-                  <ul className="space-y-0.5 mb-1.5">
+                {rec.rationale && <p className="text-[12px] text-gray-400 leading-snug mb-2">{rec.rationale}</p>}
+                {Array.isArray(rec.actions) && rec.actions.length > 0 && (
+                  <ul className="space-y-1 mb-2">
                     {rec.actions.map((a: string, j: number) => (
-                      <li key={j} className="text-[12px] text-gray-300 leading-snug">• {a}</li>
+                      <li key={j} className="flex gap-2 text-[12px] text-gray-300 leading-snug">
+                        <span className="text-emerald-400/70 flex-none">▸</span>
+                        <span>{a}</span>
+                      </li>
                     ))}
                   </ul>
                 )}
-                {rec.expectedImpact && <div className="text-[11px] text-emerald-300/80">Impact: {rec.expectedImpact}</div>}
+                {rec.expectedImpact && (
+                  <div className="text-[11px] text-emerald-300/90 flex items-center gap-1.5">
+                    <span aria-hidden>↗</span>
+                    <span>{rec.expectedImpact}</span>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -650,10 +848,13 @@ function ReportResult({ o }: { o: Record<string, any> }) {
 
       {quickWins.length > 0 && (
         <div>
-          <div className="text-[10px] uppercase tracking-widest text-gray-500 mb-1.5">Quick wins</div>
-          <ul className="space-y-1">
+          <SectionLabel>Quick wins</SectionLabel>
+          <ul className="space-y-1.5">
             {quickWins.map((q, i) => (
-              <li key={i} className="text-[12px] text-gray-300 leading-snug">✓ {q}</li>
+              <li key={i} className="flex gap-2 text-[12px] text-gray-300 leading-snug">
+                <span className="flex-none mt-0.5 w-4 h-4 rounded-full bg-emerald-500/15 text-emerald-300 text-[9px] flex items-center justify-center">✓</span>
+                <span>{q}</span>
+              </li>
             ))}
           </ul>
         </div>

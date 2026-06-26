@@ -1,16 +1,25 @@
-'use client';
+// Workspace home — lists the orgs the user belongs to and their projects.
+// Server component (RLS-protected); interactivity (new project, sign out) lives
+// in the client component.
 
-import dynamic from 'next/dynamic';
+import { redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
+import { listMyOrgs, listProjectsForOrg } from '@/lib/workspace';
+import DashboardClient from './dashboard-workspace';
 
-const DashboardContent = dynamic(() => import('./dashboard-content'), {
-  ssr: false,
-  loading: () => (
-    <div className="min-h-screen bg-[#0F172A] flex items-center justify-center">
-      <div className="animate-spin w-8 h-8 border-2 border-[#1D4ED8] border-t-transparent rounded-full" />
-    </div>
-  ),
-});
+export const dynamic = 'force-dynamic';
 
-export default function DashboardPage() {
-  return <DashboardContent />;
+export default async function DashboardPage() {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect('/login?next=/dashboard');
+
+  const orgs = await listMyOrgs();
+  const groups = await Promise.all(
+    orgs.map(async (org) => ({ org, projects: await listProjectsForOrg(org.id) })),
+  );
+
+  return <DashboardClient groups={groups} userEmail={user.email ?? ''} />;
 }

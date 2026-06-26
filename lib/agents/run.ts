@@ -79,10 +79,64 @@ export async function executeAgentRun(
     await emit(event);
   };
 
+  // Phase-banded emitter for the cascade: remaps a sub-agent's 0-100 progress
+  // into a slice [base, base+span] of the overall bar so it advances
+  // monotonically across the three phases instead of resetting each time.
+  const bandedEmit = (base: number, span: number): Emitter => async (event) => {
+    const pct = (event.payload as { pct?: number })?.pct;
+    if (event.event_type === 'progress' && typeof pct === 'number') {
+      await persistAndEmit({ ...event, payload: { ...event.payload, pct: Math.round(base + (pct / 100) * span) } });
+    } else {
+      await persistAndEmit(event);
+    }
+  };
+
   try {
     let result: { summary: string; output: Record<string, unknown> };
 
-    if (agentId === 'discovery') {
+    if (agentId === 'full_scan') {
+      // One-click cascade: Discovery → Monitor → Report, all into this one run.
+      const base = {
+        brandName: project.brand_name,
+        brandUrl: project.brand_url,
+        targetCountry: project.target_country,
+        targetLanguage: project.target_language,
+        industry: project.industry,
+      };
+
+      await persistAndEmit({ event_type: 'milestone', payload: { label: 'Phase 1/3 · Discovery', step: 1, totalSteps: 3 } });
+      const disc = await runDiscoveryAgent(base, bandedEmit(0, 33));
+      await sb.from('assets').insert({
+        project_id: project.id, agent_run_id: runId, type: 'prompt_set',
+        title: `${project.brand_name} — Discovery prompt set`, format: 'json',
+        content: JSON.stringify(disc.output, null, 2),
+        meta: { brand: project.brand_name, country: project.target_country },
+      });
+
+      await persistAndEmit({ event_type: 'milestone', payload: { label: 'Phase 2/3 · Monitor', step: 2, totalSteps: 3 } });
+      const promptSet = ((disc.output as { promptSet?: unknown[] }).promptSet as { category: string; label: string; prompts: string[] }[]) || [];
+      const mon = await runMonitorAgent({ ...base, promptSet }, bandedEmit(33, 33));
+      await sb.from('assets').insert({
+        project_id: project.id, agent_run_id: runId, type: 'geo_scorecard',
+        title: `${project.brand_name} — GEO visibility scorecard`, format: 'json',
+        content: JSON.stringify(mon.output, null, 2),
+        meta: { brand: project.brand_name, country: project.target_country },
+      });
+
+      await persistAndEmit({ event_type: 'milestone', payload: { label: 'Phase 3/3 · Report', step: 3, totalSteps: 3 } });
+      const rep = await runReportAgent({ ...base, scorecard: mon.output }, bandedEmit(66, 34));
+      await sb.from('assets').insert({
+        project_id: project.id, agent_run_id: runId, type: 'geo_report',
+        title: `${project.brand_name} — GEO visibility report`, format: 'markdown',
+        content: (rep.output as { markdown?: string }).markdown ?? JSON.stringify(rep.output, null, 2),
+        meta: { brand: project.brand_name, country: project.target_country },
+      });
+
+      result = {
+        summary: rep.summary,
+        output: { aigvrScore: (mon.output as { aigvrScore?: number }).aigvrScore, scorecard: mon.output, report: rep.output },
+      };
+    } else if (agentId === 'discovery') {
       result = await runDiscoveryAgent(
         {
           brandName: project.brand_name,

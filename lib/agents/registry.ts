@@ -11,6 +11,14 @@ export interface AgentDef {
 }
 
 export const AGENTS: Record<string, AgentDef> = {
+  full_scan: {
+    id: 'full_scan',
+    displayName: 'Full GEO Scan',
+    shortName: 'Full Scan',
+    emoji: '⚡',
+    description: 'Runs Discovery → Monitor → Report end-to-end and produces the complete GEO report in one click.',
+    typicalDurationSec: 360,
+  },
   discovery: {
     id: 'discovery',
     displayName: 'Discovery Agent',
