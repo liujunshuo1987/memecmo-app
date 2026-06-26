@@ -73,11 +73,22 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
   } | null>(null);
   const [sending, setSending] = useState(false);
   const activityEndRef = useRef<HTMLDivElement>(null);
+  const resultTopRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll activity panel
+  const isTerminal = !!runStatus && ['completed', 'failed', 'canceled'].includes(runStatus.status);
+
+  // While running, follow the live stream to the bottom. Once terminal, stop
+  // chasing the log — we converge to the deliverable instead.
   useEffect(() => {
-    activityEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activity, runStatus]);
+    if (!isTerminal) activityEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [activity, runStatus, isTerminal]);
+
+  // On completion, scroll the result modules into view (deliverable-first).
+  useEffect(() => {
+    if (isTerminal && runStatus?.output) {
+      resultTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [isTerminal, runStatus?.output]);
 
   // Poll the read-only run observer while a run is active. Execution happens
   // in Inngest (server-side, durable) — this only reads status + new events.
@@ -323,8 +334,9 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
               </button>
             </div>
             <p className="text-[10px] text-gray-600 leading-snug">
-              v0.9 — Discovery → Monitor (AIGVR across ChatGPT / Gemini / Perplexity / Claude)
-              → Report, all live. Click a past run on the left to view its result.
+              v1.0 — ⚡ Full Scan runs Discovery → Monitor (AIGVR across ChatGPT / Gemini /
+              Perplexity / Claude) → Report in one click. On completion it converges to the
+              report; the process log collapses. Click a past run to view its result.
             </p>
           </div>
         </section>
@@ -352,27 +364,48 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
             )}
           </div>
 
-          <div className="flex-1 overflow-y-auto px-6 py-4 font-mono text-xs space-y-2">
+          <div className="flex-1 overflow-y-auto px-6 py-4">
             {!activeRunId && (
-              <div className="text-gray-600 italic">
-                — Awaiting dispatch —
+              <div className="font-mono text-xs text-gray-600 italic">— Awaiting dispatch —</div>
+            )}
+
+            {activeRunId && isTerminal && runStatus?.output ? (
+              /* Converged view: deliverable first, process log collapsed. */
+              <div className="space-y-4">
+                <div ref={resultTopRef} />
+                {runStatus.summary && (
+                  <div className="p-3 rounded border border-emerald-500/30 bg-emerald-500/5">
+                    <div className="text-[10px] uppercase tracking-widest text-emerald-400 mb-1">Result</div>
+                    <div className="text-sm text-emerald-100 leading-relaxed">{runStatus.summary}</div>
+                  </div>
+                )}
+                <RunResult agentId={runStatus.agentId} output={runStatus.output} />
+                <details className="rounded border border-white/5 bg-white/[0.02]">
+                  <summary className="cursor-pointer px-3 py-2 text-[11px] uppercase tracking-widest text-gray-500 select-none hover:text-gray-300">
+                    Process log · {activity.length} steps
+                  </summary>
+                  <div className="px-3 pb-3 font-mono text-xs space-y-2 border-t border-white/5 pt-2">
+                    {activity.map((ev) => (
+                      <ActivityRow key={ev.id} ev={ev} />
+                    ))}
+                  </div>
+                </details>
+              </div>
+            ) : (
+              /* Live view: stream the process as it runs. */
+              <div className="font-mono text-xs space-y-2">
+                {activity.map((ev) => (
+                  <ActivityRow key={ev.id} ev={ev} />
+                ))}
+                {isTerminal && runStatus?.summary && (
+                  <div className="mt-4 p-3 rounded border border-emerald-500/30 bg-emerald-500/5">
+                    <div className="text-[10px] uppercase tracking-widest text-emerald-400 mb-1">Result</div>
+                    <div className="text-emerald-100 leading-relaxed">{runStatus.summary}</div>
+                  </div>
+                )}
+                <div ref={activityEndRef} />
               </div>
             )}
-            {activity.map((ev) => (
-              <ActivityRow key={ev.id} ev={ev} />
-            ))}
-            {runStatus?.summary && (
-              <div className="mt-4 p-3 rounded border border-emerald-500/30 bg-emerald-500/5">
-                <div className="text-[10px] uppercase tracking-widest text-emerald-400 mb-1">
-                  Result
-                </div>
-                <div className="text-emerald-100 leading-relaxed">{runStatus.summary}</div>
-              </div>
-            )}
-            {runStatus?.output && (
-              <RunResult agentId={runStatus.agentId} output={runStatus.output} />
-            )}
-            <div ref={activityEndRef} />
           </div>
         </section>
       </div>
@@ -676,7 +709,10 @@ function MonitorResult({ o }: { o: Record<string, any> }) {
           <div className="space-y-2">
             {stages.map((s, i) => (
               <div key={i} className="grid grid-cols-[96px_1fr_72px] items-center gap-2.5">
-                <span className="text-[11px] text-gray-400 capitalize truncate">{s.stage}</span>
+                <span className="text-[11px] text-gray-400 capitalize truncate">
+                  {s.stage}
+                  {s.confidence === 'low' && <span className="ml-1 text-amber-500/70" title="few queries — low confidence">·low n</span>}
+                </span>
                 <Bar value={s.presence} />
                 <span className="text-[11px] text-gray-400 text-right tabular-nums">
                   <span className="text-gray-200 font-semibold">{s.presence}%</span>

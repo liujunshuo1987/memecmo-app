@@ -48,8 +48,10 @@ const ENGINES: { key: string; label: string; model: string }[] = [
   { key: 'claude', label: 'Claude', model: 'Claude-Sonnet-4.5' },
 ];
 
-const SAMPLE_CAP = 16; // prompts sampled across stages (cost/latency bound)
-const QUERY_CONCURRENCY = 5;
+// Sample the full prompt set (bounded for runaway sizes). Larger n per
+// stage×engine cell = less noisy percentages — the main rigor lever.
+const SAMPLE_CAP = 40;
+const QUERY_CONCURRENCY = 6;
 
 // AIGVR composite weights (sum = 1.0).
 const WEIGHTS = { presence: 0.3, prominence: 0.25, sentiment: 0.15, citation: 0.1, competitiveShare: 0.2 };
@@ -301,9 +303,13 @@ function computeDimensions(samples: Sample[]) {
     WEIGHTS.citation * citation +
     WEIGHTS.competitiveShare * competitiveShare;
 
+  // Confidence reflects sample size in this cell — small n = noisy %.
+  const confidence = queries >= 12 ? 'high' : queries >= 6 ? 'medium' : 'low';
+
   return {
     queries,
     brandHits,
+    confidence,
     presence: round(presence),
     prominence: round(prominence),
     sentiment: round(sentiment),
@@ -351,7 +357,9 @@ export async function runMonitorAgent(
           model: engine.model,
           messages: [{ role: 'user', content: s.prompt }],
           maxTokens: 900,
-          temperature: 0.3,
+          // temperature 0 → deterministic model sampling, so the measurement is
+          // reproducible (residual variance is from web-retrieval engines only).
+          temperature: 0,
           retries: 1,
         });
         const text = resp.content || '';
@@ -496,8 +504,8 @@ export async function runMonitorAgent(
   };
 
   const summary =
-    `${brandName} — AIGVR ${overall.aigvr}/100. ` +
-    `Appears in ${overall.presence}% of AI answers (rank #${brandRank} of ${bench.length}); ` +
+    `${brandName} — AIGVR ${overall.aigvr}/100 (across ${samples.length} AI queries). ` +
+    `Appears in ${overall.presence}% of answers (rank #${brandRank} of ${bench.length}); ` +
     `prominence ${overall.prominence}, sentiment ${overall.sentiment}, competitive share ${overall.competitiveShare}. ` +
     `Strongest on ${bestEngine?.engine} (${bestEngine?.aigvr}), weakest on ${worstEngine?.engine} (${worstEngine?.aigvr}). ` +
     `${gaps.length} high-intent gaps.`;
