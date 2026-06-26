@@ -134,38 +134,72 @@ function sampleAcrossStages(
   return picked;
 }
 
-// ── competitor identification ────────────────────────────────────────────────
+// ── competitor identification (from real answers, not a cold guess) ───────────
 
-async function identifyCompetitors(input: MonitorInput): Promise<string[]> {
-  if (input.knownCompetitors && input.knownCompetitors.length) return input.knownCompetitors;
+// Extract the competitor brands the engines ACTUALLY named in their answers.
+// This self-calibrates the benchmark to the real market: if buyers ask "best X
+// companies" and the engines list Chicilon/Goldsun, those are the real rivals —
+// far more accurate than guessing competitor names before seeing any data.
+async function extractCompetitorsFromAnswers(
+  answers: { text: string }[],
+  input: MonitorInput,
+): Promise<string[]> {
+  // Build a bounded corpus from the answers.
+  let corpus = '';
+  for (const a of answers) {
+    if (corpus.length > 6000) break;
+    corpus += a.text.slice(0, 800) + '\n---\n';
+  }
   const res = await poeChat({
     messages: [
-      {
-        role: 'system',
-        content: 'You are a market analyst. Output strict JSON only.',
-      },
+      { role: 'system', content: 'You extract entities. Output strict JSON only.' },
       {
         role: 'user',
         content:
-          `Name the 4-7 most relevant real competitor brands of "${input.brandName}" ` +
-          `in ${input.targetCountry}` +
-          (input.industry ? ` in the ${input.industry} space` : '') +
-          `. Use the names as they actually appear in the market. ` +
-          `Return ONLY a JSON array of strings, no prose.`,
+          `Below are AI assistant answers to buyer questions about ` +
+          `${input.industry || 'this industry'} in ${input.targetCountry}.\n\n` +
+          `List the distinct competitor COMPANY/BRAND names that appear in these answers, ` +
+          `EXCLUDING "${input.brandName}". Order by how frequently/prominently they appear. ` +
+          `Use the exact names as written. Return ONLY a JSON array of 4-10 strings.\n\n` +
+          `ANSWERS:\n${corpus}`,
       },
     ],
-    maxTokens: 300,
-    temperature: 0.3,
+    maxTokens: 400,
+    temperature: 0.2,
   });
   try {
     const arr = parseJsonFromLLM<string[]>(res.content);
-    return Array.isArray(arr) ? arr.filter((x) => typeof x === 'string' && x.trim()).slice(0, 8) : [];
+    if (!Array.isArray(arr)) return [];
+    // Dedupe (case-insensitive), drop the brand itself and junk.
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const raw of arr) {
+      if (typeof raw !== 'string') continue;
+      const name = raw.trim();
+      if (name.length < 2) continue;
+      if (mentions(name, input.brandName) || mentions(input.brandName, name)) continue;
+      const k = norm(name);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push(name);
+    }
+    return out.slice(0, 10);
   } catch {
     return [];
   }
 }
 
 // ── main ─────────────────────────────────────────────────────────────────────
+
+interface RawAnswer {
+  engine: string;
+  stage: string;
+  prompt: string;
+  text: string;
+  brandPresent: boolean;
+  citations: string[];
+  brandCited: boolean;
+}
 
 interface Sample {
   engine: string;
@@ -183,21 +217,13 @@ export async function runMonitorAgent(
   emit: EventEmitter,
 ): Promise<{ summary: string; output: Record<string, unknown> }> {
   const { brandName, brandUrl, targetCountry } = input;
+  const brandDomain = brandUrl ? domainOf(brandUrl) : '';
 
   await emit({ event_type: 'milestone', payload: { label: 'Monitor started', step: 1, totalSteps: 4 } });
 
-  // 1. Competitors
-  await emit({ event_type: 'log', payload: { text: `Identifying competitors for ${brandName} in ${targetCountry}…` } });
-  const competitors = await identifyCompetitors(input);
-  await emit({
-    event_type: 'log',
-    payload: { text: competitors.length ? `Tracking vs: ${competitors.join(', ')}` : 'No competitors identified — measuring brand presence only.' },
-  });
-
-  // 2. Sample prompts
+  // 1. Sample prompts (stage-balanced, bounded)
   const totalPrompts = input.promptSet.reduce((n, c) => n + (c.prompts?.length || 0), 0);
   const sampled = sampleAcrossStages(input.promptSet, SAMPLE_CAP);
-  const brandDomain = brandUrl ? domainOf(brandUrl) : '';
   await emit({
     event_type: 'milestone',
     payload: { label: 'Sampling prompt set', step: 2, totalSteps: 4 },
@@ -209,8 +235,8 @@ export async function runMonitorAgent(
     },
   });
 
-  // 3. Query engines
-  const samples: Sample[] = [];
+  // 2. Query engines — collect raw answers (full text kept in-memory only).
+  const raw: RawAnswer[] = [];
   const totalQueries = sampled.length * ENGINES.length;
   let done = 0;
 
@@ -220,7 +246,7 @@ export async function runMonitorAgent(
       payload: { tool: 'engine.query', engine: engine.label, model: engine.model, prompts: sampled.length },
     });
     try {
-      const engineSamples = await mapLimit(sampled, QUERY_CONCURRENCY, async (s) => {
+      const engineAnswers = await mapLimit(sampled, QUERY_CONCURRENCY, async (s) => {
         const resp = await poeChat({
           model: engine.model,
           messages: [{ role: 'user', content: s.prompt }],
@@ -230,27 +256,26 @@ export async function runMonitorAgent(
         });
         const text = resp.content || '';
         const urls = extractUrls(text);
-        const sample: Sample = {
+        const answer: RawAnswer = {
           engine: engine.label,
           stage: s.stage,
           prompt: s.prompt,
+          text,
           brandPresent: mentions(text, brandName),
-          competitorsPresent: competitors.filter((c) => mentions(text, c)),
           citations: urls,
           brandCited: !!brandDomain && urls.some((u) => domainOf(u) === brandDomain),
-          snippet: text.slice(0, 400),
         };
         done++;
         if (done % 4 === 0 || done === totalQueries) {
-          await emit({ event_type: 'progress', payload: { pct: 10 + Math.round((done / totalQueries) * 80) } });
+          await emit({ event_type: 'progress', payload: { pct: 5 + Math.round((done / totalQueries) * 75) } });
         }
-        return sample;
+        return answer;
       });
-      samples.push(...engineSamples);
-      const hits = engineSamples.filter((s) => s.brandPresent).length;
+      raw.push(...engineAnswers);
+      const hits = engineAnswers.filter((a) => a.brandPresent).length;
       await emit({
         event_type: 'tool_result',
-        payload: { tool: 'engine.query', engine: engine.label, brandSoVPct: pct(hits, engineSamples.length) },
+        payload: { tool: 'engine.query', engine: engine.label, brandSoVPct: pct(hits, engineAnswers.length) },
       });
     } catch (err) {
       // Resilient: one engine failing doesn't sink the whole scan.
@@ -261,12 +286,36 @@ export async function runMonitorAgent(
     }
   }
 
-  if (samples.length === 0) {
+  if (raw.length === 0) {
     throw new Error('All engines failed — no measurements collected.');
   }
 
+  // 3. Identify competitors from the REAL answers (self-calibrating benchmark).
+  await emit({ event_type: 'milestone', payload: { label: 'Identifying competitors from answers', step: 3, totalSteps: 4 } });
+  const competitors = await extractCompetitorsFromAnswers(raw, input);
+  await emit({
+    event_type: 'log',
+    payload: {
+      text: competitors.length
+        ? `Competitors named by the engines: ${competitors.join(', ')}`
+        : 'No competitor brands surfaced in the answers.',
+    },
+  });
+
+  // Now score competitor presence per answer and drop full text → snippet.
+  const samples: Sample[] = raw.map((a) => ({
+    engine: a.engine,
+    stage: a.stage,
+    prompt: a.prompt,
+    brandPresent: a.brandPresent,
+    competitorsPresent: competitors.filter((c) => mentions(a.text, c)),
+    citations: a.citations,
+    brandCited: a.brandCited,
+    snippet: a.text.slice(0, 400),
+  }));
+
   // 4. Aggregate scorecard
-  await emit({ event_type: 'milestone', payload: { label: 'Computing scorecard', step: 3, totalSteps: 4 } });
+  await emit({ event_type: 'milestone', payload: { label: 'Computing scorecard', step: 4, totalSteps: 4 } });
 
   const brandHits = samples.filter((s) => s.brandPresent).length;
   const overallSoVPct = pct(brandHits, samples.length);
