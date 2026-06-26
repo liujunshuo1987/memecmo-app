@@ -49,14 +49,11 @@ export const runAgent = inngest.createFunction(
       return true;
     });
 
-    // 3. Execute the agent. executeAgentRun persists events to DB and
-    //    finalizes status (completed/failed) + assets. The emit callback is a
-    //    no-op here because the UI observes via DB polling, not a live stream.
-    //
-    //    NOTE: for v0.5 the whole agent runs in one step. In v0.6 the monitor
-    //    agent will split into per-engine step.run() calls so a failure at
-    //    engine 3 of 4 resumes from there instead of re-running everything.
-    await executeAgentRun(runId, agentId, project, async () => {});
+    // 3. Execute the agent. `step` is passed through so long cascades
+    //    (full_scan) checkpoint each phase as its own Inngest step → each runs
+    //    in a separate, short Vercel invocation and resumes durably, instead of
+    //    one long invocation that hits the function-duration ceiling and stalls.
+    await executeAgentRun(runId, agentId, project, async () => {}, step);
 
     return { runId, agentId, status: 'done' };
   },

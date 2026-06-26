@@ -56,14 +56,29 @@ export async function claimRun(runId: string): Promise<boolean> {
   return !!data && data.length > 0;
 }
 
+// Minimal shape of the Inngest `step` we use — passed through so long cascades
+// checkpoint per phase (separate short invocations, durable resume). Loosely
+// typed because Inngest's step.run returns Jsonify<T> (it serializes results);
+// our agent outputs are plain JSON so the round-trip is lossless.
+type StepRunner = { run: (id: string, fn: () => Promise<any>) => Promise<any> };
+
 // Run the agent end-to-end: emit events, finalize status, persist assets.
 export async function executeAgentRun(
   runId: string,
   agentId: string,
   project: ProjectLite,
   emit: Emitter,
+  step?: StepRunner,
 ): Promise<void> {
   const sb = svc();
+
+  // step.run when running under Inngest, else a passthrough (direct call/test).
+  // IMPORTANT: everything with a side effect inside a cascade must live INSIDE a
+  // step — Inngest re-executes code OUTSIDE steps on every resume, which would
+  // duplicate events/assets. A completed step is skipped (memoized) on resume.
+  const runStep: (id: string, fn: () => Promise<any>) => Promise<any> = step
+    ? (id, fn) => step.run(id, fn)
+    : (_id, fn) => fn();
 
   // Combined emitter: persist to DB (for history/replay) + caller's emitter.
   const persistAndEmit: Emitter = async (event) => {
@@ -105,32 +120,45 @@ export async function executeAgentRun(
         industry: project.industry,
       };
 
-      await persistAndEmit({ event_type: 'milestone', payload: { label: 'Phase 1/3 · Discovery', step: 1, totalSteps: 3 } });
-      const disc = await runDiscoveryAgent(base, bandedEmit(0, 33));
-      await sb.from('assets').insert({
-        project_id: project.id, agent_run_id: runId, type: 'prompt_set',
-        title: `${project.brand_name} — Discovery prompt set`, format: 'json',
-        content: JSON.stringify(disc.output, null, 2),
-        meta: { brand: project.brand_name, country: project.target_country },
+      // Each phase is one Inngest step → its own short invocation, durable
+      // resume. All side effects (emit + asset insert) live INSIDE the step so
+      // they run exactly once even if a later phase resumes the function.
+      const disc = await runStep('phase-discovery', async () => {
+        await persistAndEmit({ event_type: 'milestone', payload: { label: 'Phase 1/3 · Discovery', step: 1, totalSteps: 3 } });
+        const d = await runDiscoveryAgent(base, bandedEmit(0, 33));
+        await sb.from('assets').insert({
+          project_id: project.id, agent_run_id: runId, type: 'prompt_set',
+          title: `${project.brand_name} — Discovery prompt set`, format: 'json',
+          content: JSON.stringify(d.output, null, 2),
+          meta: { brand: project.brand_name, country: project.target_country },
+        });
+        return d;
       });
 
-      await persistAndEmit({ event_type: 'milestone', payload: { label: 'Phase 2/3 · Monitor', step: 2, totalSteps: 3 } });
-      const promptSet = ((disc.output as { promptSet?: unknown[] }).promptSet as { category: string; label: string; prompts: string[] }[]) || [];
-      const mon = await runMonitorAgent({ ...base, promptSet }, bandedEmit(33, 33));
-      await sb.from('assets').insert({
-        project_id: project.id, agent_run_id: runId, type: 'geo_scorecard',
-        title: `${project.brand_name} — GEO visibility scorecard`, format: 'json',
-        content: JSON.stringify(mon.output, null, 2),
-        meta: { brand: project.brand_name, country: project.target_country },
+      const mon = await runStep('phase-monitor', async () => {
+        await persistAndEmit({ event_type: 'milestone', payload: { label: 'Phase 2/3 · Monitor', step: 2, totalSteps: 3 } });
+        const promptSet = ((disc.output as { promptSet?: unknown[] }).promptSet as { category: string; label: string; prompts: string[] }[]) || [];
+        // No nested stepper: this whole phase is already one step.
+        const m = await runMonitorAgent({ ...base, promptSet }, bandedEmit(33, 33));
+        await sb.from('assets').insert({
+          project_id: project.id, agent_run_id: runId, type: 'geo_scorecard',
+          title: `${project.brand_name} — GEO visibility scorecard`, format: 'json',
+          content: JSON.stringify(m.output, null, 2),
+          meta: { brand: project.brand_name, country: project.target_country },
+        });
+        return m;
       });
 
-      await persistAndEmit({ event_type: 'milestone', payload: { label: 'Phase 3/3 · Report', step: 3, totalSteps: 3 } });
-      const rep = await runReportAgent({ ...base, scorecard: mon.output }, bandedEmit(66, 34));
-      await sb.from('assets').insert({
-        project_id: project.id, agent_run_id: runId, type: 'geo_report',
-        title: `${project.brand_name} — GEO visibility report`, format: 'markdown',
-        content: (rep.output as { markdown?: string }).markdown ?? JSON.stringify(rep.output, null, 2),
-        meta: { brand: project.brand_name, country: project.target_country },
+      const rep = await runStep('phase-report', async () => {
+        await persistAndEmit({ event_type: 'milestone', payload: { label: 'Phase 3/3 · Report', step: 3, totalSteps: 3 } });
+        const r = await runReportAgent({ ...base, scorecard: mon.output }, bandedEmit(66, 34));
+        await sb.from('assets').insert({
+          project_id: project.id, agent_run_id: runId, type: 'geo_report',
+          title: `${project.brand_name} — GEO visibility report`, format: 'markdown',
+          content: (r.output as { markdown?: string }).markdown ?? JSON.stringify(r.output, null, 2),
+          meta: { brand: project.brand_name, country: project.target_country },
+        });
+        return r;
       });
 
       result = {
