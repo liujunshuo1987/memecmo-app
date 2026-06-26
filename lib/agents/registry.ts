@@ -52,6 +52,14 @@ export const AGENTS: Record<string, AgentDef> = {
     description: 'Turns the top measured gap into a publish-ready, AI-retrieval-optimized page + FAQ schema in the target language.',
     typicalDurationSec: 60,
   },
+  distribute: {
+    id: 'distribute',
+    displayName: 'Distribution Agent',
+    shortName: 'Distribute',
+    emoji: '📣',
+    description: 'Turns the Source-Authority targets into ready-to-send third-party placements (directory / PR / review submissions) in the target language.',
+    typicalDurationSec: 60,
+  },
 };
 
 export const V05_AGENT_IDS = Object.keys(AGENTS);

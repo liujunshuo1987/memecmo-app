@@ -12,6 +12,7 @@ import { runDiscoveryAgent } from './discovery';
 import { runMonitorAgent } from './monitor';
 import { runReportAgent } from './report';
 import { runOptimizeAgent } from './optimize';
+import { runDistributeAgent } from './distribute';
 
 export type AgentEvent = {
   event_type:
@@ -365,6 +366,38 @@ export async function executeAgentRun(
         },
         persistAndEmit,
       );
+    } else if (agentId === 'distribute') {
+      // Distribute turns the Source-Authority targets into submission assets.
+      const { data: scAsset } = await sb
+        .from('assets')
+        .select('content')
+        .eq('project_id', project.id)
+        .eq('type', 'geo_scorecard')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!scAsset?.content) {
+        throw new Error('No Monitor scorecard found. Run Monitor (or Full Scan) first.');
+      }
+      let scorecard: any;
+      try {
+        scorecard = JSON.parse(scAsset.content);
+      } catch {
+        throw new Error('Scorecard asset corrupted — re-run Monitor.');
+      }
+      const sources = (scorecard.sourceAuthority?.ranking || []) as { domain: string; citations: number; isBrand: boolean }[];
+      result = await runDistributeAgent(
+        {
+          brandName: project.brand_name,
+          brandUrl: project.brand_url,
+          targetCountry: project.target_country,
+          targetLanguage: project.target_language,
+          industry: project.industry,
+          sources,
+          competitors: scorecard.competitors,
+        },
+        persistAndEmit,
+      );
     } else {
       const def = AGENTS[agentId];
       await persistAndEmit({
@@ -428,6 +461,16 @@ export async function executeAgentRun(
         format: 'markdown',
         content: (result.output as { fullMarkdown?: string }).fullMarkdown ?? JSON.stringify(result.output, null, 2),
         meta: { brand: project.brand_name, targetQuery: (result.output as { targetQuery?: string }).targetQuery },
+      });
+    } else if (agentId === 'distribute') {
+      await sb.from('assets').insert({
+        project_id: project.id,
+        agent_run_id: runId,
+        type: 'distribution_kit',
+        title: `${project.brand_name} — GEO distribution kit`,
+        format: 'markdown',
+        content: (result.output as { fullMarkdown?: string }).fullMarkdown ?? JSON.stringify(result.output, null, 2),
+        meta: { brand: project.brand_name, country: project.target_country },
       });
     }
   } catch (err: unknown) {

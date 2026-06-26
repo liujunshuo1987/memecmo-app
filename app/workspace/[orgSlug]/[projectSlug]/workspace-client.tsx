@@ -577,6 +577,8 @@ function RunResult({ agentId, output }: { agentId?: string; output: Record<strin
         <ReportResult o={output} />
       ) : agentId === 'optimize' ? (
         <ContentResult o={output} />
+      ) : agentId === 'distribute' ? (
+        <DistributionResult o={output} />
       ) : agentId === 'discovery' ? (
         <DiscoveryResult o={output} />
       ) : null}
@@ -627,6 +629,36 @@ function ContentResult({ o }: { o: Record<string, any> }) {
           </ul>
         </div>
       )}
+    </div>
+  );
+}
+
+function DistributionResult({ o }: { o: Record<string, any> }) {
+  const targets: any[] = o.targets || [];
+  const copy = (t?: string) => { if (t) navigator.clipboard?.writeText(t).catch(() => {}); };
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-white">Distribution kit</h3>
+          <p className="text-[11px] text-gray-500 mt-0.5">{targets.length} ready-to-send placements · get cited where AI engines look</p>
+        </div>
+        <button onClick={() => copy(o.fullMarkdown)} className="text-[11px] px-2 py-0.5 rounded border border-white/10 text-gray-400 hover:border-blue-400/40 hover:text-blue-200 transition shrink-0">Copy kit</button>
+      </div>
+      <div className="space-y-2.5">
+        {targets.map((t, i) => (
+          <div key={i} className="rounded-lg border border-white/5 bg-white/[0.02] p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[12px] font-medium text-white truncate">{t.domain}</span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-gray-400 uppercase tracking-wide shrink-0">{(t.channelType || '').replace(/_/g, ' ')}</span>
+              <button onClick={() => copy(t.draft)} className="ml-auto text-[10px] text-gray-500 hover:text-blue-200 shrink-0">copy</button>
+            </div>
+            {t.title && <div className="text-[12px] text-gray-300 font-medium mb-1">{t.title}</div>}
+            {t.draft && <div className="text-[12px] text-gray-400 leading-snug whitespace-pre-wrap">{t.draft}</div>}
+            {t.why && <div className="text-[10px] text-emerald-300/70 mt-1.5">↳ {t.why}</div>}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
