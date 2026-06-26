@@ -10,6 +10,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { AGENTS } from './registry';
 import { runDiscoveryAgent } from './discovery';
 import { runMonitorAgent } from './monitor';
+import { runReportAgent } from './report';
 
 export type AgentEvent = {
   event_type:
@@ -125,6 +126,36 @@ export async function executeAgentRun(
         },
         persistAndEmit,
       );
+    } else if (agentId === 'report') {
+      // Report turns the latest Monitor scorecard into a client deliverable.
+      const { data: scAsset } = await sb
+        .from('assets')
+        .select('content')
+        .eq('project_id', project.id)
+        .eq('type', 'geo_scorecard')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!scAsset?.content) {
+        throw new Error('No Monitor scorecard found for this project. Run Monitor first.');
+      }
+      let scorecard: unknown;
+      try {
+        scorecard = JSON.parse(scAsset.content);
+      } catch {
+        throw new Error('Monitor scorecard asset is corrupted — re-run Monitor.');
+      }
+      result = await runReportAgent(
+        {
+          brandName: project.brand_name,
+          brandUrl: project.brand_url,
+          targetCountry: project.target_country,
+          targetLanguage: project.target_language,
+          industry: project.industry,
+          scorecard,
+        },
+        persistAndEmit,
+      );
     } else {
       const def = AGENTS[agentId];
       await persistAndEmit({
@@ -167,6 +198,16 @@ export async function executeAgentRun(
         title: `${project.brand_name} — GEO visibility scorecard`,
         format: 'json',
         content: JSON.stringify(result.output, null, 2),
+        meta: { brand: project.brand_name, country: project.target_country },
+      });
+    } else if (agentId === 'report') {
+      await sb.from('assets').insert({
+        project_id: project.id,
+        agent_run_id: runId,
+        type: 'geo_report',
+        title: `${project.brand_name} — GEO visibility report`,
+        format: 'markdown',
+        content: (result.output as { markdown?: string }).markdown ?? JSON.stringify(result.output, null, 2),
         meta: { brand: project.brand_name, country: project.target_country },
       });
     }
