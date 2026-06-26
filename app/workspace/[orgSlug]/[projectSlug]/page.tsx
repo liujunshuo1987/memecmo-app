@@ -22,14 +22,14 @@ export default async function WorkspacePage({ params }: PageProps) {
   const projectAndOrg = await getProjectBySlug(params.orgSlug, params.projectSlug);
   if (!projectAndOrg) {
     return (
-      <div className="min-h-screen bg-[#0a1628] text-white flex items-center justify-center px-4">
+      <div className="min-h-screen bg-canvas text-ink flex items-center justify-center px-4">
         <div className="max-w-md text-center space-y-3">
           <h1 className="text-2xl font-semibold">Project not found</h1>
-          <p className="text-sm text-gray-400">
-            Either <code className="text-gray-300">{params.orgSlug}/{params.projectSlug}</code> doesn&apos;t exist,
+          <p className="text-sm text-dim">
+            Either <code className="text-dim">{params.orgSlug}/{params.projectSlug}</code> doesn&apos;t exist,
             or your account doesn&apos;t have access. If you think this is wrong, contact your org admin.
           </p>
-          <a href="/" className="inline-block text-sm text-blue-400 hover:underline">← Back home</a>
+          <a href="/" className="inline-block text-sm text-brand hover:underline">← Back home</a>
         </div>
       </div>
     );

@@ -53,17 +53,49 @@
   --color-neon-red: #ff4455;
 }
 
+/* ── MemeCMO "Atelier" warm theme — night + day, one-click switch ──────── */
+.theme-night {
+  --canvas: #1B1416; --surface: #251C1F; --raised: #2E2327;
+  --edge: rgba(243,231,225,0.10); --edge-strong: rgba(243,231,225,0.20);
+  --ink: #F3E7E1; --dim: #B6A39C; --faint: #8A7A7E;
+  --brand: #E59CA6; --on-brand: #3A1E22; --brand-soft: rgba(229,156,166,0.13);
+  --gold: #E3BC7E; --sage: #9DC3A6; --garnet: #E08594;
+}
+.theme-day {
+  --canvas: #FBF7F4; --surface: #FFFFFF; --raised: #F4ECE6;
+  --edge: rgba(58,30,34,0.12); --edge-strong: rgba(58,30,34,0.22);
+  --ink: #2A2024; --dim: #6E625F; --faint: #9C8E8A;
+  --brand: #C76B7A; --on-brand: #FFFFFF; --brand-soft: rgba(199,107,122,0.10);
+  --gold: #B6863A; --sage: #5E9E76; --garnet: #C0455C;
+}
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-edge: var(--edge);
+  --color-edge-strong: var(--edge-strong);
+  --color-ink: var(--ink);
+  --color-dim: var(--dim);
+  --color-faint: var(--faint);
+  --color-brand: var(--brand);
+  --color-on-brand: var(--on-brand);
+  --color-brand-soft: var(--brand-soft);
+  --color-gold: var(--gold);
+  --color-sage: var(--sage);
+  --color-garnet: var(--garnet);
+}
+
 body {
-  background: var(--color-background);
-  color: var(--color-foreground);
+  background: var(--canvas);
+  color: var(--ink);
 }
 
 ::selection {
-  background: rgba(96, 165, 250, 0.3);
-  color: white;
+  background: var(--brand-soft);
+  color: var(--ink);
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(96, 165, 250, 0.2) transparent;
+  scrollbar-color: var(--edge-strong) transparent;
 }
