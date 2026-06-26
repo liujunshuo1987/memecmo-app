@@ -68,6 +68,8 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
   });
   const [intent, setIntent] = useState('');
   const [readingLang, setReadingLang] = useState<'orig' | 'zh' | 'en'>('orig');
+  // Sandbox version stacks survive navigation within the session (keyed by runId).
+  const [sandboxVersions, setSandboxVersions] = useState<Record<string, { label: string; content: string }[]>>({});
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [runStatus, setRunStatus] = useState<{
@@ -333,9 +335,17 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
                     <div className="p-3 rounded border border-emerald-500/30 bg-emerald-500/5 text-sm text-emerald-100 leading-relaxed">{runStatus.summary}</div>
                   )}
                   {readingLang !== 'orig' && (
-                    <TranslatedView output={runStatus.output} summary={runStatus.summary} to={readingLang} />
+                    <TranslatedView agentId={runStatus.agentId} output={runStatus.output} summary={runStatus.summary} to={readingLang} />
                   )}
-                  <RunResult agentId={runStatus.agentId} output={runStatus.output} projectId={project.id} />
+                  <RunResult
+                    agentId={runStatus.agentId}
+                    output={runStatus.output}
+                    projectId={project.id}
+                    runId={activeRunId ?? undefined}
+                    versions={activeRunId ? sandboxVersions[activeRunId] : undefined}
+                    onVersions={(v) => { if (activeRunId) setSandboxVersions((m) => ({ ...m, [activeRunId]: v })); }}
+                    onDispatch={dispatchAgent}
+                  />
                   <details className="rounded border border-white/5 bg-white/[0.02]">
                     <summary className="cursor-pointer px-3 py-2 text-[11px] uppercase tracking-widest text-gray-500 select-none hover:text-gray-300">Process log · {activity.length} steps</summary>
                     <div className="px-3 pb-3 font-mono text-xs space-y-2 border-t border-white/5 pt-2">
@@ -400,13 +410,8 @@ function NavItem({
   );
 }
 
-function TranslatedView({ output, summary, to }: { output: any; summary: string | null; to: 'zh' | 'en' }) {
-  const text =
-    output?.fullMarkdown ||
-    output?.markdown ||
-    output?.report?.markdown ||
-    [summary, output?.executiveSummary, output?.description, output?.definition].filter(Boolean).join('\n\n') ||
-    '';
+function TranslatedView({ agentId, output, summary, to }: { agentId?: string; output: any; summary: string | null; to: 'zh' | 'en' }) {
+  const text = resultToText(agentId, output, summary);
   const [state, setState] = useState<{ loading: boolean; text: string; err: string | null }>({ loading: false, text: '', err: null });
   useEffect(() => {
     if (!text.trim()) { setState({ loading: false, text: '', err: 'No translatable text in this result.' }); return; }
@@ -630,7 +635,16 @@ function RadarChart({ data }: { data: { label: string; value: number }[] }) {
   );
 }
 
-function RunResult({ agentId, output, projectId }: { agentId?: string; output: Record<string, any>; projectId?: string }) {
+function RunResult({ agentId, output, projectId, runId, versions, onVersions, onDispatch }: {
+  agentId?: string;
+  output: Record<string, any>;
+  projectId?: string;
+  runId?: string;
+  versions?: { label: string; content: string }[];
+  onVersions?: (v: { label: string; content: string }[]) => void;
+  onDispatch?: (agentId: string) => void;
+}) {
+  const advisory = agentId === 'monitor' || agentId === 'report' || agentId === 'full_scan';
   return (
     <div className="mt-4 font-sans text-sm text-gray-200 space-y-4">
       {agentId === 'full_scan' ? (
@@ -643,7 +657,7 @@ function RunResult({ agentId, output, projectId }: { agentId?: string; output: R
       ) : agentId === 'report' ? (
         <ReportResult o={output} />
       ) : agentId === 'optimize' ? (
-        <ContentSandbox o={output} projectId={projectId} />
+        <ContentSandbox o={output} projectId={projectId} runId={runId} versions={versions} onVersions={onVersions} />
       ) : agentId === 'distribute' ? (
         <DistributionResult o={output} />
       ) : agentId === 'site' ? (
@@ -655,14 +669,115 @@ function RunResult({ agentId, output, projectId }: { agentId?: string; output: R
       ) : agentId === 'discovery' ? (
         <DiscoveryResult o={output} />
       ) : null}
+      {advisory && projectId && agentId && (
+        <AdvisoryChat projectId={projectId} agentId={agentId} output={output} onDispatch={onDispatch} />
+      )}
     </div>
   );
 }
 
-function ContentSandbox({ o, projectId }: { o: Record<string, any>; projectId?: string }) {
+// Text extraction for translation/advisory — the FULL readable content of a
+// result, not just its one-line summary (fix: whole scorecard translates).
+function scorecardText(sc: any): string {
+  if (!sc) return '';
+  const L: string[] = [];
+  if (sc.aigvrScore != null) L.push(`AIGVR ${sc.aigvrScore}/100`);
+  if (sc.dimensions) L.push('Dimensions: ' + Object.entries(sc.dimensions).map(([k, v]) => `${k} ${v}`).join(', '));
+  if (sc.metrics?.perStage?.length) L.push('By funnel stage: ' + sc.metrics.perStage.map((s: any) => `${s.stage} ${s.presence}% (n=${s.queries})`).join('; '));
+  if (sc.competitorBenchmark?.length) L.push('Share of voice: ' + sc.competitorBenchmark.map((b: any) => `${b.name} ${b.sovPct}%`).join('; '));
+  if (sc.gaps?.length) L.push('High-intent gaps:\n' + sc.gaps.map((g: any) => `- [${g.engine}/${g.stage}] ${g.prompt} → ${(g.competitorsPresent || []).join(', ')}`).join('\n'));
+  if (sc.sourceAuthority?.ranking?.length) L.push('Sources AI engines cite: ' + sc.sourceAuthority.ranking.slice(0, 10).map((d: any) => `${d.domain} (${d.citations}x)`).join(', '));
+  return L.join('\n');
+}
+function resultToText(agentId: string | undefined, o: any, summary: string | null): string {
+  if (agentId === 'monitor') return [summary, scorecardText(o)].filter(Boolean).join('\n\n');
+  if (agentId === 'full_scan') return [summary, scorecardText(o?.scorecard), o?.report?.markdown].filter(Boolean).join('\n\n');
+  return o?.fullMarkdown || o?.markdown || o?.report?.markdown || [summary, o?.executiveSummary, o?.description, o?.definition].filter(Boolean).join('\n\n') || '';
+}
+
+function AdvisoryChat({ projectId, agentId, output, onDispatch }: {
+  projectId: string;
+  agentId: string;
+  output: any;
+  onDispatch?: (agentId: string) => void;
+}) {
+  const [q, setQ] = useState('');
+  const [thread, setThread] = useState<{ q: string; a: string; suggested?: string | null }[]>([]);
+  const [busy, setBusy] = useState(false);
+  const ask = async (question: string) => {
+    if (!question.trim() || busy) return;
+    setBusy(true);
+    const digest = resultToText(agentId, output, output?.summary ?? null);
+    try {
+      const res = await fetch('/api/workspace/ask', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, agentId, question: question.trim(), resultDigest: digest }),
+      });
+      const d = await res.json();
+      setThread((t) => [...t, { q: question.trim(), a: d.answer || d.error || 'No answer', suggested: d.suggestedAgent }]);
+      setQ('');
+    } catch (e) {
+      setThread((t) => [...t, { q: question.trim(), a: e instanceof Error ? e.message : String(e) }]);
+    }
+    setBusy(false);
+  };
+  const QUICK = ['哪个缺口最该先打?', '为什么某些引擎上我可见度低?', '最该先做哪件事?'];
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-2">
+      <div className="text-[10px] uppercase tracking-widest text-gray-500">Ask about this result</div>
+      {thread.map((t, i) => (
+        <div key={i} className="space-y-1">
+          <div className="text-[12px] text-blue-200">› {t.q}</div>
+          <div className="text-[13px] text-gray-300 leading-relaxed whitespace-pre-wrap">{t.a}</div>
+          {t.suggested && onDispatch && (
+            <button onClick={() => onDispatch(t.suggested!)} className="text-[11px] px-2 py-1 rounded border border-blue-400/40 text-blue-200 hover:bg-blue-500/10 transition">
+              ▶ Run {AGENTS[t.suggested]?.shortName ?? t.suggested}
+            </button>
+          )}
+        </div>
+      ))}
+      <div className="flex gap-2 pt-1">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && q.trim()) { e.preventDefault(); ask(q); } }}
+          placeholder="问这份结果…(可中文)"
+          disabled={busy}
+          className="flex-1 bg-white/[0.03] border border-white/10 rounded-md px-3 py-2 text-[13px] focus:outline-none focus:border-blue-400/50"
+        />
+        <button onClick={() => ask(q)} disabled={busy || !q.trim()} className="px-3 py-2 text-[13px] rounded-md bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 transition">{busy ? '…' : '问'}</button>
+      </div>
+      {thread.length === 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {QUICK.map((qq) => (
+            <button key={qq} onClick={() => ask(qq)} disabled={busy} className="text-[10px] px-2 py-0.5 rounded-full border border-white/10 text-gray-400 hover:border-blue-400/40 hover:text-blue-200 disabled:opacity-40 transition">{qq}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ContentSandbox({ o, projectId, runId, versions: extVersions, onVersions }: {
+  o: Record<string, any>;
+  projectId?: string;
+  runId?: string;
+  versions?: { label: string; content: string }[];
+  onVersions?: (v: { label: string; content: string }[]) => void;
+}) {
   const initial: string = o.fullMarkdown || o.articleMarkdown || '';
-  const [versions, setVersions] = useState<{ label: string; content: string }[]>([{ label: 'v1 · original', content: initial }]);
-  const [active, setActive] = useState(0);
+  // Versions persist in the parent (keyed by runId) so navigating away and back
+  // doesn't lose refinements. Fall back to local state if not provided.
+  const [localVersions, setLocalVersions] = useState<{ label: string; content: string }[]>(
+    extVersions && extVersions.length ? extVersions : [{ label: 'v1 · original', content: initial }],
+  );
+  const versions = extVersions && extVersions.length ? extVersions : localVersions;
+  const setVersions = (updater: (v: { label: string; content: string }[]) => { label: string; content: string }[]) => {
+    const next = updater(versions);
+    setLocalVersions(next);
+    onVersions?.(next);
+  };
+  const [active, setActive] = useState(() => (extVersions && extVersions.length ? extVersions.length - 1 : 0));
   const [editing, setEditing] = useState(false);
   const [instr, setInstr] = useState('');
   const [busy, setBusy] = useState(false);
