@@ -324,7 +324,7 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
                   {readingLang !== 'orig' && (
                     <TranslatedView output={runStatus.output} summary={runStatus.summary} to={readingLang} />
                   )}
-                  <RunResult agentId={runStatus.agentId} output={runStatus.output} />
+                  <RunResult agentId={runStatus.agentId} output={runStatus.output} projectId={project.id} />
                   <details className="rounded border border-white/5 bg-white/[0.02]">
                     <summary className="cursor-pointer px-3 py-2 text-[11px] uppercase tracking-widest text-gray-500 select-none hover:text-gray-300">Process log · {activity.length} steps</summary>
                     <div className="px-3 pb-3 font-mono text-xs space-y-2 border-t border-white/5 pt-2">
@@ -619,7 +619,7 @@ function RadarChart({ data }: { data: { label: string; value: number }[] }) {
   );
 }
 
-function RunResult({ agentId, output }: { agentId?: string; output: Record<string, any> }) {
+function RunResult({ agentId, output, projectId }: { agentId?: string; output: Record<string, any>; projectId?: string }) {
   return (
     <div className="mt-4 font-sans text-sm text-gray-200 space-y-4">
       {agentId === 'full_scan' ? (
@@ -632,7 +632,7 @@ function RunResult({ agentId, output }: { agentId?: string; output: Record<strin
       ) : agentId === 'report' ? (
         <ReportResult o={output} />
       ) : agentId === 'optimize' ? (
-        <ContentResult o={output} />
+        <ContentSandbox o={output} projectId={projectId} />
       ) : agentId === 'distribute' ? (
         <DistributionResult o={output} />
       ) : agentId === 'site' ? (
@@ -644,6 +644,94 @@ function RunResult({ agentId, output }: { agentId?: string; output: Record<strin
       ) : agentId === 'discovery' ? (
         <DiscoveryResult o={output} />
       ) : null}
+    </div>
+  );
+}
+
+function ContentSandbox({ o, projectId }: { o: Record<string, any>; projectId?: string }) {
+  const initial: string = o.fullMarkdown || o.articleMarkdown || '';
+  const [versions, setVersions] = useState<{ label: string; content: string }[]>([{ label: 'v1 · original', content: initial }]);
+  const [active, setActive] = useState(0);
+  const [editing, setEditing] = useState(false);
+  const [instr, setInstr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const current = versions[active];
+
+  const refineWith = async (instruction: string) => {
+    if (!instruction.trim() || busy || !projectId) return;
+    setBusy(true); setErr(null);
+    try {
+      const res = await fetch('/api/workspace/refine', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, artifactType: 'content_draft', currentContent: current.content, instruction: instruction.trim() }),
+      });
+      const d = await res.json();
+      if (!res.ok || !d.content) { setErr(d.error || 'Refine failed'); setBusy(false); return; }
+      setVersions((vs) => [...vs, { label: `v${vs.length + 1} · ${instruction.trim().slice(0, 24)}`, content: d.content }]);
+      setActive(versions.length);
+      setInstr('');
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    setBusy(false);
+  };
+
+  const QUICK = ['更口语自然', '更简短', '加入联系方式与报价', '更突出竞争优势'];
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-white">Content sandbox</h3>
+          {o.targetQuery && <p className="text-[11px] text-gray-500 mt-0.5">targets: <span className="text-amber-300">{o.targetQuery}</span></p>}
+        </div>
+        <div className="flex gap-2 shrink-0">
+          <button onClick={() => setEditing((e) => !e)} className="text-[11px] px-2 py-0.5 rounded border border-white/10 text-gray-400 hover:border-blue-400/40 hover:text-blue-200 transition">{editing ? 'Done' : 'Edit'}</button>
+          <button onClick={() => navigator.clipboard?.writeText(current.content).catch(() => {})} className="text-[11px] px-2 py-0.5 rounded border border-white/10 text-gray-400 hover:border-blue-400/40 hover:text-blue-200 transition">Copy</button>
+        </div>
+      </div>
+
+      {versions.length > 1 && (
+        <div className="flex flex-wrap gap-1.5">
+          {versions.map((v, i) => (
+            <button key={i} onClick={() => setActive(i)} className={`text-[10px] px-2 py-0.5 rounded border transition ${i === active ? 'bg-blue-600 border-blue-500 text-white' : 'border-white/10 text-gray-400 hover:text-gray-200'}`} title={v.label}>{v.label}</button>
+          ))}
+        </div>
+      )}
+
+      {editing ? (
+        <textarea
+          value={current.content}
+          onChange={(e) => setVersions((vs) => vs.map((v, i) => (i === active ? { ...v, content: e.target.value } : v)))}
+          className="w-full h-72 bg-black/30 border border-white/10 rounded-md p-3 text-[12px] text-gray-200 font-mono leading-relaxed focus:outline-none focus:border-blue-400/50"
+        />
+      ) : (
+        <div className="text-[13px] text-gray-200 leading-relaxed whitespace-pre-wrap max-h-[55vh] overflow-y-auto border border-white/5 rounded-md p-3 bg-black/20">{current.content}</div>
+      )}
+
+      {/* Refine dialogue — scoped to this artifact */}
+      <div className="border-t border-white/5 pt-3 space-y-2">
+        <div className="text-[10px] uppercase tracking-widest text-gray-500">Refine with a message</div>
+        <div className="flex gap-2">
+          <input
+            value={instr}
+            onChange={(e) => setInstr(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && instr.trim()) { e.preventDefault(); refineWith(instr); } }}
+            placeholder='e.g. "更口语，加入我们的报价"'
+            disabled={busy}
+            className="flex-1 bg-white/[0.03] border border-white/10 rounded-md px-3 py-2 text-[13px] focus:outline-none focus:border-blue-400/50"
+          />
+          <button onClick={() => refineWith(instr)} disabled={busy || !instr.trim()} className="px-3 py-2 text-[13px] rounded-md bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 transition">
+            {busy ? '改写中…' : '改写'}
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {QUICK.map((q) => (
+            <button key={q} onClick={() => refineWith(q)} disabled={busy} className="text-[10px] px-2 py-0.5 rounded-full border border-white/10 text-gray-400 hover:border-blue-400/40 hover:text-blue-200 disabled:opacity-40 transition">{q}</button>
+          ))}
+        </div>
+        {err && <div className="text-[11px] text-amber-300">{err}</div>}
+        <p className="text-[10px] text-gray-600">Versions live in this session · the original deliverable is unchanged. Copy/Edit to keep a version.</p>
+      </div>
     </div>
   );
 }
