@@ -126,7 +126,10 @@ export async function runSiteAgent(
     '  "homepageEdits": [{ "section": "e.g. above-the-fold / about / services", "change": "exact copy or structural change to make" }],',
     '  "schema": [{ "type": "Organization|LocalBusiness|Service|FAQPage|BreadcrumbList", "jsonld": { ...valid schema.org JSON-LD object ready to paste into <head>... } }]',
     '}',
-    'Rules: 5-8 checklist items, 3-5 homepage edits, 2-4 schema blocks (always include Organization with real brand fields). Be specific to this brand. Return ONLY the JSON.',
+    'Rules: 5-7 checklist items (one sentence each), 3-4 homepage edits (concise), ' +
+      'EXACTLY 2-3 schema blocks (always Organization; add LocalBusiness or FAQPage if ' +
+      'clearly useful) — keep each JSON-LD compact, only essential fields. Be specific to ' +
+      'this brand. Return ONLY the JSON, nothing after it.',
   ].join('\n');
 
   await emit({ event_type: 'tool_call', payload: { tool: 'poe.chat', args: { model: DEFAULT_MODEL, purpose: 'AEO site audit' } } });
@@ -138,7 +141,7 @@ export async function runSiteAgent(
       { role: 'system', content: system },
       { role: 'user', content: user },
     ],
-    maxTokens: 5000,
+    maxTokens: 8000,
     temperature: 0.4,
   });
 
