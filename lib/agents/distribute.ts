@@ -35,6 +35,8 @@ const LANGUAGE_NAMES: Record<string, string> = {
 interface Target {
   domain: string;
   channelType: string; // directory | industry_media | review_site | social | video | encyclopedia | other
+  tier: number; // 1 = national/mainstream (highest authority, hardest) · 2 = industry/trade · 3 = directory/listing (quick win)
+  effort: string; // 'quick' | 'medium' | 'high'
   title: string;
   draft: string;
   why: string;
@@ -82,15 +84,19 @@ export async function runDistributeAgent(
     sourceList,
     '',
     'For each target (plus 1-2 universal high-value GEO placements like a relevant ' +
-      'industry directory or Wikipedia if appropriate), produce a ready-to-send asset. ' +
-      'Return ONLY JSON of this shape:',
+      'industry directory or Wikipedia if appropriate), produce a ready-to-send asset, ' +
+      'and TIER each by authority/difficulty: tier 1 = national/mainstream media ' +
+      '(highest authority, hardest to land), tier 2 = industry/trade media & strong ' +
+      'platforms, tier 3 = directories/listings (quick wins). Return ONLY JSON of this shape:',
     '{',
     '  "targets": [',
     '    { "domain": "the source", "channelType": "directory|industry_media|review_site|social|video|encyclopedia|other",',
+    '      "tier": 1, "effort": "quick|medium|high",',
     '      "title": "listing title / PR angle", "draft": "the actual submission/listing/pitch body in ' + languageName + ', 120-180 words, ready to send", "why": "one line: why this source moves AI visibility" }',
     '  ]',
     '}',
-    'Rules: 4-7 targets, each draft concrete and publishable, all copy in ' + languageName + '.',
+    'Rules: 5-8 targets spanning all three tiers (include at least one tier-3 quick win ' +
+      'and one tier-1 aspirational target), each draft concrete and publishable, all copy in ' + languageName + '.',
   ]
     .filter(Boolean)
     .join('\n');
@@ -117,7 +123,7 @@ export async function runDistributeAgent(
   } catch (e) {
     throw new Error(`Distribute model returned unparseable output: ${e instanceof Error ? e.message : String(e)}`);
   }
-  const list = Array.isArray(parsed.targets) ? parsed.targets : [];
+  const list = (Array.isArray(parsed.targets) ? parsed.targets : []).sort((a, b) => (a.tier || 9) - (b.tier || 9));
   if (!list.length) throw new Error('Distribution produced no targets.');
 
   await emit({ event_type: 'milestone', payload: { label: 'Assembling kit', step: 2, totalSteps: 3 } });
@@ -125,20 +131,16 @@ export async function runDistributeAgent(
     await emit({ event_type: 'output_chunk', payload: { kind: 'placement', value: { domain: t.domain, channelType: t.channelType } } });
   }
 
-  // Assemble a publish-ready Markdown distribution kit.
-  const md = [`# ${input.brandName} — GEO Distribution Kit`, '', `Market: ${input.targetCountry} · language: ${languageName}`, '']
-    .concat(
-      list.flatMap((t) => [
-        `## ${t.domain}  _(${t.channelType})_`,
-        `**${t.title}**`,
-        '',
-        t.draft,
-        '',
-        `> Why: ${t.why}`,
-        '',
-      ]),
-    )
-    .join('\n');
+  // Assemble a publish-ready Markdown distribution kit, grouped by tier.
+  const tierLabel = (n: number) => (n === 1 ? 'Tier 1 — National / mainstream media' : n === 2 ? 'Tier 2 — Industry / trade media' : 'Tier 3 — Directories / listings (quick wins)');
+  const md = [`# ${input.brandName} — GEO Distribution Kit`, '', `Market: ${input.targetCountry} · language: ${languageName}`, ''];
+  let curTier = 0;
+  for (const t of list) {
+    const tier = t.tier || 3;
+    if (tier !== curTier) { md.push(`\n## ${tierLabel(tier)}\n`); curTier = tier; }
+    md.push(`### ${t.domain}  _(${t.channelType} · ${t.effort || 'medium'} effort)_`, `**${t.title}**`, '', t.draft, '', `> Why: ${t.why}`, '');
+  }
+  const mdStr = md.join('\n');
 
   await emit({ event_type: 'progress', payload: { pct: 100 } });
   await emit({ event_type: 'milestone', payload: { label: 'Distribution kit ready', step: 3, totalSteps: 3 } });
@@ -148,7 +150,7 @@ export async function runDistributeAgent(
     output: {
       language: langCode,
       targets: list,
-      fullMarkdown: md,
+      fullMarkdown: mdStr,
       generatedBy: `poe:${res.model}`,
     },
   };
