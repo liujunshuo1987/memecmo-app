@@ -657,13 +657,29 @@ function RunResult({ agentId, output, projectId, runId, versions, onVersions, on
       ) : agentId === 'report' ? (
         <ReportResult o={output} />
       ) : agentId === 'optimize' ? (
-        <ContentSandbox o={output} projectId={projectId} runId={runId} versions={versions} onVersions={onVersions} />
-      ) : agentId === 'distribute' ? (
-        <DistributionResult o={output} />
+        <ArtifactSandbox o={output} projectId={projectId} runId={runId} versions={versions} onVersions={onVersions}
+          title="Content sandbox" artifactType="content_draft"
+          subtitle={output.targetQuery ? <>targets: <span className="text-amber-300">{output.targetQuery}</span></> : undefined}
+          quick={['更口语自然', '更简短', '加入联系方式与报价', '更突出竞争优势']}
+          structured={<ContentResult o={output} />} />
       ) : agentId === 'site' ? (
-        <SiteResult o={output} />
+        <ArtifactSandbox o={output} projectId={projectId} runId={runId} versions={versions} onVersions={onVersions}
+          title="Homepage sandbox" artifactType="site_optimization"
+          subtitle={output.siteAudited ? `audited ${output.siteAudited}` : 'homepage AEO upgrade'}
+          quick={['更适配 AI 检索', '补充 FAQ schema', '强化实体定义', '加入 NAP 信息']}
+          structured={<SiteResult o={output} />} />
+      ) : agentId === 'distribute' ? (
+        <ArtifactSandbox o={output} projectId={projectId} runId={runId} versions={versions} onVersions={onVersions}
+          title="Distribution sandbox" artifactType="distribution_kit"
+          subtitle={`${(output.targets || []).length} placements, tiered`}
+          quick={['更贴合该媒体调性', '更简短', '更突出差异化', '增加数据支撑']}
+          structured={<DistributionResult o={output} />} />
       ) : agentId === 'encyclopedia' ? (
-        <EncyclopediaResult o={output} />
+        <ArtifactSandbox o={output} projectId={projectId} runId={runId} versions={versions} onVersions={onVersions}
+          title="Encyclopedia sandbox" artifactType="encyclopedia_entry"
+          subtitle={output.targetWiki}
+          quick={['更中立客观', '补充可靠引用', '精简篇幅', '强调显著性证据']}
+          structured={<EncyclopediaResult o={output} />} />
       ) : agentId === 'profile' ? (
         <ProfileResult o={output} />
       ) : agentId === 'discovery' ? (
@@ -758,12 +774,17 @@ function AdvisoryChat({ projectId, agentId, output, onDispatch }: {
   );
 }
 
-function ContentSandbox({ o, projectId, runId, versions: extVersions, onVersions }: {
+function ArtifactSandbox({ o, projectId, runId, versions: extVersions, onVersions, title = 'Content sandbox', artifactType = 'content_draft', subtitle, quick, structured }: {
   o: Record<string, any>;
   projectId?: string;
   runId?: string;
   versions?: { label: string; content: string }[];
   onVersions?: (v: { label: string; content: string }[]) => void;
+  title?: string;
+  artifactType?: string;
+  subtitle?: ReactNode;
+  quick?: string[];
+  structured?: ReactNode;
 }) {
   const initial: string = o.fullMarkdown || o.articleMarkdown || '';
   // Versions persist in the parent (keyed by runId) so navigating away and back
@@ -790,7 +811,7 @@ function ContentSandbox({ o, projectId, runId, versions: extVersions, onVersions
     try {
       const res = await fetch('/api/workspace/refine', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId, artifactType: 'content_draft', currentContent: current.content, instruction: instruction.trim() }),
+        body: JSON.stringify({ projectId, artifactType, currentContent: current.content, instruction: instruction.trim() }),
       });
       const d = await res.json();
       if (!res.ok || !d.content) { setErr(d.error || 'Refine failed'); setBusy(false); return; }
@@ -801,20 +822,27 @@ function ContentSandbox({ o, projectId, runId, versions: extVersions, onVersions
     setBusy(false);
   };
 
-  const QUICK = ['更口语自然', '更简短', '加入联系方式与报价', '更突出竞争优势'];
+  const QUICK = quick && quick.length ? quick : ['更口语自然', '更简短', '加入联系方式与报价', '更突出竞争优势'];
 
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-white">Content sandbox</h3>
-          {o.targetQuery && <p className="text-[11px] text-gray-500 mt-0.5">targets: <span className="text-amber-300">{o.targetQuery}</span></p>}
+          <h3 className="text-sm font-semibold text-white">{title}</h3>
+          {subtitle && <p className="text-[11px] text-gray-500 mt-0.5">{subtitle}</p>}
         </div>
         <div className="flex gap-2 shrink-0">
           <button onClick={() => setEditing((e) => !e)} className="text-[11px] px-2 py-0.5 rounded border border-white/10 text-gray-400 hover:border-blue-400/40 hover:text-blue-200 transition">{editing ? 'Done' : 'Edit'}</button>
           <button onClick={() => navigator.clipboard?.writeText(current.content).catch(() => {})} className="text-[11px] px-2 py-0.5 rounded border border-white/10 text-gray-400 hover:border-blue-400/40 hover:text-blue-200 transition">Copy</button>
         </div>
       </div>
+
+      {structured && (
+        <details className="rounded border border-white/5 bg-white/[0.02]">
+          <summary className="cursor-pointer px-3 py-2 text-[11px] uppercase tracking-widest text-gray-500 select-none hover:text-gray-300">Structured view</summary>
+          <div className="px-3 pb-3 pt-1 border-t border-white/5">{structured}</div>
+        </details>
+      )}
 
       {versions.length > 1 && (
         <div className="flex flex-wrap gap-1.5">
