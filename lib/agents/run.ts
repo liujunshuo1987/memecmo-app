@@ -62,13 +62,18 @@ export async function executeAgentRun(
 ): Promise<void> {
   const sb = svc();
 
-  // Combined emitter: persist to DB (for history/replay) + caller's emitter (SSE).
+  // Combined emitter: persist to DB (for history/replay) + caller's emitter.
   const persistAndEmit: Emitter = async (event) => {
     await sb.from('agent_run_events').insert({
       agent_run_id: runId,
       event_type: event.event_type,
       payload: event.payload,
     });
+    // Mirror progress events onto the run row so the UI progress bar moves
+    // smoothly instead of jumping 0 → 100 at completion.
+    if (event.event_type === 'progress' && typeof event.payload?.pct === 'number') {
+      await sb.from('agent_runs').update({ progress_pct: event.payload.pct }).eq('id', runId);
+    }
     await emit(event);
   };
 
