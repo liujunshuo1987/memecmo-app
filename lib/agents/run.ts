@@ -81,6 +81,7 @@ export async function executeAgentRun(
           brandName: project.brand_name,
           brandUrl: project.brand_url,
           targetCountry: project.target_country,
+          targetLanguage: project.target_language,
           industry: project.industry,
         },
         persistAndEmit,

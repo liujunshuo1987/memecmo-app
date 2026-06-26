@@ -1,8 +1,11 @@
-// Discovery Agent (v0.5 — mock implementation)
+// Discovery Agent (v0.6 — real LLM implementation via Poe)
 //
-// Real version (v0.6) will call Poe / Claude to generate prompts.
-// This mock emits realistic-looking events so the workspace UI can be
-// exercised end-to-end without burning LLM tokens.
+// Generates a GEO "prompt set": the real-world queries a buyer in the target
+// market would type into ChatGPT / Gemini / Perplexity, organized by funnel
+// stage and written in the target language. This prompt set is the input the
+// Monitor agent later runs against each engine to measure share-of-voice.
+
+import { poeChat, parseJsonFromLLM, DEFAULT_MODEL } from '@/lib/llm/poe';
 
 type EventEmitter = (event: {
   event_type:
@@ -20,142 +23,207 @@ interface DiscoveryInput {
   brandName: string;
   brandUrl?: string | null;
   targetCountry: string;
+  targetLanguage?: string | null;
   industry?: string | null;
   userPrompt?: string;
 }
 
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
+// Map ISO-ish language codes to names the model understands unambiguously.
+const LANGUAGE_NAMES: Record<string, string> = {
+  vi: 'Vietnamese',
+  th: 'Thai',
+  fil: 'Filipino (Tagalog)',
+  tl: 'Filipino (Tagalog)',
+  ms: 'Malay',
+  id: 'Indonesian',
+  zh: 'Chinese (Simplified)',
+  en: 'English',
+};
+
+interface PromptCategory {
+  category: string;
+  label: string;
+  prompts: string[];
+}
+
+interface DiscoveryParsed {
+  industry: string;
+  subVerticals: string[];
+  audienceNote?: string;
+  promptSet: PromptCategory[];
+}
+
+const TARGET_CATEGORIES = 5;
+const PROMPTS_PER_CATEGORY = 6;
+
+function buildPrompt(input: DiscoveryInput, languageName: string) {
+  const { brandName, brandUrl, targetCountry, industry, userPrompt } = input;
+
+  const system =
+    'You are a senior Generative Engine Optimization (GEO) strategist. You design ' +
+    'the exact set of natural-language questions that real buyers ask AI assistants ' +
+    '(ChatGPT, Gemini, Perplexity, Claude) during their journey, so a brand can be ' +
+    'measured and optimized for visibility in AI answers. You think like a local ' +
+    'buyer in the target market, not like a marketer. Output strict JSON only.';
+
+  const user = [
+    `Brand: ${brandName}`,
+    brandUrl ? `Website: ${brandUrl}` : null,
+    `Target market: ${targetCountry}`,
+    `Output language for all prompts: ${languageName}`,
+    industry ? `Known industry: ${industry}` : 'Industry: infer it yourself from the brand.',
+    userPrompt ? `Extra context from the user: ${userPrompt}` : null,
+    '',
+    'Task: produce a GEO prompt set for this brand in this market.',
+    '',
+    'Requirements:',
+    `- ${TARGET_CATEGORIES} funnel-stage categories covering: awareness/discovery, ` +
+      'consideration/research, evaluation/decision, competitive comparison, and ' +
+      'trust/local-intent (reviews, reliability, local presence).',
+    `- About ${PROMPTS_PER_CATEGORY} prompts per category.`,
+    `- EVERY prompt MUST be written in ${languageName}, phrased exactly how a real ` +
+      `person in ${targetCountry} would type or speak it to an AI assistant — natural, ` +
+      'colloquial, specific. Do NOT translate stiffly from English.',
+    '- Prompts should be answerable by an AI and relevant to whether this brand ' +
+      'would surface (mix branded and non-branded/category queries; non-branded ' +
+      'queries are where GEO visibility is won).',
+    '- Infer 3-6 sub-verticals the brand competes in.',
+    '',
+    'Return ONLY this JSON shape, no prose, no markdown fences:',
+    '{',
+    '  "industry": "string",',
+    '  "subVerticals": ["string"],',
+    '  "audienceNote": "one sentence on who the buyer is",',
+    '  "promptSet": [',
+    '    { "category": "discovery|consideration|evaluation|competitive|trust",',
+    '      "label": "short human label", "prompts": ["string"] }',
+    '  ]',
+    '}',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  return { system, user };
 }
 
 export async function runDiscoveryAgent(
   input: DiscoveryInput,
   emit: EventEmitter,
 ): Promise<{ summary: string; output: Record<string, unknown> }> {
-  const { brandName, targetCountry, industry } = input;
+  const { brandName, targetCountry } = input;
+  const langCode = (input.targetLanguage || 'en').toLowerCase();
+  const languageName = LANGUAGE_NAMES[langCode] || 'English';
 
   await emit({
     event_type: 'milestone',
-    payload: { label: 'Discovery started', step: 1, totalSteps: 5 },
+    payload: { label: 'Discovery started', step: 1, totalSteps: 4 },
   });
   await emit({
     event_type: 'log',
-    payload: { text: `Profiling brand: ${brandName} (target: ${targetCountry})` },
+    payload: {
+      text: `Profiling ${brandName} for ${targetCountry} — generating prompts in ${languageName}.`,
+    },
   });
-  await sleep(400);
+
+  const { system, user } = buildPrompt(input, languageName);
 
   await emit({
     event_type: 'tool_call',
-    payload: { tool: 'web_fetch', args: { url: input.brandUrl || `inferred for ${brandName}` } },
+    payload: {
+      tool: 'poe.chat',
+      args: { model: DEFAULT_MODEL, purpose: 'Generate GEO prompt set' },
+    },
   });
-  await sleep(700);
+  await emit({ event_type: 'progress', payload: { pct: 15 } });
+
+  const result = await poeChat({
+    model: DEFAULT_MODEL,
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+    maxTokens: 3000,
+    temperature: 0.6,
+  });
+
   await emit({
     event_type: 'tool_result',
     payload: {
-      tool: 'web_fetch',
-      result: `Mocked: detected industry "${industry ?? 'Marketing / Media'}", ~12 product categories.`,
+      tool: 'poe.chat',
+      model: result.model,
+      latencyMs: result.latencyMs,
+      tokens: result.usage?.total ?? null,
     },
   });
+  await emit({ event_type: 'progress', payload: { pct: 55 } });
 
-  await emit({ event_type: 'progress', payload: { pct: 20 } });
+  // Parse — fail loudly if the model returned something unusable.
+  let parsed: DiscoveryParsed;
+  try {
+    parsed = parseJsonFromLLM<DiscoveryParsed>(result.content);
+  } catch (e) {
+    throw new Error(
+      `Discovery model returned unparseable output: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+
+  const promptSet = Array.isArray(parsed.promptSet) ? parsed.promptSet : [];
+  if (promptSet.length === 0) {
+    throw new Error('Discovery produced an empty prompt set.');
+  }
+
   await emit({
     event_type: 'milestone',
-    payload: { label: 'Industry verticals identified', step: 2, totalSteps: 5 },
+    payload: { label: 'Prompt set generated', step: 2, totalSteps: 4 },
   });
-  await sleep(500);
-
-  const subVerticals = [
-    'elevator media',
-    'OOH digital signage',
-    'office building network',
-    'brand campaign management',
-  ];
   await emit({
     event_type: 'log',
     payload: {
-      text: `Sub-verticals: ${subVerticals.join(', ')}`,
+      text: `Industry: ${parsed.industry}. Sub-verticals: ${(parsed.subVerticals || []).join(', ')}.`,
     },
   });
-  await emit({ event_type: 'progress', payload: { pct: 40 } });
-  await sleep(500);
 
-  await emit({
-    event_type: 'milestone',
-    payload: { label: 'Generating prompt set', step: 3, totalSteps: 5 },
-  });
-
-  // Mocked prompt categories with sample prompts
-  const promptCategories = [
-    {
-      category: 'discovery',
-      label: 'Awareness-stage discovery',
-      prompts: [
-        `Best ${industry ?? 'marketing'} agencies in ${targetCountry}`,
-        `Who are the top elevator-media players in ${targetCountry}?`,
-        `Compare ${brandName} vs international OOH brands operating in ${targetCountry}`,
-      ],
-    },
-    {
-      category: 'consideration',
-      label: 'Consideration-stage research',
-      prompts: [
-        `Pricing of elevator advertising in ${targetCountry}`,
-        `How does ${brandName} measure ROI?`,
-        `${brandName} case studies in ${targetCountry}`,
-      ],
-    },
-    {
-      category: 'evaluation',
-      label: 'Evaluation / decision',
-      prompts: [
-        `Pros and cons of ${brandName} for B2B campaigns`,
-        `Is ${brandName} a good fit for a Vietnamese F&B brand?`,
-        `Customer reviews of ${brandName}`,
-      ],
-    },
-    {
-      category: 'competitive',
-      label: 'Competitive positioning',
-      prompts: [
-        `${brandName} vs Lifesight`,
-        `Which Vietnamese media network has the most premium office tower coverage?`,
-        `Innovation pipeline of ${brandName}`,
-      ],
-    },
-  ];
-  for (const cat of promptCategories) {
+  // Stream each category to the UI activity feed.
+  for (const cat of promptSet) {
     await emit({
       event_type: 'output_chunk',
       payload: { kind: 'prompt_category', value: cat },
     });
-    await sleep(300);
   }
-  await emit({ event_type: 'progress', payload: { pct: 75 } });
 
+  const promptCount = promptSet.reduce(
+    (n, c) => n + (Array.isArray(c.prompts) ? c.prompts.length : 0),
+    0,
+  );
+
+  await emit({ event_type: 'progress', payload: { pct: 85 } });
   await emit({
     event_type: 'milestone',
-    payload: { label: 'Persisting asset', step: 4, totalSteps: 5 },
+    payload: { label: 'Persisting asset', step: 3, totalSteps: 4 },
   });
-  await sleep(300);
 
   const finalOutput = {
     brand: brandName,
     country: targetCountry,
-    industry: industry ?? 'Marketing / Media',
-    subVerticals,
-    promptSet: promptCategories,
-    promptCountSampled: promptCategories.reduce((n, c) => n + c.prompts.length, 0),
-    note: 'v0.5 mock — sample 12 prompts shown. v0.6 will generate full 100-prompt set via Poe.',
+    language: langCode,
+    industry: parsed.industry,
+    subVerticals: parsed.subVerticals || [],
+    audienceNote: parsed.audienceNote || null,
+    promptSet,
+    promptCount,
+    model: result.model,
+    usage: result.usage || null,
+    generatedBy: `poe:${result.model}`,
   };
 
   await emit({ event_type: 'progress', payload: { pct: 100 } });
   await emit({
     event_type: 'milestone',
-    payload: { label: 'Discovery complete', step: 5, totalSteps: 5 },
+    payload: { label: 'Discovery complete', step: 4, totalSteps: 4 },
   });
 
   return {
-    summary: `Drafted prompt set across 4 categories (${finalOutput.promptCountSampled} sample prompts). Industry: ${finalOutput.industry}.`,
+    summary: `Generated ${promptCount} GEO prompts across ${promptSet.length} funnel stages in ${languageName}. Industry: ${parsed.industry}.`,
     output: finalOutput,
   };
 }
