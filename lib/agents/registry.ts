@@ -27,6 +27,14 @@ export const AGENTS: Record<string, AgentDef> = {
     description: 'Generates 100 core GEO prompts + brand context from the brand input.',
     typicalDurationSec: 60,
   },
+  profile: {
+    id: 'profile',
+    displayName: 'Brand Profile Agent',
+    shortName: 'Profile',
+    emoji: '🪪',
+    description: 'Builds one canonical brand fact base (identity, services, facts, NAP) from the homepage that all execution agents reuse for consistency.',
+    typicalDurationSec: 45,
+  },
   monitor: {
     id: 'monitor',
     displayName: 'AIGVR Monitor Agent',

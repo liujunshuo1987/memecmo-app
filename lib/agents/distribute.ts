@@ -9,6 +9,7 @@
 // → Optimize (own content) → Distribute (third-party citations).
 
 import { poeChat, parseJsonFromLLM, DEFAULT_MODEL } from '@/lib/llm/poe';
+import { brandProfileBlock } from './brand-facts';
 
 type EventEmitter = (event: {
   event_type: 'log' | 'tool_call' | 'tool_result' | 'progress' | 'output_chunk' | 'error' | 'milestone';
@@ -23,6 +24,7 @@ interface DistributeInput {
   industry?: string | null;
   sources: { domain: string; citations: number; isBrand: boolean }[];
   competitors?: string[];
+  brandProfile?: any;
 }
 
 const LANGUAGE_NAMES: Record<string, string> = {
@@ -74,6 +76,7 @@ export async function runDistributeAgent(
     `Market: ${input.targetCountry}` + (input.industry ? ` · ${input.industry}` : ''),
     `Write all submission copy in ${languageName}.`,
     input.competitors?.length ? `Competitors already present on these sources: ${input.competitors.join(', ')}.` : null,
+    brandProfileBlock(input.brandProfile) || null,
     '',
     'Target sources (the domains AI engines actually cite for this category — get the brand featured here):',
     sourceList,

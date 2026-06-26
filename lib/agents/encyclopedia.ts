@@ -9,6 +9,7 @@
 // relevant articles meanwhile.
 
 import { poeChat, parseJsonFromLLM, DEFAULT_MODEL } from '@/lib/llm/poe';
+import { brandProfileBlock } from './brand-facts';
 
 type EventEmitter = (event: {
   event_type: 'log' | 'tool_call' | 'tool_result' | 'progress' | 'output_chunk' | 'error' | 'milestone';
@@ -22,6 +23,7 @@ interface EncyclopediaInput {
   targetLanguage?: string | null;
   industry?: string | null;
   sources?: { domain: string; citations: number; isBrand: boolean }[];
+  brandProfile?: any;
 }
 
 const LANGUAGE_NAMES: Record<string, string> = {
@@ -79,6 +81,8 @@ export async function runEncyclopediaAgent(
     '',
     'Independent sources observed citing this brand (notability signal):',
     sourceLines,
+    '',
+    brandProfileBlock(input.brandProfile),
     '',
     'Assess and produce JSON of this exact shape:',
     '{',

@@ -583,6 +583,8 @@ function RunResult({ agentId, output }: { agentId?: string; output: Record<strin
         <SiteResult o={output} />
       ) : agentId === 'encyclopedia' ? (
         <EncyclopediaResult o={output} />
+      ) : agentId === 'profile' ? (
+        <ProfileResult o={output} />
       ) : agentId === 'discovery' ? (
         <DiscoveryResult o={output} />
       ) : null}
@@ -633,6 +635,41 @@ function ContentResult({ o }: { o: Record<string, any> }) {
           </ul>
         </div>
       )}
+    </div>
+  );
+}
+
+function ProfileResult({ o }: { o: Record<string, any> }) {
+  const facts: any[] = o.facts || [];
+  const nap = o.nap || {};
+  const napEntries = Object.entries(nap).filter(([, v]) => v);
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 space-y-3">
+      <div>
+        <h3 className="text-sm font-semibold text-white">Canonical brand profile</h3>
+        <p className="text-[11px] text-gray-500 mt-0.5">{o.sourcedFromHomepage ? 'verified against homepage' : 'from brand knowledge'} · reused by all execution agents</p>
+      </div>
+      {o.definition && <div className="text-[13px] text-gray-200 font-medium leading-snug">{o.definition}</div>}
+      {o.description && <div className="text-[12px] text-gray-400 leading-relaxed">{o.description}</div>}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+        {(o.services || []).length > 0 && (
+          <div><SectionLabel>Services</SectionLabel><div className="flex flex-wrap gap-1">{o.services.map((s: string, i: number) => <span key={i} className="text-[11px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-gray-300">{s}</span>)}</div></div>
+        )}
+        {(o.differentiators || []).length > 0 && (
+          <div><SectionLabel>Differentiators</SectionLabel><ul className="space-y-0.5">{o.differentiators.map((d: string, i: number) => <li key={i} className="text-[11px] text-gray-400">· {d}</li>)}</ul></div>
+        )}
+      </div>
+      {facts.length > 0 && (
+        <div><SectionLabel>Facts</SectionLabel>
+          <div className="space-y-0.5">{facts.map((f, i) => <div key={i} className="text-[12px]"><span className="text-gray-500">{f.label}: </span><span className="text-gray-200">{f.value}</span></div>)}</div>
+        </div>
+      )}
+      {napEntries.length > 0 && (
+        <div><SectionLabel>NAP</SectionLabel>
+          <div className="text-[11px] text-gray-400">{napEntries.map(([k, v]) => `${k}: ${v}`).join('  ·  ')}</div>
+        </div>
+      )}
+      {o.confidence && <div className="text-[10px] text-gray-600 pt-1 border-t border-white/5">{o.confidence}</div>}
     </div>
   );
 }

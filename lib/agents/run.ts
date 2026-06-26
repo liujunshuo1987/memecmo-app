@@ -15,6 +15,26 @@ import { runOptimizeAgent } from './optimize';
 import { runDistributeAgent } from './distribute';
 import { runSiteAgent } from './site';
 import { runEncyclopediaAgent } from './encyclopedia';
+import { runProfileAgent } from './profile';
+
+// Load the latest canonical brand profile (if any) so execution agents share
+// consistent facts. Returns null when none exists yet.
+async function loadBrandProfile(sb: ReturnType<typeof svc>, projectId: string): Promise<any | null> {
+  const { data } = await sb
+    .from('assets')
+    .select('content')
+    .eq('project_id', projectId)
+    .eq('type', 'brand_profile')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!data?.content) return null;
+  try {
+    return JSON.parse(data.content);
+  } catch {
+    return null;
+  }
+}
 
 export type AgentEvent = {
   event_type:
@@ -365,6 +385,7 @@ export async function executeAgentRun(
           targetLanguage: project.target_language,
           industry: project.industry,
           target,
+          brandProfile: await loadBrandProfile(sb, project.id),
         },
         persistAndEmit,
       );
@@ -397,6 +418,7 @@ export async function executeAgentRun(
           industry: project.industry,
           sources,
           competitors: scorecard.competitors,
+          brandProfile: await loadBrandProfile(sb, project.id),
         },
         persistAndEmit,
       );
@@ -409,6 +431,7 @@ export async function executeAgentRun(
           targetCountry: project.target_country,
           targetLanguage: project.target_language,
           industry: project.industry,
+          brandProfile: await loadBrandProfile(sb, project.id),
         },
         persistAndEmit,
       );
@@ -439,6 +462,27 @@ export async function executeAgentRun(
           targetLanguage: project.target_language,
           industry: project.industry,
           sources,
+          brandProfile: await loadBrandProfile(sb, project.id),
+        },
+        persistAndEmit,
+      );
+    } else if (agentId === 'profile') {
+      // Canonical brand profile — fetches the site; grounds on Discovery /
+      // Monitor hints if present. No hard prerequisite.
+      let subVerticals: string[] = [];
+      let competitors: string[] = [];
+      const { data: psA } = await sb.from('assets').select('content').eq('project_id', project.id).eq('type', 'prompt_set').order('created_at', { ascending: false }).limit(1).maybeSingle();
+      if (psA?.content) { try { subVerticals = JSON.parse(psA.content)?.subVerticals ?? []; } catch { /* ignore */ } }
+      const { data: scA } = await sb.from('assets').select('content').eq('project_id', project.id).eq('type', 'geo_scorecard').order('created_at', { ascending: false }).limit(1).maybeSingle();
+      if (scA?.content) { try { competitors = JSON.parse(scA.content)?.competitors ?? []; } catch { /* ignore */ } }
+      result = await runProfileAgent(
+        {
+          brandName: project.brand_name,
+          brandUrl: project.brand_url,
+          targetCountry: project.target_country,
+          targetLanguage: project.target_language,
+          industry: project.industry,
+          hints: { subVerticals, competitors },
         },
         persistAndEmit,
       );
@@ -534,6 +578,16 @@ export async function executeAgentRun(
         title: `${project.brand_name} — encyclopedia entry & path`,
         format: 'markdown',
         content: (result.output as { fullMarkdown?: string }).fullMarkdown ?? JSON.stringify(result.output, null, 2),
+        meta: { brand: project.brand_name, country: project.target_country },
+      });
+    } else if (agentId === 'profile') {
+      await sb.from('assets').insert({
+        project_id: project.id,
+        agent_run_id: runId,
+        type: 'brand_profile',
+        title: `${project.brand_name} — canonical brand profile`,
+        format: 'json',
+        content: JSON.stringify(result.output, null, 2),
         meta: { brand: project.brand_name, country: project.target_country },
       });
     }

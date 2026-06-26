@@ -8,6 +8,7 @@
 // doesn't learn SEO tools — the agent hands back exactly what to change.
 
 import { poeChat, parseJsonFromLLM, DEFAULT_MODEL } from '@/lib/llm/poe';
+import { brandProfileBlock } from './brand-facts';
 
 type EventEmitter = (event: {
   event_type: 'log' | 'tool_call' | 'tool_result' | 'progress' | 'output_chunk' | 'error' | 'milestone';
@@ -20,6 +21,7 @@ interface SiteInput {
   targetCountry: string;
   targetLanguage?: string | null;
   industry?: string | null;
+  brandProfile?: any;
 }
 
 const LANGUAGE_NAMES: Record<string, string> = {
@@ -27,7 +29,7 @@ const LANGUAGE_NAMES: Record<string, string> = {
   ms: 'Malay', id: 'Indonesian', zh: 'Chinese (Simplified)', en: 'English',
 };
 
-interface FetchedSite {
+export interface FetchedSite {
   ok: boolean;
   title: string;
   metaDesc: string;
@@ -36,7 +38,7 @@ interface FetchedSite {
   error?: string;
 }
 
-async function fetchSite(url: string): Promise<FetchedSite> {
+export async function fetchSite(url: string): Promise<FetchedSite> {
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(15000),
@@ -119,6 +121,8 @@ export async function runSiteAgent(
     '',
     'Current homepage:',
     siteBlock,
+    '',
+    brandProfileBlock(input.brandProfile),
     '',
     'Produce an AEO upgrade as JSON of this shape:',
     '{',

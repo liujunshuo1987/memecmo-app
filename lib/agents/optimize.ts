@@ -7,6 +7,7 @@
 // GEO — the step beyond measure/recommend.
 
 import { poeChat, parseJsonFromLLM, DEFAULT_MODEL } from '@/lib/llm/poe';
+import { brandProfileBlock } from './brand-facts';
 
 type EventEmitter = (event: {
   event_type:
@@ -27,6 +28,7 @@ interface OptimizeInput {
   targetLanguage?: string | null;
   industry?: string | null;
   target: { query: string; stage: string; competitors?: string[] };
+  brandProfile?: any;
 }
 
 const LANGUAGE_NAMES: Record<string, string> = {
@@ -86,6 +88,7 @@ export async function runOptimizeAgent(
     `Market: ${input.targetCountry}` + (input.industry ? ` · ${input.industry}` : ''),
     `Write everything in ${languageName}.`,
     input.target.competitors?.length ? `Competitors currently winning this query: ${input.target.competitors.join(', ')}.` : null,
+    brandProfileBlock(input.brandProfile) || null,
     '',
     `Target buyer query to win (write the page that should rank/be-cited for it):`,
     `"${query}"`,
