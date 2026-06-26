@@ -13,6 +13,7 @@ import { runMonitorAgent } from './monitor';
 import { runReportAgent } from './report';
 import { runOptimizeAgent } from './optimize';
 import { runDistributeAgent } from './distribute';
+import { runSiteAgent } from './site';
 
 export type AgentEvent = {
   event_type:
@@ -398,6 +399,18 @@ export async function executeAgentRun(
         },
         persistAndEmit,
       );
+    } else if (agentId === 'site') {
+      // Homepage AEO upgrade — no prerequisite; fetches the brand site itself.
+      result = await runSiteAgent(
+        {
+          brandName: project.brand_name,
+          brandUrl: project.brand_url,
+          targetCountry: project.target_country,
+          targetLanguage: project.target_language,
+          industry: project.industry,
+        },
+        persistAndEmit,
+      );
     } else {
       const def = AGENTS[agentId];
       await persistAndEmit({
@@ -468,6 +481,16 @@ export async function executeAgentRun(
         agent_run_id: runId,
         type: 'distribution_kit',
         title: `${project.brand_name} — GEO distribution kit`,
+        format: 'markdown',
+        content: (result.output as { fullMarkdown?: string }).fullMarkdown ?? JSON.stringify(result.output, null, 2),
+        meta: { brand: project.brand_name, country: project.target_country },
+      });
+    } else if (agentId === 'site') {
+      await sb.from('assets').insert({
+        project_id: project.id,
+        agent_run_id: runId,
+        type: 'site_optimization',
+        title: `${project.brand_name} — homepage AEO upgrade`,
         format: 'markdown',
         content: (result.output as { fullMarkdown?: string }).fullMarkdown ?? JSON.stringify(result.output, null, 2),
         meta: { brand: project.brand_name, country: project.target_country },

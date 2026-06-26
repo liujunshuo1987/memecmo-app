@@ -60,6 +60,14 @@ export const AGENTS: Record<string, AgentDef> = {
     description: 'Turns the Source-Authority targets into ready-to-send third-party placements (directory / PR / review submissions) in the target language.',
     typicalDurationSec: 60,
   },
+  site: {
+    id: 'site',
+    displayName: 'Site Optimize Agent',
+    shortName: 'Site',
+    emoji: '🏗️',
+    description: 'Fetches the brand homepage and returns paste-in JSON-LD + concrete AEO edits (entity clarity, structure) for AI retrieval & Google rich results.',
+    typicalDurationSec: 60,
+  },
 };
 
 export const V05_AGENT_IDS = Object.keys(AGENTS);

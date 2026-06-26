@@ -579,6 +579,8 @@ function RunResult({ agentId, output }: { agentId?: string; output: Record<strin
         <ContentResult o={output} />
       ) : agentId === 'distribute' ? (
         <DistributionResult o={output} />
+      ) : agentId === 'site' ? (
+        <SiteResult o={output} />
       ) : agentId === 'discovery' ? (
         <DiscoveryResult o={output} />
       ) : null}
@@ -659,6 +661,74 @@ function DistributionResult({ o }: { o: Record<string, any> }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function SiteResult({ o }: { o: Record<string, any> }) {
+  const checklist: any[] = o.aeoChecklist || [];
+  const edits: any[] = o.homepageEdits || [];
+  const schema: any[] = o.schema || [];
+  const copy = (t?: string) => { if (t) navigator.clipboard?.writeText(t).catch(() => {}); };
+  const dot = (s: string) => (s === 'ok' ? 'text-emerald-400' : s === 'weak' ? 'text-amber-400' : 'text-red-400');
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-white">Homepage AEO upgrade</h3>
+          <p className="text-[11px] text-gray-500 mt-0.5">
+            {o.siteAudited ? <>audited <span className="text-gray-400">{o.siteAudited}</span></> : 'homepage not fetched — from brand knowledge'}
+            {o.existingSchema?.length ? ` · existing schema: ${o.existingSchema.join(', ')}` : ' · no existing schema'}
+          </p>
+        </div>
+        <button onClick={() => copy(o.fullMarkdown)} className="text-[11px] px-2 py-0.5 rounded border border-white/10 text-gray-400 hover:border-blue-400/40 hover:text-blue-200 transition shrink-0">Copy brief</button>
+      </div>
+
+      {checklist.length > 0 && (
+        <div>
+          <SectionLabel>AEO checklist</SectionLabel>
+          <ul className="space-y-1">
+            {checklist.map((c, i) => (
+              <li key={i} className="text-[12px] leading-snug">
+                <span className={`${dot(c.status)} mr-1`}>●</span>
+                <span className="text-gray-200">{c.item}</span>
+                <span className="text-gray-500"> — {c.fix}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {edits.length > 0 && (
+        <div>
+          <SectionLabel>Homepage edits</SectionLabel>
+          <div className="space-y-1.5">
+            {edits.map((e, i) => (
+              <div key={i} className="text-[12px] leading-snug">
+                <span className="text-gray-300 font-medium">{e.section}: </span>
+                <span className="text-gray-400">{e.change}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {schema.length > 0 && (
+        <div>
+          <SectionLabel>Paste-in JSON-LD ({schema.length})</SectionLabel>
+          <div className="space-y-1.5">
+            {schema.map((s, i) => (
+              <div key={i} className="rounded border border-white/5 bg-black/20">
+                <div className="flex items-center justify-between px-2.5 py-1.5">
+                  <span className="text-[11px] text-purple-200">{s.type}</span>
+                  <button onClick={() => copy(JSON.stringify(s.jsonld, null, 2))} className="text-[10px] text-gray-500 hover:text-blue-200">copy</button>
+                </div>
+                <pre className="text-[10px] text-gray-400 px-2.5 pb-2 overflow-x-auto max-h-40 overflow-y-auto">{JSON.stringify(s.jsonld, null, 2)}</pre>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
