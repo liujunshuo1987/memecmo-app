@@ -48,10 +48,11 @@ const ENGINES: { key: string; label: string; model: string }[] = [
   { key: 'claude', label: 'Claude', model: 'Claude-Sonnet-4.5' },
 ];
 
-// Sample the full prompt set (bounded for runaway sizes). Larger n per
-// stage×engine cell = less noisy percentages — the main rigor lever.
-const SAMPLE_CAP = 40;
-const QUERY_CONCURRENCY = 6;
+// Sample size balances rigor (more n per stage×engine cell = less noisy %)
+// against latency/cost. 24 prompts × 4 engines ≈ 96 queries (~5 min) gives
+// medium-to-high confidence per stage without the ~12 min a full 40 cost.
+const SAMPLE_CAP = 24;
+const QUERY_CONCURRENCY = 8;
 
 // AIGVR composite weights (sum = 1.0).
 const WEIGHTS = { presence: 0.3, prominence: 0.25, sentiment: 0.15, citation: 0.1, competitiveShare: 0.2 };
