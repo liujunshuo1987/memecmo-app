@@ -46,6 +46,45 @@ const COUNTRY_FLAG: Record<string, string> = {
   Malaysia: '🇲🇾',
 };
 
+// ── UI i18n (chrome only — static, instant) ──────────────────────────────────
+// Keyed by the English source string. Module-level UI_LANG is set on each render
+// of WorkspaceClient so every nested renderer can call t() without prop drilling.
+type UiLang = 'en' | 'zh' | 'vi';
+let UI_LANG: UiLang = 'en';
+const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
+  zh: {
+    'Run full GEO scan': '运行完整 GEO 扫描', '…focus the agents': '…给智能体一个方向',
+    Setup: '准备', Measure: '测量', 'Act — build AEO presence': '执行 · 建设 AEO 存在',
+    ready: '就绪', run: '运行', 'running…': '运行中…', 'Re-run': '重跑', Copy: '复制', Edit: '编辑', Done: '完成',
+    Result: '结果', 'Pick a deliverable on the left, or run a full GEO scan.': '从左侧选一个交付物,或运行完整 GEO 扫描。',
+    'Ask about this result': '问这份结果', 'Refine with a message': '用一句话改写', 'View →': '查看 →', 'Run →': '运行 →',
+    'By engine': '分引擎', 'Funnel-stage visibility': '分漏斗阶段可见度', 'Share of voice': '声量份额',
+    'Sources AI engines cite · AEO targets': 'AI 引擎引用的来源 · AEO 目标', 'Key findings': '关键发现',
+    Recommendations: '建议', 'Quick wins': '速赢', 'AEO checklist': 'AEO 清单', 'Homepage edits': '主页修改',
+    'Citation plan': '引用计划', 'Evidence needed to qualify': '达标所需证据', 'Get mentioned in existing articles': '进入已有词条被提及',
+    'Latest scan': '最近扫描', 'Presence (SoV)': '存在(声量)', 'Brand rank': '品牌排名', 'High-intent gaps': '高意图缺口',
+    'Cited sources': '被引来源', Deliverables: '交付物', 'Structured view': '结构化视图', Refine: '改写', Ask: '问',
+    'Full Scan': '完整扫描', Profile: '品牌档案', Discovery: '发现', Monitor: '监测', Report: '报告',
+    Optimize: '内容', Site: '主页', Distribute: '分发', Encyclopedia: '百科', 'Copy kit': '复制全套', 'Copy brief': '复制简报',
+    'Copy page': '复制页面', 'Copy schema': '复制 schema', 'Copy plan': '复制方案', 'Copy Markdown': '复制 Markdown',
+  },
+  vi: {
+    'Run full GEO scan': 'Chạy quét GEO đầy đủ', '…focus the agents': '…định hướng cho agent',
+    Setup: 'Chuẩn bị', Measure: 'Đo lường', 'Act — build AEO presence': 'Hành động · xây dựng AEO',
+    ready: 'sẵn sàng', run: 'chạy', 'running…': 'đang chạy…', 'Re-run': 'Chạy lại', Copy: 'Sao chép', Edit: 'Sửa', Done: 'Xong',
+    Result: 'Kết quả', 'Pick a deliverable on the left, or run a full GEO scan.': 'Chọn một mục bên trái, hoặc chạy quét GEO đầy đủ.',
+    'Ask about this result': 'Hỏi về kết quả này', 'Refine with a message': 'Tinh chỉnh bằng một câu',
+    'By engine': 'Theo engine', 'Funnel-stage visibility': 'Hiển thị theo giai đoạn phễu', 'Share of voice': 'Thị phần tiếng nói',
+    'Key findings': 'Phát hiện chính', Recommendations: 'Khuyến nghị', 'Quick wins': 'Việc cần làm', Deliverables: 'Sản phẩm',
+    'Full Scan': 'Quét đầy đủ', Profile: 'Hồ sơ', Discovery: 'Khám phá', Monitor: 'Giám sát', Report: 'Báo cáo',
+    Optimize: 'Nội dung', Site: 'Trang chủ', Distribute: 'Phân phối', Encyclopedia: 'Bách khoa',
+  },
+};
+function t(s: string): string {
+  if (UI_LANG === 'en') return s;
+  return UI_DICT[UI_LANG]?.[s] ?? s;
+}
+
 // Outcome-first deliverable groups. Each item maps to an agent; cards show the
 // latest completed run of that agent (view it) or offer to run it.
 const DELIVERABLE_GROUPS: { label: string; items: string[] }[] = [
@@ -68,11 +107,14 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
     return m;
   });
   const [intent, setIntent] = useState('');
-  const [readingLang, setReadingLang] = useState<'orig' | 'zh' | 'en'>('orig');
+  const [uiLang, setUiLang] = useState<UiLang>('en');
+  UI_LANG = uiLang; // module-level so nested renderers can call t()
   const [theme, setTheme] = useState<'night' | 'day'>('night');
   useEffect(() => {
     try { setTheme(localStorage.getItem('memecmo-theme') === 'day' ? 'day' : 'night'); } catch { /* ignore */ }
+    try { const l = localStorage.getItem('memecmo-uilang'); if (l === 'zh' || l === 'vi' || l === 'en') setUiLang(l); } catch { /* ignore */ }
   }, []);
+  const changeUiLang = (l: UiLang) => { setUiLang(l); try { localStorage.setItem('memecmo-uilang', l); } catch { /* ignore */ } };
   const toggleTheme = () => {
     const next = theme === 'night' ? 'day' : 'night';
     setTheme(next);
@@ -242,11 +284,11 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
             <Icon name={theme === 'night' ? 'sun' : 'moon'} size={15} />
           </button>
           <div className="flex items-center rounded-md border border-edge overflow-hidden text-[11px]">
-            {([['orig', '原文'], ['zh', '中文'], ['en', 'EN']] as const).map(([v, label]) => (
+            {([['en', 'EN'], ['zh', '中文'], ['vi', 'VN']] as const).map(([v, label]) => (
               <button
                 key={v}
-                onClick={() => setReadingLang(v)}
-                className={`px-2 py-1 transition ${readingLang === v ? 'bg-brand text-on-brand' : 'text-dim hover:text-ink'}`}
+                onClick={() => changeUiLang(v)}
+                className={`px-2 py-1 transition ${uiLang === v ? 'bg-brand text-on-brand' : 'text-dim hover:text-ink'}`}
               >
                 {label}
               </button>
@@ -280,20 +322,20 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
               disabled={sending}
               className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-brand text-on-brand hover:brightness-110 disabled:bg-raised disabled:text-faint text-sm font-medium transition"
             >
-              <Icon name="full_scan" size={16} /> Run full GEO scan
+              <Icon name="full_scan" size={16} /> {t('Run full GEO scan')}
             </button>
             <input
               value={intent}
               onChange={(e) => setIntent(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && intent.trim()) { e.preventDefault(); dispatchAgent('full_scan', intent.trim()); setIntent(''); } }}
-              placeholder="…focus the agents"
+              placeholder={t('…focus the agents')}
               disabled={sending}
               className="w-full bg-surface border border-edge rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-blue-400/50"
             />
           </div>
           {DELIVERABLE_GROUPS.map((group) => (
             <div key={group.label}>
-              <div className="text-[10px] uppercase tracking-widest text-faint mb-1.5">{group.label}</div>
+              <div className="text-[10px] uppercase tracking-widest text-faint mb-1.5">{t(group.label)}</div>
               <div className="space-y-1">
                 {group.items.map((aid) => (
                   <NavItem
@@ -317,7 +359,7 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
           {!runStatus ? (
             <div className="h-full flex flex-col items-center justify-center text-center text-faint gap-2 py-16">
               <div className="text-brand"><Icon name="full_scan" size={32} /></div>
-              <div className="text-sm text-dim">Pick a deliverable on the left, or run a full GEO scan.</div>
+              <div className="text-sm text-dim">{t('Pick a deliverable on the left, or run a full GEO scan.')}</div>
               <div className="text-xs text-faint max-w-sm">Full Scan runs Discovery → Monitor → Report; then build AEO presence with Site / Content / Distribute / Encyclopedia.</div>
             </div>
           ) : (
@@ -337,7 +379,7 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
                       disabled={sending}
                       className="text-[11px] px-2.5 py-1 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand disabled:opacity-40 transition"
                     >
-                      ↻ Re-run
+                      ↻ {t('Re-run')}
                     </button>
                   )}
                   <div className="w-24 h-1.5 bg-raised rounded-full overflow-hidden">
@@ -351,8 +393,8 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
                   {runStatus.summary && (
                     <div className="p-3 rounded border border-sage/35 bg-sage/10 text-sm text-sage leading-relaxed">{runStatus.summary}</div>
                   )}
-                  {readingLang !== 'orig' && (
-                    <TranslatedView agentId={runStatus.agentId} output={runStatus.output} summary={runStatus.summary} to={readingLang} />
+                  {uiLang === 'zh' && (
+                    <TranslatedView agentId={runStatus.agentId} output={runStatus.output} summary={runStatus.summary} to="zh" />
                   )}
                   <RunResult
                     agentId={runStatus.agentId}
@@ -415,13 +457,13 @@ function NavItem({
       }`}
     >
       <span className="shrink-0 text-brand"><Icon name={agentId} size={17} /></span>
-      <span className="text-[13px] text-ink truncate flex-1">{a?.shortName ?? agentId}</span>
+      <span className="text-[13px] text-ink truncate flex-1">{t(a?.shortName ?? agentId)}</span>
       {running ? (
         <span className="text-[10px] text-brand shrink-0">…</span>
       ) : ready ? (
         <span className="w-1.5 h-1.5 rounded-full bg-sage inline-block shrink-0" title="ready" />
       ) : (
-        <span className="text-[10px] text-faint shrink-0">run</span>
+        <span className="text-[10px] text-faint shrink-0">{t('run')}</span>
       )}
     </button>
   );
@@ -459,7 +501,7 @@ function TranslatedView({ agentId, output, summary, to }: { agentId?: string; ou
 function ContextMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between text-[12px]">
-      <span className="text-faint">{label}</span>
+      <span className="text-faint">{t(label)}</span>
       <span className="text-ink font-medium">{value}</span>
     </div>
   );
@@ -487,7 +529,7 @@ function ContextPanel({ headlineAigvr, scoreRun, runsByAgent, totalAgents }: {
       </div>
       {sc && (
         <div className="rounded-lg border border-edge bg-surface p-3 space-y-2">
-          <div className="text-[10px] uppercase tracking-widest text-faint">Latest scan</div>
+          <div className="text-[10px] uppercase tracking-widest text-faint">{t('Latest scan')}</div>
           <ContextMetric label="Presence (SoV)" value={presence != null ? `${presence}%` : '—'} />
           <ContextMetric label="Brand rank" value={rank ? `#${rank} of ${benchN}` : '—'} />
           <ContextMetric label="High-intent gaps" value={String(gaps)} />
@@ -495,8 +537,8 @@ function ContextPanel({ headlineAigvr, scoreRun, runsByAgent, totalAgents }: {
         </div>
       )}
       <div className="rounded-lg border border-edge bg-surface p-3">
-        <div className="text-[10px] uppercase tracking-widest text-faint mb-1">Deliverables</div>
-        <div className="text-sm text-ink">{readyCount} / {totalAgents} ready</div>
+        <div className="text-[10px] uppercase tracking-widest text-faint mb-1">{t('Deliverables')}</div>
+        <div className="text-sm text-ink">{readyCount} / {totalAgents} {t('ready')}</div>
       </div>
     </div>
   );
@@ -570,7 +612,7 @@ function SectionLabel({ children }: { children: ReactNode }) {
   return (
     <div className="flex items-center gap-2 mb-2">
       <span className="w-1 h-3 rounded-full bg-sage/70" />
-      <span className="text-[10px] uppercase tracking-[0.18em] text-dim">{children}</span>
+      <span className="text-[10px] uppercase tracking-[0.18em] text-dim">{typeof children === 'string' ? t(children) : children}</span>
     </div>
   );
 }
@@ -757,7 +799,7 @@ function AdvisoryChat({ projectId, agentId, output, onDispatch }: {
   const QUICK = ['哪个缺口最该先打?', '为什么某些引擎上我可见度低?', '最该先做哪件事?'];
   return (
     <div className="rounded-xl border border-edge bg-surface p-4 space-y-2">
-      <div className="text-[10px] uppercase tracking-widest text-faint">Ask about this result</div>
+      <div className="text-[10px] uppercase tracking-widest text-faint">{t('Ask about this result')}</div>
       {thread.map((t, i) => (
         <div key={i} className="space-y-1">
           <div className="text-[12px] text-brand">› {t.q}</div>
@@ -845,12 +887,12 @@ function ArtifactSandbox({ o, projectId, runId, versions: extVersions, onVersion
     <div className="rounded-xl border border-edge bg-surface p-4 space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-ink">{title}</h3>
+          <h3 className="text-sm font-semibold text-ink">{t(title)}</h3>
           {subtitle && <p className="text-[11px] text-faint mt-0.5">{subtitle}</p>}
         </div>
         <div className="flex gap-2 shrink-0">
-          <button onClick={() => setEditing((e) => !e)} className="text-[11px] px-2 py-0.5 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition">{editing ? 'Done' : 'Edit'}</button>
-          <button onClick={() => navigator.clipboard?.writeText(current.content).catch(() => {})} className="text-[11px] px-2 py-0.5 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition">Copy</button>
+          <button onClick={() => setEditing((e) => !e)} className="text-[11px] px-2 py-0.5 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition">{editing ? t('Done') : t('Edit')}</button>
+          <button onClick={() => navigator.clipboard?.writeText(current.content).catch(() => {})} className="text-[11px] px-2 py-0.5 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition">{t('Copy')}</button>
         </div>
       </div>
 
@@ -881,7 +923,7 @@ function ArtifactSandbox({ o, projectId, runId, versions: extVersions, onVersion
 
       {/* Refine dialogue — scoped to this artifact */}
       <div className="border-t border-edge pt-3 space-y-2">
-        <div className="text-[10px] uppercase tracking-widest text-faint">Refine with a message</div>
+        <div className="text-[10px] uppercase tracking-widest text-faint">{t('Refine with a message')}</div>
         <div className="flex gap-2">
           <input
             value={instr}
@@ -923,8 +965,8 @@ function ContentResult({ o }: { o: Record<string, any> }) {
           )}
         </div>
         <div className="flex gap-2 shrink-0">
-          <button onClick={() => copy(o.fullMarkdown)} className="text-[11px] px-2 py-0.5 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition">Copy page</button>
-          <button onClick={() => copy(JSON.stringify(o.schemaJsonLd, null, 2))} className="text-[11px] px-2 py-0.5 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition">Copy schema</button>
+          <button onClick={() => copy(o.fullMarkdown)} className="text-[11px] px-2 py-0.5 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition">{t('Copy page')}</button>
+          <button onClick={() => copy(JSON.stringify(o.schemaJsonLd, null, 2))} className="text-[11px] px-2 py-0.5 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition">{t('Copy schema')}</button>
         </div>
       </div>
 
@@ -1005,7 +1047,7 @@ function EncyclopediaResult({ o }: { o: Record<string, any> }) {
           <h3 className="text-sm font-semibold text-ink">Encyclopedia entry &amp; path</h3>
           <p className="text-[11px] text-faint mt-0.5">{o.targetWiki}</p>
         </div>
-        <button onClick={() => copy(o.fullMarkdown)} className="text-[11px] px-2 py-0.5 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition shrink-0">Copy plan</button>
+        <button onClick={() => copy(o.fullMarkdown)} className="text-[11px] px-2 py-0.5 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition shrink-0">{t('Copy plan')}</button>
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
@@ -1079,7 +1121,7 @@ function DistributionResult({ o }: { o: Record<string, any> }) {
           <h3 className="text-sm font-semibold text-ink">Distribution kit</h3>
           <p className="text-[11px] text-faint mt-0.5">{targets.length} ready-to-send placements, tiered by authority · get cited where AI engines look</p>
         </div>
-        <button onClick={() => copy(o.fullMarkdown)} className="text-[11px] px-2 py-0.5 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition shrink-0">Copy kit</button>
+        <button onClick={() => copy(o.fullMarkdown)} className="text-[11px] px-2 py-0.5 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition shrink-0">{t('Copy kit')}</button>
       </div>
       {tiers.map((tier) => (
         <div key={tier}>
@@ -1121,7 +1163,7 @@ function SiteResult({ o }: { o: Record<string, any> }) {
             {o.existingSchema?.length ? ` · existing schema: ${o.existingSchema.join(', ')}` : ' · no existing schema'}
           </p>
         </div>
-        <button onClick={() => copy(o.fullMarkdown)} className="text-[11px] px-2 py-0.5 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition shrink-0">Copy brief</button>
+        <button onClick={() => copy(o.fullMarkdown)} className="text-[11px] px-2 py-0.5 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition shrink-0">{t('Copy brief')}</button>
       </div>
 
       {checklist.length > 0 && (
