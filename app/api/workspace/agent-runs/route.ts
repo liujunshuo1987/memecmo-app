@@ -1,8 +1,9 @@
 // POST /api/workspace/agent-runs — create a queued agent run on a project.
 //
-// The actual agent work runs inside the SSE stream endpoint
-// (/api/workspace/agent-runs/[id]/stream), which is a long-lived streaming
-// response that stays alive for the agent's full duration. This avoids the
+// This endpoint does NOT run the agent. It inserts a queued run row and emits
+// an `agent/run.requested` event to Inngest, which invokes /api/inngest
+// server-to-server to do the durable background work. The UI then observes
+// progress by polling GET /api/workspace/agent-runs/[id]. This avoids the
 // serverless fire-and-forget trap where work scheduled after an HTTP return
 // is frozen by the platform.
 
