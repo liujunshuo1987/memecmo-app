@@ -3,7 +3,7 @@
 
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { getProjectBySlug, getRecentRuns } from '@/lib/workspace';
+import { getProjectBySlug, getRecentRuns, getScanHistory } from '@/lib/workspace';
 import WorkspaceClient from './workspace-client';
 
 interface PageProps {
@@ -36,12 +36,14 @@ export default async function WorkspacePage({ params }: PageProps) {
   }
 
   const recentRuns = await getRecentRuns(projectAndOrg.project.id, 25);
+  const scanHistory = await getScanHistory(projectAndOrg.project.id);
 
   return (
     <WorkspaceClient
       project={projectAndOrg.project}
       organization={projectAndOrg.organization}
       initialRuns={recentRuns}
+      scanHistory={scanHistory}
     />
   );
 }

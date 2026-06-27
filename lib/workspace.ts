@@ -141,6 +141,52 @@ export async function getRecentRuns(projectId: string, limit = 20): Promise<Agen
   return (data as AgentRun[]) ?? [];
 }
 
+// ─── Scan history (closed loop) ─────────────────────────────────────────────
+// Every Monitor / Full-Scan run already persists its scorecard in
+// agent_runs.output, so the trend over time is derivable without a new table.
+export interface ScanPoint {
+  runId: string;
+  ts: string;
+  aigvr: number | null;
+  presence: number | null;
+  rank: number | null;
+  gaps: number;
+  prominence: number | null;
+  sentiment: number | null;
+  citation: number | null;
+  competitive: number | null;
+}
+
+export async function getScanHistory(projectId: string): Promise<ScanPoint[]> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from('agent_runs')
+    .select('id, created_at, output')
+    .eq('project_id', projectId)
+    .in('agent_id', ['monitor', 'full_scan'])
+    .eq('status', 'completed')
+    .order('created_at', { ascending: true });
+  return ((data as { id: string; created_at: string; output: Record<string, any> | null }[]) ?? [])
+    .map((r) => {
+      const o = r.output || {};
+      const sc = o.scorecard ?? o; // full_scan nests the scorecard
+      const d = sc.dimensions || {};
+      return {
+        runId: r.id,
+        ts: r.created_at,
+        aigvr: sc.aigvrScore ?? null,
+        presence: d.presence ?? null,
+        rank: sc.brandRank ?? null,
+        gaps: (sc.gaps || []).length,
+        prominence: d.prominence ?? null,
+        sentiment: d.sentiment ?? null,
+        citation: d.citation ?? null,
+        competitive: d.competitiveShare ?? null,
+      };
+    })
+    .filter((p) => p.aigvr != null);
+}
+
 export async function getRun(runId: string): Promise<AgentRun | null> {
   const supabase = createClient();
   const { data } = await supabase

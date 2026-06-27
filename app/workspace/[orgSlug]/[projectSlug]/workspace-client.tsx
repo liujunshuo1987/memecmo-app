@@ -12,12 +12,26 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { AGENTS } from '@/lib/agents/registry';
 import { Icon } from '@/components/icons';
-import type { AgentRun, Organization, Project } from '@/lib/workspace';
+import type { AgentRun, Organization, Project, ScanPoint } from '@/lib/workspace';
 
 interface Props {
   project: Project;
   organization: Organization;
   initialRuns: AgentRun[];
+  scanHistory: ScanPoint[];
+}
+
+// Extract a trend point from a monitor / full_scan run's output (mirrors getScanHistory).
+function pointFromOutput(runId: string, ts: string, output: any): ScanPoint | null {
+  const sc = output?.scorecard ?? output;
+  if (!sc || sc.aigvrScore == null) return null;
+  const d = sc.dimensions || {};
+  return {
+    runId, ts,
+    aigvr: sc.aigvrScore ?? null, presence: d.presence ?? null, rank: sc.brandRank ?? null,
+    gaps: (sc.gaps || []).length, prominence: d.prominence ?? null, sentiment: d.sentiment ?? null,
+    citation: d.citation ?? null, competitive: d.competitiveShare ?? null,
+  };
 }
 
 interface ActivityEvent {
@@ -67,6 +81,7 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Full Scan': '完整扫描', Profile: '品牌档案', Discovery: '发现', Monitor: '监测', Report: '报告',
     Optimize: '内容', Site: '主页', Distribute: '分发', Encyclopedia: '百科', 'Copy kit': '复制全套', 'Copy brief': '复制简报',
     'Copy page': '复制页面', 'Copy schema': '复制 schema', 'Copy plan': '复制方案', 'Copy Markdown': '复制 Markdown',
+    'AIGVR trend': 'AIGVR 趋势', 'vs previous scan': '对比上次扫描', 'Run another scan to track change.': '再扫一次即可追踪变化。',
   },
   vi: {
     'Run full GEO scan': 'Chạy quét GEO đầy đủ', '…focus the agents': '…định hướng cho agent',
@@ -95,7 +110,8 @@ const DELIVERABLE_GROUPS: { label: string; items: string[] }[] = [
 
 type LatestRun = { runId: string; summary: string | null; status: string; output: any; createdAt: string };
 
-export default function WorkspaceClient({ project, organization, initialRuns }: Props) {
+export default function WorkspaceClient({ project, organization, initialRuns, scanHistory }: Props) {
+  const [history, setHistory] = useState<ScanPoint[]>(scanHistory);
   const [runsByAgent, setRunsByAgent] = useState<Record<string, LatestRun>>(() => {
     const m: Record<string, LatestRun> = {};
     for (const r of initialRuns) {
@@ -206,6 +222,11 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
                   createdAt: data.run.created_at || prev[data.run.agent_id]?.createdAt || '',
                 },
               }));
+              // Closed loop: a completed scan extends the AIGVR trend.
+              if ((data.run.agent_id === 'monitor' || data.run.agent_id === 'full_scan') && data.run.status === 'completed') {
+                const pt = pointFromOutput(activeRunId, data.run.created_at || new Date().toISOString(), data.run.output);
+                if (pt) setHistory((h) => [...h, pt]);
+              }
             }
             cancelled = true;
             return;
@@ -427,6 +448,7 @@ export default function WorkspaceClient({ project, organization, initialRuns }: 
 
         {/* RIGHT — at-a-glance context */}
         <aside className="hidden lg:block lg:border-l border-edge lg:overflow-y-auto px-4 py-4 space-y-4 lg:min-h-0">
+          <TrendPanel history={history} />
           <ContextPanel headlineAigvr={headlineAigvr} scoreRun={scoreRun} runsByAgent={runsByAgent} totalAgents={DELIVERABLE_GROUPS.reduce((n, g) => n + g.items.length, 0)} />
         </aside>
       </div>
@@ -503,6 +525,56 @@ function ContextMetric({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between text-[12px]">
       <span className="text-faint">{t(label)}</span>
       <span className="text-ink font-medium">{value}</span>
+    </div>
+  );
+}
+
+function TrendPanel({ history }: { history: ScanPoint[] }) {
+  if (!history.length) return null;
+  const last = history[history.length - 1];
+  const prev = history.length >= 2 ? history[history.length - 2] : null;
+  const dA = prev && last.aigvr != null && prev.aigvr != null ? last.aigvr - prev.aigvr : null;
+  const dP = prev && last.presence != null && prev.presence != null ? last.presence - prev.presence : null;
+  const dG = prev ? last.gaps - prev.gaps : null;
+
+  // AIGVR sparkline
+  const vals = history.map((p) => p.aigvr ?? 0);
+  const W = 244, H = 44, pad = 5;
+  const min = Math.min(...vals), max = Math.max(...vals), range = Math.max(1, max - min);
+  const xy = vals.map((v, i) => {
+    const x = vals.length === 1 ? W / 2 : pad + (i * (W - 2 * pad)) / (vals.length - 1);
+    const y = H - pad - ((v - min) / range) * (H - 2 * pad);
+    return [x, y] as const;
+  });
+  const dPath = xy.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+  const arrow = (d: number | null) => (d == null ? '' : d > 0 ? '▲' : d < 0 ? '▼' : '–');
+  const dColor = (d: number | null, goodUp = true) => (d == null || d === 0 ? 'text-faint' : (d > 0) === goodUp ? 'text-sage' : 'text-garnet');
+
+  return (
+    <div className="rounded-lg border border-edge bg-surface p-4 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="text-[10px] uppercase tracking-widest text-faint">{t('AIGVR trend')} · {history.length}</div>
+        {dA != null && <div className={`text-[11px] font-medium ${dColor(dA)}`}>{arrow(dA)} {Math.abs(dA)}</div>}
+      </div>
+      <div className="flex items-end gap-2">
+        <div className="text-2xl font-semibold leading-none text-ink">{last.aigvr}</div>
+        <div className="text-[10px] text-faint mb-0.5">/ 100</div>
+      </div>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="block">
+        {history.length > 1 && <path d={dPath} fill="none" stroke="var(--brand)" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" />}
+        {xy.map((p, i) => (
+          <circle key={i} cx={p[0]} cy={p[1]} r={i === xy.length - 1 ? 3 : 2} fill={i === xy.length - 1 ? 'var(--gold)' : 'var(--brand)'} />
+        ))}
+      </svg>
+      {prev ? (
+        <div className="space-y-1 pt-1">
+          <div className="flex items-center justify-between text-[11px]"><span className="text-faint">{t('Presence (SoV)')}</span><span className={dColor(dP)}>{arrow(dP)} {dP == null ? '—' : `${Math.abs(dP)}%`}</span></div>
+          <div className="flex items-center justify-between text-[11px]"><span className="text-faint">{t('High-intent gaps')}</span><span className={dColor(dG, false)}>{arrow(dG)} {dG == null ? '—' : Math.abs(dG)}</span></div>
+          <div className="text-[10px] text-faint pt-1">{t('vs previous scan')}</div>
+        </div>
+      ) : (
+        <div className="text-[10px] text-faint pt-1">{t('Run another scan to track change.')}</div>
+      )}
     </div>
   );
 }
