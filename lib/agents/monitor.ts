@@ -371,9 +371,16 @@ export async function runMonitorAgent(
         let text = '';
         let citations: string[];
         if (engine.kind === 'serp') {
-          const aio = await fetchGoogleAio(s.prompt, { gl: loc.gl, hl: loc.hl, key: serpKey! });
-          text = aio.text;
-          citations = aio.citations;
+          // Per-query resilience: one slow/failed AIO fetch must not sink the
+          // whole engine. A timeout = "no AI Overview shown for this query".
+          try {
+            const aio = await fetchGoogleAio(s.prompt, { gl: loc.gl, hl: loc.hl, key: serpKey! });
+            text = aio.text;
+            citations = aio.citations;
+          } catch {
+            text = '';
+            citations = [];
+          }
         } else {
           const resp = await poeChat({
             model: engine.model,

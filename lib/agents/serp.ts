@@ -44,7 +44,7 @@ export async function fetchGoogleAio(
     api_key: opts.key,
   });
   const res = await fetch(`${SERP_URL}?${params.toString()}`, {
-    signal: opts.signal ?? AbortSignal.timeout(30_000),
+    signal: opts.signal ?? AbortSignal.timeout(50_000),
   });
   if (!res.ok) throw new Error(`SerpApi ${res.status}`);
   const json: any = await res.json();
@@ -59,7 +59,7 @@ export async function fetchGoogleAio(
   // Collapsed AI Overview → second call with its page_token.
   if (aio.page_token) {
     const p2 = new URLSearchParams({ engine: 'google_ai_overview', page_token: aio.page_token, api_key: opts.key });
-    const r2 = await fetch(`${SERP_URL}?${p2.toString()}`, { signal: opts.signal ?? AbortSignal.timeout(30_000) });
+    const r2 = await fetch(`${SERP_URL}?${p2.toString()}`, { signal: opts.signal ?? AbortSignal.timeout(50_000) });
     if (r2.ok) {
       const j2: any = await r2.json();
       const a2 = j2?.ai_overview;
