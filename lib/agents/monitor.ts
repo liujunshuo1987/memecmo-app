@@ -11,6 +11,7 @@
 // doesn't). This is the measurement that turns prompts into a deliverable.
 
 import { poeChat, parseJsonFromLLM } from '@/lib/llm/poe';
+import { fetchGoogleAio, localeFor } from './serp';
 
 type EventEmitter = (event: {
   event_type:
@@ -40,13 +41,18 @@ interface MonitorInput {
   knownCompetitors?: string[];
 }
 
-// The AI answer engines we measure. Model names verified live on Poe.
-const ENGINES: { key: string; label: string; model: string }[] = [
-  { key: 'chatgpt', label: 'ChatGPT', model: 'GPT-4o' },
-  { key: 'gemini', label: 'Gemini', model: 'Gemini-2.5-Pro' },
-  { key: 'perplexity', label: 'Perplexity', model: 'Perplexity-Sonar' },
-  { key: 'claude', label: 'Claude', model: 'Claude-Sonnet-4.5' },
+// The AI answer engines we measure. Poe engines proxy the model APIs; the
+// Google AI Overview engine (kind 'serp') is the REAL Google surface — added at
+// runtime only when SERPAPI_KEY is configured.
+type EngineKind = 'poe' | 'serp';
+interface Engine { key: string; label: string; model: string; kind: EngineKind }
+const ENGINES: Engine[] = [
+  { key: 'chatgpt', label: 'ChatGPT', model: 'GPT-4o', kind: 'poe' },
+  { key: 'gemini', label: 'Gemini', model: 'Gemini-2.5-Pro', kind: 'poe' },
+  { key: 'perplexity', label: 'Perplexity', model: 'Perplexity-Sonar', kind: 'poe' },
+  { key: 'claude', label: 'Claude', model: 'Claude-Sonnet-4.5', kind: 'poe' },
 ];
+const AIO_ENGINE: Engine = { key: 'google_aio', label: 'Google AI Overview', model: 'serpapi', kind: 'serp' };
 
 // Sample size balances rigor (more n per stage×engine cell = less noisy %)
 // against latency/cost. 24 prompts × 4 engines ≈ 96 queries (~5 min) gives
@@ -329,6 +335,12 @@ export async function runMonitorAgent(
   const { brandName, brandUrl, targetCountry } = input;
   const brandDomain = brandUrl ? domainOf(brandUrl) : '';
 
+  // Real Google AI Overview engine joins only when a SERP key is configured.
+  const serpKey = process.env.SERPAPI_KEY;
+  const engines: Engine[] = serpKey ? [...ENGINES, AIO_ENGINE] : [...ENGINES];
+  const kindByLabel = new Map(engines.map((e) => [e.label, e.kind]));
+  const loc = localeFor(targetCountry, input.targetLanguage);
+
   await emit({ event_type: 'milestone', payload: { label: 'Monitor started', step: 1, totalSteps: 5 } });
 
   // 1. Sample prompts (stage-balanced, bounded)
@@ -338,41 +350,51 @@ export async function runMonitorAgent(
   await emit({
     event_type: 'log',
     payload: {
-      text: `Measuring ${sampled.length} of ${totalPrompts} prompts × ${ENGINES.length} engines = ${sampled.length * ENGINES.length} AI queries.`,
+      text: `Measuring ${sampled.length} of ${totalPrompts} prompts × ${engines.length} engines = ${sampled.length * engines.length} queries` +
+        (serpKey ? ' (incl. real Google AI Overview).' : ' (Poe model APIs; Google AI Overview off — no SERP key).'),
     },
   });
 
   // 2. Query engines — collect raw answers (full text in-memory only).
   const rawByEngine = new Map<string, RawAnswer[]>();
-  const totalQueries = sampled.length * ENGINES.length;
+  const totalQueries = sampled.length * engines.length;
   let done = 0;
 
-  for (const engine of ENGINES) {
+  for (const engine of engines) {
     await emit({
       event_type: 'tool_call',
-      payload: { tool: 'engine.query', engine: engine.label, model: engine.model, prompts: sampled.length },
+      payload: { tool: 'engine.query', engine: engine.label, model: engine.model, prompts: sampled.length, real: engine.kind === 'serp' },
     });
     try {
-      const answers = await mapLimit(sampled, QUERY_CONCURRENCY, async (s) => {
-        const resp = await poeChat({
-          model: engine.model,
-          messages: [{ role: 'user', content: s.prompt }],
-          maxTokens: 900,
-          // temperature 0 → deterministic model sampling, so the measurement is
-          // reproducible (residual variance is from web-retrieval engines only).
-          temperature: 0,
-          retries: 1,
-        });
-        const text = resp.content || '';
-        const urls = extractUrls(text);
+      const conc = engine.kind === 'serp' ? 3 : QUERY_CONCURRENCY; // be gentle on the SERP API
+      const answers = await mapLimit(sampled, conc, async (s) => {
+        let text = '';
+        let citations: string[];
+        if (engine.kind === 'serp') {
+          const aio = await fetchGoogleAio(s.prompt, { gl: loc.gl, hl: loc.hl, key: serpKey! });
+          text = aio.text;
+          citations = aio.citations;
+        } else {
+          const resp = await poeChat({
+            model: engine.model,
+            messages: [{ role: 'user', content: s.prompt }],
+            maxTokens: 900,
+            // temperature 0 → deterministic model sampling, so the measurement is
+            // reproducible (residual variance is from web-retrieval engines only).
+            temperature: 0,
+            retries: 1,
+          });
+          text = resp.content || '';
+          citations = extractUrls(text);
+        }
         const a: RawAnswer = {
           engine: engine.label,
           stage: s.stage,
           prompt: s.prompt,
           text,
           brandPresentStr: mentions(text, brandName),
-          citations: urls,
-          brandCited: !!brandDomain && urls.some((u) => domainOf(u) === brandDomain),
+          citations,
+          brandCited: !!brandDomain && citations.some((u) => domainOf(u) === brandDomain),
         };
         done++;
         if (done % 5 === 0 || done === totalQueries) {
@@ -408,7 +430,7 @@ export async function runMonitorAgent(
   await emit({ event_type: 'milestone', payload: { label: 'Scoring prominence & sentiment', step: 4, totalSteps: 5 } });
   const samples: Sample[] = [];
   let judgedEngines = 0;
-  for (const engine of ENGINES) {
+  for (const engine of engines) {
     const answers = rawByEngine.get(engine.label);
     if (!answers || !answers.length) continue;
     let verdicts: (Verdict | null)[] = new Array(answers.length).fill(null);
@@ -418,7 +440,7 @@ export async function runMonitorAgent(
       /* fall back to string-match below */
     }
     judgedEngines++;
-    await emit({ event_type: 'progress', payload: { pct: 65 + Math.round((judgedEngines / ENGINES.length) * 25) } });
+    await emit({ event_type: 'progress', payload: { pct: 65 + Math.round((judgedEngines / engines.length) * 25) } });
     answers.forEach((a, i) => {
       const v = verdicts[i];
       const brandPresent = v ? v.brandMentioned : a.brandPresentStr;
@@ -446,7 +468,7 @@ export async function runMonitorAgent(
   const overall = computeDimensions(samples);
 
   const enginesUsed = Array.from(new Set(samples.map((s) => s.engine)));
-  const perEngine = enginesUsed.map((eng) => ({ engine: eng, ...computeDimensions(samples.filter((s) => s.engine === eng)) }));
+  const perEngine = enginesUsed.map((eng) => ({ engine: eng, kind: kindByLabel.get(eng) ?? 'poe', ...computeDimensions(samples.filter((s) => s.engine === eng)) }));
 
   const stages = Array.from(new Set(samples.map((s) => s.stage)));
   const perStage = stages.map((st) => ({ stage: st, ...computeDimensions(samples.filter((s) => s.stage === st)) }));
@@ -494,6 +516,7 @@ export async function runMonitorAgent(
     weights: WEIGHTS,
     competitors,
     engines: enginesUsed,
+    surfaces: { realSurfaces: serpKey ? ['Google AI Overview'] : [], proxySurfaces: ENGINES.map((e) => e.label) },
     sampled: { total: totalPrompts, used: sampled.length, queries: samples.length },
     metrics: { overall, perEngine, perStage },
     competitorBenchmark: bench,
@@ -501,7 +524,7 @@ export async function runMonitorAgent(
     citations: { brandCited: brandCitedCount > 0, brandCitedCount, sampleSources: allSources },
     gaps,
     rawSamples: samples,
-    generatedBy: `poe:${ENGINES.map((e) => e.model).join('+')}`,
+    generatedBy: engines.map((e) => (e.kind === 'serp' ? 'serpapi:google_aio' : `poe:${e.model}`)).join('+'),
   };
 
   const summary =

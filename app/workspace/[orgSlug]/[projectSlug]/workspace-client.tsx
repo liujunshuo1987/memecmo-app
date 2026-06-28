@@ -1395,12 +1395,13 @@ function MonitorResult({ o }: { o: Record<string, any> }) {
           <SectionLabel>By engine</SectionLabel>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {engines.map((e, i) => (
-              <div key={i} className="rounded-lg border border-edge bg-surface px-2.5 py-2">
+              <div key={i} className={`rounded-lg border bg-surface px-2.5 py-2 ${e.kind === 'serp' ? 'border-gold/40' : 'border-edge'}`}>
                 <div className="flex items-baseline justify-between gap-1">
                   <span className="text-[11px] text-dim truncate">{e.engine}</span>
                   <span className="text-[13px] font-bold tabular-nums" style={{ color: toneColor(e.aigvr || 0) }}>{e.aigvr ?? '—'}</span>
                 </div>
-                <div className="mt-1.5"><Bar value={e.aigvr} /></div>
+                <div className="mt-1.5"><Bar value={e.aigvr} color={e.kind === 'serp' ? 'bg-gold' : 'bg-brand'} /></div>
+                <div className="mt-1 text-[9px] uppercase tracking-wider text-faint">{e.kind === 'serp' ? '● 真实界面 real surface' : 'API proxy'}</div>
               </div>
             ))}
           </div>
