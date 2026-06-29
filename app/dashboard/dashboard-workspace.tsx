@@ -11,11 +11,13 @@ import type { Organization, Project } from '@/lib/workspace';
 
 interface Group {
   org: Organization;
+  role: string | null;
   projects: Project[];
 }
 interface Props {
   groups: Group[];
   userEmail: string;
+  isRootAdmin: boolean;
 }
 
 const COUNTRIES = [
@@ -44,13 +46,29 @@ function slugify(s: string): string {
     .slice(0, 40);
 }
 
-export default function DashboardClient({ groups, userEmail }: Props) {
+export default function DashboardClient({ groups, userEmail, isRootAdmin }: Props) {
   const router = useRouter();
   const [modalOrg, setModalOrg] = useState<Organization | null>(null);
+  const [newClientFor, setNewClientFor] = useState<Organization | null>(null);
+  const [busyApprove, setBusyApprove] = useState<string | null>(null);
 
   const signOut = async () => {
     await createClient().auth.signOut();
     router.push('/login');
+  };
+
+  // Pending-approval orgs the caller can see (root admin → the approval queue).
+  const pending = groups.map((g) => g.org).filter((o) => o.status === 'pending_approval');
+
+  const decide = async (orgId: string, action: 'approve' | 'reject') => {
+    setBusyApprove(orgId);
+    try {
+      await fetch('/api/workspace/orgs/approve', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orgId, action }),
+      });
+      router.refresh();
+    } finally { setBusyApprove(null); }
   };
 
   return (
@@ -79,9 +97,27 @@ export default function DashboardClient({ groups, userEmail }: Props) {
           </div>
         )}
 
+        {isRootAdmin && pending.length > 0 && (
+          <div className="mb-8 rounded-lg border border-gold/40 bg-gold/10 p-4">
+            <div className="text-[11px] uppercase tracking-widest text-gold mb-2">Pending approval · {pending.length}</div>
+            <div className="space-y-2">
+              {pending.map((o) => (
+                <div key={o.id} className="flex items-center justify-between gap-3">
+                  <div className="text-sm text-ink">{o.name} <span className="text-[11px] text-faint">· {ORG_TYPE_LABEL[o.type] ?? o.type}</span></div>
+                  <div className="flex gap-2">
+                    <button disabled={busyApprove === o.id} onClick={() => decide(o.id, 'approve')} className="text-xs px-3 py-1 rounded-md bg-brand text-on-brand hover:brightness-110 disabled:opacity-50 transition">Approve</button>
+                    <button disabled={busyApprove === o.id} onClick={() => decide(o.id, 'reject')} className="text-xs px-3 py-1 rounded-md border border-edge text-dim hover:text-garnet transition">Reject</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="space-y-10">
-          {groups.map(({ org, projects }) => {
+          {groups.map(({ org, role, projects }) => {
             const active = org.status === 'active';
+            const canAddClient = org.type === 'channel_partner' && role === 'admin';
             return (
               <section key={org.id}>
                 <div className="flex items-center justify-between mb-3">
@@ -96,14 +132,24 @@ export default function DashboardClient({ groups, userEmail }: Props) {
                       </span>
                     )}
                   </div>
-                  {active && (
-                    <button
-                      onClick={() => setModalOrg(org)}
-                      className="text-xs px-3 py-1.5 rounded-md bg-brand text-on-brand hover:brightness-110 transition"
-                    >
-                      + New project
-                    </button>
-                  )}
+                  <div className="flex gap-2">
+                    {canAddClient && (
+                      <button
+                        onClick={() => setNewClientFor(org)}
+                        className="text-xs px-3 py-1.5 rounded-md border border-brand/50 text-brand hover:bg-brand-soft transition"
+                      >
+                        + New client
+                      </button>
+                    )}
+                    {active && (
+                      <button
+                        onClick={() => setModalOrg(org)}
+                        className="text-xs px-3 py-1.5 rounded-md bg-brand text-on-brand hover:brightness-110 transition"
+                      >
+                        + New project
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {projects.length === 0 ? (
@@ -143,6 +189,54 @@ export default function DashboardClient({ groups, userEmail }: Props) {
           onCreated={(orgSlug, projectSlug) => router.push(`/workspace/${orgSlug}/${projectSlug}`)}
         />
       )}
+      {newClientFor && (
+        <NewClientModal
+          parent={newClientFor}
+          onClose={() => setNewClientFor(null)}
+          onCreated={() => { setNewClientFor(null); router.refresh(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function NewClientModal({ parent, onClose, onCreated }: { parent: Organization; onClose: () => void; onCreated: () => void }) {
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const submit = async () => {
+    if (!name.trim() || busy) return;
+    setBusy(true); setError(null);
+    try {
+      const res = await fetch('/api/workspace/orgs', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parentOrgSlug: parent.slug, name: name.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'Failed to create client'); setBusy(false); return; }
+      onCreated();
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); setBusy(false); }
+  };
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-xl border border-edge bg-surface p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div>
+          <h3 className="text-sm font-semibold text-ink">New client organization</h3>
+          <p className="text-xs text-faint">under {parent.name} · needs MemeCMO approval before it goes live</p>
+        </div>
+        <label className="block">
+          <span className="text-[11px] uppercase tracking-wider text-faint mb-1 block">Client / brand company name *</span>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Acme Vietnam Co." autoFocus
+            className="w-full bg-raised border border-edge rounded-md px-3 py-2 text-sm focus:outline-none focus:border-brand/50" />
+        </label>
+        {error && <div className="text-xs text-garnet bg-garnet/10 border border-garnet/40 rounded px-3 py-2">{error}</div>}
+        <div className="flex justify-end gap-2 pt-1">
+          <button onClick={onClose} className="text-sm px-3 py-2 rounded-md border border-edge text-dim hover:text-ink transition">Cancel</button>
+          <button onClick={submit} disabled={busy || !name.trim()} className="text-sm px-4 py-2 rounded-md bg-brand text-on-brand hover:brightness-110 disabled:bg-raised disabled:text-faint transition">
+            {busy ? 'Creating…' : 'Create (pending approval)'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

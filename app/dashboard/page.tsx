@@ -17,9 +17,17 @@ export default async function DashboardPage() {
   if (!user) redirect('/login?next=/dashboard');
 
   const orgs = await listMyOrgs();
+  const { data: mems } = await supabase
+    .from('organization_members')
+    .select('organization_id, role')
+    .eq('user_id', user.id);
+  const roleByOrg: Record<string, string> = Object.fromEntries((mems ?? []).map((m) => [m.organization_id, m.role]));
+  const rootOrg = orgs.find((o) => o.type === 'root');
+  const isRootAdmin = !!rootOrg && roleByOrg[rootOrg.id] === 'admin';
+
   const groups = await Promise.all(
-    orgs.map(async (org) => ({ org, projects: await listProjectsForOrg(org.id) })),
+    orgs.map(async (org) => ({ org, role: roleByOrg[org.id] ?? null, projects: await listProjectsForOrg(org.id) })),
   );
 
-  return <DashboardClient groups={groups} userEmail={user.email ?? ''} />;
+  return <DashboardClient groups={groups} userEmail={user.email ?? ''} isRootAdmin={isRootAdmin} />;
 }
