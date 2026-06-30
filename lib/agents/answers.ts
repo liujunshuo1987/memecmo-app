@@ -103,28 +103,32 @@ export async function runStandardAnswersAgent(
         const batch = batches[idx];
         const { system, user } = buildBatchPrompt(input, localLang, profileBlock, batch);
         let out: StdAnswer[] = [];
-        try {
-          const res = await poeChat({
-            model: DEFAULT_MODEL,
-            messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
-            // Generous: bilingual structured JSON truncates easily at low caps.
-            maxTokens: 3500,
-            temperature: 0.4,
-            retries: 1,
-          });
-          const parsed = parseJsonFromLLM<any>(res.content);
-          const list: any[] = Array.isArray(parsed) ? parsed : (parsed?.answers || []);
-          // Map by index back to the batch prompts — the model may omit/alter the
-          // verbatim prompt field. Keep any item with a non-empty answer.
-          out = list
-            .map((a: any, k: number) => ({
-              prompt: (typeof a?.prompt === 'string' && a.prompt.trim()) ? a.prompt : (batch[k] || ''),
-              local: String(a?.local ?? a?.vi ?? ''),
-              en: String(a?.en ?? a?.english ?? ''),
-            }))
-            .filter((a) => a.prompt && (a.local || a.en));
-        } catch {
-          /* a failed batch yields no answers; others still produce a usable library */
+        // A batch that parses to nothing is usually a one-off content/parse miss
+        // (not a network error poeChat retries). Re-attempt once to cover all 20.
+        for (let attempt = 0; attempt < 2 && out.length === 0; attempt++) {
+          try {
+            const res = await poeChat({
+              model: DEFAULT_MODEL,
+              messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+              // Generous: bilingual structured JSON truncates easily at low caps.
+              maxTokens: 3500,
+              temperature: 0.4,
+              retries: 1,
+            });
+            const parsed = parseJsonFromLLM<any>(res.content);
+            const list: any[] = Array.isArray(parsed) ? parsed : (parsed?.answers || []);
+            // Map by index back to the batch prompts — the model may omit/alter the
+            // verbatim prompt field. Keep any item with a non-empty answer.
+            out = list
+              .map((a: any, k: number) => ({
+                prompt: (typeof a?.prompt === 'string' && a.prompt.trim()) ? a.prompt : (batch[k] || ''),
+                local: String(a?.local ?? a?.vi ?? ''),
+                en: String(a?.en ?? a?.english ?? ''),
+              }))
+              .filter((a) => a.prompt && (a.local || a.en));
+          } catch {
+            /* retry once; if still empty, this batch is skipped (others still produce a usable library) */
+          }
         }
         results[idx] = out;
         done++;
