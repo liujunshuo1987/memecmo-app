@@ -29,5 +29,30 @@ export default async function DashboardPage() {
     orgs.map(async (org) => ({ org, role: roleByOrg[org.id] ?? null, projects: await listProjectsForOrg(org.id) })),
   );
 
-  return <DashboardClient groups={groups} userEmail={user.email ?? ''} isRootAdmin={isRootAdmin} />;
+  // ③ Commercial: subscription + period usage per end-client org (RLS-scoped).
+  const endClientIds = orgs.filter((o) => o.type === 'end_client').map((o) => o.id);
+  const billing: Record<string, { planName: string; quota: number; used: number; status: string }> = {};
+  if (endClientIds.length) {
+    const { data: subs } = await supabase
+      .from('org_subscriptions')
+      .select('organization_id, status, current_period_start, plans(name, monthly_scan_quota)')
+      .in('organization_id', endClientIds);
+    for (const s of subs ?? []) {
+      const plan = (s as any).plans;
+      const { count } = await supabase
+        .from('usage_events')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', s.organization_id)
+        .in('kind', ['full_scan', 'monitor'])
+        .gte('ts', s.current_period_start);
+      billing[s.organization_id] = {
+        planName: plan?.name ?? '—',
+        quota: plan?.monthly_scan_quota ?? 0,
+        used: count ?? 0,
+        status: s.status,
+      };
+    }
+  }
+
+  return <DashboardClient groups={groups} userEmail={user.email ?? ''} isRootAdmin={isRootAdmin} billing={billing} />;
 }

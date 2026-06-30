@@ -14,10 +14,17 @@ interface Group {
   role: string | null;
   projects: Project[];
 }
+interface Billing {
+  planName: string;
+  quota: number;
+  used: number;
+  status: string;
+}
 interface Props {
   groups: Group[];
   userEmail: string;
   isRootAdmin: boolean;
+  billing: Record<string, Billing>;
 }
 
 const COUNTRIES = [
@@ -46,10 +53,11 @@ function slugify(s: string): string {
     .slice(0, 40);
 }
 
-export default function DashboardClient({ groups, userEmail, isRootAdmin }: Props) {
+export default function DashboardClient({ groups, userEmail, isRootAdmin, billing }: Props) {
   const router = useRouter();
   const [modalOrg, setModalOrg] = useState<Organization | null>(null);
   const [newClientFor, setNewClientFor] = useState<Organization | null>(null);
+  const [inviteOrg, setInviteOrg] = useState<Organization | null>(null);
   const [busyApprove, setBusyApprove] = useState<string | null>(null);
 
   const signOut = async () => {
@@ -118,10 +126,12 @@ export default function DashboardClient({ groups, userEmail, isRootAdmin }: Prop
           {groups.map(({ org, role, projects }) => {
             const active = org.status === 'active';
             const canAddClient = org.type === 'channel_partner' && role === 'admin';
+            const canInvite = role === 'admin' && active;
+            const bill = billing[org.id];
             return (
               <section key={org.id}>
                 <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h2 className="text-sm font-semibold">{org.name}</h2>
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-raised border border-edge text-dim uppercase tracking-wider">
                       {ORG_TYPE_LABEL[org.type] ?? org.type}
@@ -131,8 +141,26 @@ export default function DashboardClient({ groups, userEmail, isRootAdmin }: Prop
                         {org.status}
                       </span>
                     )}
+                    {bill && (
+                      <span
+                        title={`${bill.status} · resets monthly`}
+                        className={`text-[10px] px-2 py-0.5 rounded-full border uppercase tracking-wider ${
+                          bill.used >= bill.quota ? 'border-garnet/50 text-garnet bg-garnet/10' : 'border-sage/40 text-sage bg-sage/10'
+                        }`}
+                      >
+                        {bill.planName} · {bill.used}/{bill.quota} scans
+                      </span>
+                    )}
                   </div>
                   <div className="flex gap-2">
+                    {canInvite && (
+                      <button
+                        onClick={() => setInviteOrg(org)}
+                        className="text-xs px-3 py-1.5 rounded-md border border-edge text-dim hover:text-ink hover:border-edge-strong transition"
+                      >
+                        Invite
+                      </button>
+                    )}
                     {canAddClient && (
                       <button
                         onClick={() => setNewClientFor(org)}
@@ -196,6 +224,86 @@ export default function DashboardClient({ groups, userEmail, isRootAdmin }: Prop
           onCreated={() => { setNewClientFor(null); router.refresh(); }}
         />
       )}
+      {inviteOrg && <InviteModal org={inviteOrg} onClose={() => setInviteOrg(null)} />}
+    </div>
+  );
+}
+
+function InviteModal({ org, onClose }: { org: Organization; onClose: () => void }) {
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState<'admin' | 'editor' | 'viewer'>('viewer');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [link, setLink] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const submit = async () => {
+    if (!email.trim() || busy) return;
+    setBusy(true); setError(null);
+    try {
+      const res = await fetch('/api/workspace/invites', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orgId: org.id, email: email.trim(), role }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || 'Failed to create invite'); setBusy(false); return; }
+      setLink(data.acceptUrl);
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    setBusy(false);
+  };
+
+  const copy = async () => {
+    if (!link) return;
+    try { await navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* ignore */ }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-xl border border-edge bg-surface p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div>
+          <h3 className="text-sm font-semibold text-ink">Invite a member</h3>
+          <p className="text-xs text-faint">to {org.name} · they sign in with this email to join</p>
+        </div>
+
+        {!link ? (
+          <>
+            <label className="block">
+              <span className="text-[11px] uppercase tracking-wider text-faint mb-1 block">Email *</span>
+              <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="person@company.com" autoFocus type="email"
+                className="w-full bg-raised border border-edge rounded-md px-3 py-2 text-sm focus:outline-none focus:border-brand/50" />
+            </label>
+            <label className="block">
+              <span className="text-[11px] uppercase tracking-wider text-faint mb-1 block">Role</span>
+              <select value={role} onChange={(e) => setRole(e.target.value as 'admin' | 'editor' | 'viewer')}
+                className="w-full bg-raised border border-edge rounded-md px-3 py-2 text-sm focus:outline-none focus:border-brand/50">
+                <option value="viewer">Viewer — read reports</option>
+                <option value="editor">Editor — run agents</option>
+                <option value="admin">Admin — manage org</option>
+              </select>
+            </label>
+            {error && <div className="text-xs text-garnet bg-garnet/10 border border-garnet/40 rounded px-3 py-2">{error}</div>}
+            <div className="flex justify-end gap-2 pt-1">
+              <button onClick={onClose} className="text-sm px-3 py-2 rounded-md border border-edge text-dim hover:text-ink transition">Cancel</button>
+              <button onClick={submit} disabled={busy || !email.trim()} className="text-sm px-4 py-2 rounded-md bg-brand text-on-brand hover:brightness-110 disabled:bg-raised disabled:text-faint transition">
+                {busy ? 'Creating…' : 'Create invite'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-xs text-faint">Send this link to <span className="text-ink">{email}</span>. It expires in 14 days.</p>
+            <div className="flex items-center gap-2">
+              <input readOnly value={link} className="flex-1 bg-raised border border-edge rounded-md px-3 py-2 text-xs text-dim" />
+              <button onClick={copy} className="text-xs px-3 py-2 rounded-md bg-brand text-on-brand hover:brightness-110 transition whitespace-nowrap">
+                {copied ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+            <div className="flex justify-end pt-1">
+              <button onClick={onClose} className="text-sm px-3 py-2 rounded-md border border-edge text-dim hover:text-ink transition">Done</button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

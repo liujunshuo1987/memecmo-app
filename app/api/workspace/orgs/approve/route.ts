@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
+import { ensureSubscription, DEFAULT_PLAN_ID } from '@/lib/commerce';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -32,7 +33,14 @@ export async function POST(req: NextRequest) {
   }
 
   const sb = createServiceClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
-  const { data: org, error } = await sb.from('organizations').update({ status }).eq('id', body.orgId).select('id, slug, status').single();
+  const { data: org, error } = await sb.from('organizations').update({ status }).eq('id', body.orgId).select('id, slug, status, type').single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // ③ Commercial: on approval, provision a default subscription for end clients
+  // so the org has a plan/quota from day one.
+  if (status === 'active' && org.type === 'end_client') {
+    await ensureSubscription(sb, org.id, DEFAULT_PLAN_ID);
+  }
+
   return NextResponse.json({ ok: true, org });
 }

@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { V05_AGENT_IDS } from '@/lib/agents/registry';
 import { inngest } from '@/lib/inngest/client';
+import { getQuotaStatusForProject, isMeteredKind, recordUsage, orgIdForProject } from '@/lib/commerce';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -58,6 +59,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Project not found or no access' }, { status: 404 });
   }
 
+  // ③ Commercial: enforce monthly scan quota for metered (end_client) orgs.
+  // Operator + channel-partner orgs are never metered (see lib/commerce.ts).
+  const metered = isMeteredKind(body.agentId);
+  const quota = metered ? await getQuotaStatusForProject(body.projectId) : null;
+  if (quota?.metered && quota.overQuota) {
+    return NextResponse.json(
+      {
+        error: 'quota_exceeded',
+        message: `Monthly scan quota reached (${quota.used}/${quota.quota} on ${quota.planName}). Upgrade the plan or wait for the next billing period.`,
+        quota,
+      },
+      { status: 402 },
+    );
+  }
+
   const { data: run, error: runError } = await supabase
     .from('agent_runs')
     .insert({
@@ -101,5 +117,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  return NextResponse.json({ ok: true, run });
+  // ③ Commercial: meter the run after a successful enqueue.
+  if (metered) {
+    const orgId = await orgIdForProject(body.projectId);
+    if (orgId) await recordUsage({ orgId, projectId: body.projectId, agentRunId: run.id, kind: body.agentId });
+  }
+
+  return NextResponse.json({ ok: true, run, quota });
 }
