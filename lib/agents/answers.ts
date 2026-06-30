@@ -36,7 +36,7 @@ interface StdAnswer {
   en: string;    // answer in English
 }
 
-const BATCH = 5;
+const BATCH = 4;
 const CONCURRENCY = 3;
 
 function buildBatchPrompt(input: StandardAnswersInput, localLang: string, profileBlock: string, prompts: string[]) {
@@ -100,20 +100,29 @@ export async function runStandardAnswersAgent(
     Array.from({ length: Math.min(CONCURRENCY, batches.length) }, async () => {
       while (bi < batches.length) {
         const idx = bi++;
-        const { system, user } = buildBatchPrompt(input, localLang, profileBlock, batches[idx]);
+        const batch = batches[idx];
+        const { system, user } = buildBatchPrompt(input, localLang, profileBlock, batch);
         let out: StdAnswer[] = [];
         try {
           const res = await poeChat({
             model: DEFAULT_MODEL,
             messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
-            maxTokens: 1800,
+            // Generous: bilingual structured JSON truncates easily at low caps.
+            maxTokens: 3500,
             temperature: 0.4,
             retries: 1,
           });
-          const parsed = parseJsonFromLLM<{ answers?: StdAnswer[] }>(res.content);
-          out = (parsed.answers || [])
-            .filter((a) => a && typeof a.prompt === 'string')
-            .map((a) => ({ prompt: a.prompt, local: String(a.local || ''), en: String(a.en || '') }));
+          const parsed = parseJsonFromLLM<any>(res.content);
+          const list: any[] = Array.isArray(parsed) ? parsed : (parsed?.answers || []);
+          // Map by index back to the batch prompts — the model may omit/alter the
+          // verbatim prompt field. Keep any item with a non-empty answer.
+          out = list
+            .map((a: any, k: number) => ({
+              prompt: (typeof a?.prompt === 'string' && a.prompt.trim()) ? a.prompt : (batch[k] || ''),
+              local: String(a?.local ?? a?.vi ?? ''),
+              en: String(a?.en ?? a?.english ?? ''),
+            }))
+            .filter((a) => a.prompt && (a.local || a.en));
         } catch {
           /* a failed batch yields no answers; others still produce a usable library */
         }
