@@ -85,6 +85,7 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'AIGVR trend': 'AIGVR 趋势', 'vs previous scan': '对比上次扫描', 'Run another scan to track change.': '再扫一次即可追踪变化。',
     'Top-of-mind rate': '首位推荐率', 'featured / first recommendation': '被作为首选/首位推荐',
     'Top-of-mind · key prompts': '首位推荐率 · 重点 Prompt', 'key prompts monitored': '条重点 Prompt 已监测',
+    Answers: '标准答案', 'Standard answer library': '标准答案库', 'the answer we want AI to give': '我们希望 AI 给出的答案',
   },
   vi: {
     'Run full GEO scan': 'Chạy quét GEO đầy đủ', '…focus the agents': '…định hướng cho agent',
@@ -98,6 +99,7 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     Optimize: 'Nội dung', Site: 'Trang chủ', Distribute: 'Phân phối', Encyclopedia: 'Bách khoa',
     'Top-of-mind rate': 'Tỷ lệ đề xuất đầu tiên', 'featured / first recommendation': 'được đề xuất đầu tiên',
     'Top-of-mind · key prompts': 'Đề xuất đầu tiên · prompt trọng điểm', 'key prompts monitored': 'prompt trọng điểm được theo dõi',
+    Answers: 'Câu trả lời chuẩn', 'Standard answer library': 'Thư viện câu trả lời chuẩn', 'the answer we want AI to give': 'câu trả lời ta muốn AI đưa ra',
   },
 };
 function t(s: string): string {
@@ -108,7 +110,7 @@ function t(s: string): string {
 // Outcome-first deliverable groups. Each item maps to an agent; cards show the
 // latest completed run of that agent (view it) or offer to run it.
 const DELIVERABLE_GROUPS: { label: string; items: string[] }[] = [
-  { label: 'Setup', items: ['profile', 'discovery'] },
+  { label: 'Setup', items: ['profile', 'discovery', 'answers'] },
   { label: 'Measure', items: ['monitor', 'report'] },
   { label: 'Act — build AEO presence', items: ['site', 'optimize', 'distribute', 'encyclopedia'] },
 ];
@@ -824,6 +826,8 @@ function RunResult({ agentId, output, projectId, runId, versions, onVersions, on
         <ProfileResult o={output} />
       ) : agentId === 'discovery' ? (
         <DiscoveryResult o={output} />
+      ) : agentId === 'answers' ? (
+        <StandardAnswersResult o={output} />
       ) : null}
       {advisory && projectId && agentId && (
         <AdvisoryChat projectId={projectId} agentId={agentId} output={output} onDispatch={onDispatch} />
@@ -1340,6 +1344,54 @@ function DiscoveryResult({ o }: { o: Record<string, any> }) {
                 </li>
               ))}
             </ul>
+          </details>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StandardAnswersResult({ o }: { o: Record<string, any> }) {
+  const answers: any[] = o.answers || [];
+  const localName = o.localLangName || 'Local';
+  const copy = (text: string) => navigator.clipboard?.writeText(text).catch(() => {});
+  const copyAll = () =>
+    copy(answers.map((a, i) => `${i + 1}. ${a.prompt}\n[${localName}] ${a.local}\n[English] ${a.en}`).join('\n\n'));
+  return (
+    <div className="rounded-xl border border-edge bg-surface p-5 space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-ink tracking-wide">{t('Standard answer library')}</h3>
+          <p className="text-[11px] text-faint mt-0.5">{localName} + English · {t('the answer we want AI to give')}</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="text-right">
+            <div className="text-2xl font-bold text-ink leading-none tabular-nums">{o.count ?? answers.length}</div>
+            <div className="text-[10px] text-faint uppercase tracking-wider mt-0.5">answers</div>
+          </div>
+          <button onClick={copyAll} className="text-[11px] px-2 py-1 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition">{t('Copy kit')}</button>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {answers.map((a, i) => (
+          <details key={i} className="group rounded-lg border border-edge bg-surface">
+            <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden px-3 py-2.5 flex items-center gap-2 select-none rounded-lg hover:bg-raised">
+              <span className="text-faint text-[9px] transition-transform group-open:rotate-90">▶</span>
+              <span className="text-faint flex-none tabular-nums text-[11px]">{i + 1}.</span>
+              <span className="text-[12px] font-medium text-brand/90 flex-1 min-w-0 truncate">{a.prompt}</span>
+            </summary>
+            <div className="px-3 pb-3 pt-1.5 space-y-2.5 border-t border-edge">
+              {[{ lab: localName, val: a.local }, { lab: 'English', val: a.en }].map((blk, k) => (
+                <div key={k}>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-[10px] uppercase tracking-wider text-faint">{blk.lab}</span>
+                    <button onClick={() => copy(blk.val)} className="text-[10px] text-faint hover:text-brand transition">{t('Copy')}</button>
+                  </div>
+                  <p className="text-[12px] text-dim leading-relaxed">{blk.val}</p>
+                </div>
+              ))}
+            </div>
           </details>
         ))}
       </div>

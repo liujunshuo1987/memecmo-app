@@ -35,6 +35,14 @@ export const AGENTS: Record<string, AgentDef> = {
     description: 'Builds one canonical brand fact base (identity, services, facts, NAP) from the homepage that all execution agents reuse for consistency.',
     typicalDurationSec: 45,
   },
+  answers: {
+    id: 'answers',
+    displayName: 'Standard Answer Library',
+    shortName: 'Answers',
+    emoji: '📝',
+    description: 'Writes the canonical answer we want AI to give for each key prompt — in the market language + English — grounded in the brand profile. The GEO answer key.',
+    typicalDurationSec: 60,
+  },
   monitor: {
     id: 'monitor',
     displayName: 'AIGVR Monitor Agent',

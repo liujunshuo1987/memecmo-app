@@ -8,6 +8,7 @@ const PATHS: Record<string, ReactNode> = {
   full_scan: (<><circle cx="12" cy="12" r="8.5" /><path d="M12 12 L18 7" /><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none" /></>),
   profile: (<><rect x="3.5" y="5" width="17" height="14" rx="2.5" /><circle cx="9" cy="11" r="2.1" /><path d="M5.8 16c.7-1.7 5-1.7 6.4 0" /><path d="M14.6 10h3.6M14.6 13h2.8" /></>),
   discovery: (<><circle cx="12" cy="12" r="8.5" /><path d="M15.5 8.5l-2.2 4.8-4.8 2.2 2.2-4.8z" /></>),
+  answers: (<><path d="M4 5.5h16v10H9l-4 3.5v-3.5H4z" /><path d="M8 9h8M8 12h5" /></>),
   monitor: (<><path d="M4 14a8 8 0 0 1 16 0" /><path d="M7.5 14a4.5 4.5 0 0 1 9 0" /><circle cx="12" cy="14" r="1.3" fill="currentColor" stroke="none" /></>),
   report: (<><rect x="5" y="3.5" width="14" height="17" rx="2" /><path d="M9 16v-3.5M12 16v-6M15 16v-2.5" /></>),
   site: (<><rect x="3.5" y="5" width="17" height="14" rx="2" /><path d="M3.5 9h17" /><path d="M6.5 7h.01M9 7h.01" /></>),

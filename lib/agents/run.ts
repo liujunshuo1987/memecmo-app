@@ -16,6 +16,7 @@ import { runDistributeAgent } from './distribute';
 import { runSiteAgent } from './site';
 import { runEncyclopediaAgent } from './encyclopedia';
 import { runProfileAgent } from './profile';
+import { runStandardAnswersAgent } from './answers';
 
 // Load the latest canonical brand profile (if any) so execution agents share
 // consistent facts. Returns null when none exists yet.
@@ -260,6 +261,38 @@ export async function executeAgentRun(
           targetLanguage: project.target_language,
           industry: project.industry,
           userPrompt,
+        },
+        persistAndEmit,
+      );
+    } else if (agentId === 'answers') {
+      // Standard Answer Library — canonical bilingual answers for the key prompts.
+      const { data: psAsset } = await sb
+        .from('assets')
+        .select('content')
+        .eq('project_id', project.id)
+        .eq('type', 'prompt_set')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!psAsset?.content) throw new Error('No Discovery prompt set found. Run Discovery first.');
+      let keyPrompts: string[] = [];
+      try {
+        const ps = JSON.parse(psAsset.content);
+        keyPrompts = Array.isArray(ps?.keyPrompts) && ps.keyPrompts.length
+          ? ps.keyPrompts
+          : (ps?.promptSet || []).flatMap((c: any) => c.prompts || []).slice(0, 20);
+      } catch {
+        throw new Error('Discovery prompt set asset is corrupted — re-run Discovery.');
+      }
+      result = await runStandardAnswersAgent(
+        {
+          brandName: project.brand_name,
+          brandUrl: project.brand_url,
+          targetCountry: project.target_country,
+          targetLanguage: project.target_language,
+          industry: project.industry,
+          keyPrompts,
+          brandProfile: await loadBrandProfile(sb, project.id),
         },
         persistAndEmit,
       );
@@ -527,6 +560,16 @@ export async function executeAgentRun(
         agent_run_id: runId,
         type: 'prompt_set',
         title: `${project.brand_name} — Discovery prompt set`,
+        format: 'json',
+        content: JSON.stringify(result.output, null, 2),
+        meta: { brand: project.brand_name, country: project.target_country },
+      });
+    } else if (agentId === 'answers') {
+      await sb.from('assets').insert({
+        project_id: project.id,
+        agent_run_id: runId,
+        type: 'standard_answers',
+        title: `${project.brand_name} — Standard answer library`,
         format: 'json',
         content: JSON.stringify(result.output, null, 2),
         meta: { brand: project.brand_name, country: project.target_country },
