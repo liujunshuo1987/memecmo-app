@@ -3,12 +3,53 @@
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { inngest } from './client';
 import { executeAgentRun } from '@/lib/agents/run';
+import { recordUsage, isMeteredKind } from '@/lib/commerce';
 
 function svc() {
   return createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   );
+}
+
+// ── Scheduled cadence (FMVN §4.5 / E2 / M4-M5) ───────────────────────────────
+// Weekly re-measure + monthly report & competitor patrol. Gated twice so it
+// never burns credits unintentionally:
+//   1. global kill-switch  SCHEDULED_SCANS_ENABLED=1
+//   2. per-project opt-in   projects.metadata.reporting ∈ {'weekly','monthly'}
+// Scheduled runs are metered (visibility) but NEVER quota-blocked — they are
+// the contracted deliverable, not client-initiated usage.
+
+function schedulingEnabled(): boolean {
+  return process.env.SCHEDULED_SCANS_ENABLED === '1';
+}
+
+// Active projects (with active org) opted into one of the given cadences.
+async function listScheduledProjects(cadences: string[]): Promise<{ id: string; organization_id: string }[]> {
+  const sb = svc();
+  const { data } = await sb
+    .from('projects')
+    .select('id, organization_id, metadata, status, organizations!inner(status)')
+    .eq('status', 'active')
+    .in('metadata->>reporting', cadences);
+  return (data ?? [])
+    .filter((p: any) => p.organizations?.status === 'active')
+    .map((p: any) => ({ id: p.id, organization_id: p.organization_id }));
+}
+
+// Insert a queued run + hand off to Inngest, exactly like the HTTP endpoint but
+// server-side (no quota gate). Returns the new run id, or null on failure.
+async function enqueueScheduledRun(projectId: string, organizationId: string, agentId: string): Promise<string | null> {
+  const sb = svc();
+  const { data: run, error } = await sb
+    .from('agent_runs')
+    .insert({ project_id: projectId, agent_id: agentId, trigger_method: 'schedule', status: 'queued' })
+    .select('id')
+    .single();
+  if (error || !run) return null;
+  await inngest.send({ name: 'agent/run.requested', data: { runId: run.id, agentId, projectId } });
+  if (isMeteredKind(agentId)) await recordUsage({ orgId: organizationId, projectId, agentRunId: run.id, kind: agentId });
+  return run.id;
 }
 
 // Handles 'agent/run.requested' — runs the requested agent end-to-end.
@@ -59,4 +100,41 @@ export const runAgent = inngest.createFunction(
   },
 );
 
-export const functions = [runAgent];
+// Weekly re-measure (Mondays 02:00 UTC) — fresh scorecard + trend + competitor
+// patrol for projects opted into weekly reporting. This is the "周报" data pull.
+export const scheduledWeekly = inngest.createFunction(
+  { id: 'scheduled-weekly', name: 'Weekly GEO re-measure', triggers: [{ cron: '0 2 * * 1' }] },
+  async ({ step }) => {
+    if (!schedulingEnabled()) return { skipped: 'SCHEDULED_SCANS_ENABLED!=1' };
+    const projects = await step.run('list-weekly', () => listScheduledProjects(['weekly']));
+    let enqueued = 0;
+    for (const p of projects) {
+      const id = await step.run(`monitor-${p.id}`, () => enqueueScheduledRun(p.id, p.organization_id, 'monitor'));
+      if (id) enqueued++;
+    }
+    return { cadence: 'weekly', projects: projects.length, enqueued };
+  },
+);
+
+// Monthly (1st, 03:00 UTC) — re-measure for monthly-cadence projects, then a
+// report for every scheduled project. Covers M4 competitor patrol + M5 monthly
+// maintenance report. Report synthesizes the latest scorecard.
+export const scheduledMonthly = inngest.createFunction(
+  { id: 'scheduled-monthly', name: 'Monthly GEO report & patrol', triggers: [{ cron: '0 3 1 * *' }] },
+  async ({ step }) => {
+    if (!schedulingEnabled()) return { skipped: 'SCHEDULED_SCANS_ENABLED!=1' };
+    const monthly = await step.run('list-monthly', () => listScheduledProjects(['monthly']));
+    for (const p of monthly) {
+      await step.run(`monitor-${p.id}`, () => enqueueScheduledRun(p.id, p.organization_id, 'monitor'));
+    }
+    const all = await step.run('list-all', () => listScheduledProjects(['weekly', 'monthly']));
+    let reports = 0;
+    for (const p of all) {
+      const id = await step.run(`report-${p.id}`, () => enqueueScheduledRun(p.id, p.organization_id, 'report'));
+      if (id) reports++;
+    }
+    return { cadence: 'monthly', monitored: monthly.length, reports };
+  },
+);
+
+export const functions = [runAgent, scheduledWeekly, scheduledMonthly];

@@ -38,6 +38,7 @@ interface MonitorInput {
   targetLanguage?: string | null;
   industry?: string | null;
   promptSet: PromptCategory[];
+  keyPrompts?: string[];
   knownCompetitors?: string[];
 }
 
@@ -121,25 +122,36 @@ function round(n: number): number {
   return Math.round(n);
 }
 
-// Evenly sample up to `cap` prompts across funnel stages.
-function sampleAcrossStages(
-  promptSet: PromptCategory[],
-  cap: number,
-): { stage: string; label: string; prompt: string }[] {
-  const flat: { stage: string; label: string; prompt: string }[] = [];
+type Sampled = { stage: string; label: string; prompt: string; key: boolean };
+
+function normKey(s: string): string {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+// Select up to `cap` prompts to measure. The 20 "key" prompts (FMVN §4.2) are
+// ALWAYS included first (close monitoring — measured every scan); the rest of
+// the budget is filled stage-balanced from the non-key library for breadth.
+function selectSample(promptSet: PromptCategory[], keyPrompts: string[], cap: number): Sampled[] {
+  const keySet = new Set((keyPrompts || []).map(normKey));
+  const flat: Sampled[] = [];
   for (const c of promptSet) {
     for (const p of c.prompts || []) {
-      flat.push({ stage: c.category || 'general', label: c.label || c.category || 'general', prompt: p });
+      flat.push({ stage: c.category || 'general', label: c.label || c.category || 'general', prompt: p, key: keySet.has(normKey(p)) });
     }
   }
   if (flat.length <= cap) return flat;
-  const byStage = new Map<string, typeof flat>();
-  for (const f of flat) {
+
+  const keyed = flat.filter((f) => f.key);
+  const rest = flat.filter((f) => !f.key);
+  const picked: Sampled[] = keyed.slice(0, cap); // all key prompts first
+
+  // Fill remaining slots stage-balanced from non-key prompts.
+  const byStage = new Map<string, Sampled[]>();
+  for (const f of rest) {
     if (!byStage.has(f.stage)) byStage.set(f.stage, []);
     byStage.get(f.stage)!.push(f);
   }
   const queues = Array.from(byStage.values());
-  const picked: typeof flat = [];
   let qi = 0;
   while (picked.length < cap && queues.some((q) => q.length)) {
     const q = queues[qi % queues.length];
@@ -267,6 +279,7 @@ interface RawAnswer {
   engine: string;
   stage: string;
   prompt: string;
+  key: boolean;
   text: string;
   brandPresentStr: boolean; // string-match fallback
   citations: string[];
@@ -277,6 +290,7 @@ interface Sample {
   engine: string;
   stage: string;
   prompt: string;
+  key: boolean;
   brandPresent: boolean;
   prominence: number;
   sentiment: Sentiment;
@@ -303,6 +317,11 @@ function computeDimensions(samples: Sample[]) {
   const competitorMentions = samples.reduce((a, s) => a + s.competitorsPresent.length, 0);
   const competitiveShare = brandHits + competitorMentions ? (brandHits / (brandHits + competitorMentions)) * 100 : 0;
 
+  // Top-of-Mind / first-recommendation rate (FMVN KPI 2.2): share of ALL queries
+  // where the brand is the featured / top recommendation (prominence == 3).
+  const topOfMind = mentioned.filter((s) => s.prominence >= 3).length;
+  const topOfMindRate = pct(topOfMind, queries);
+
   const aigvr =
     WEIGHTS.presence * presence +
     WEIGHTS.prominence * prominence +
@@ -322,6 +341,8 @@ function computeDimensions(samples: Sample[]) {
     sentiment: round(sentiment),
     citation: round(citation),
     competitiveShare: round(competitiveShare),
+    topOfMind,
+    topOfMindRate: round(topOfMindRate),
     aigvr: round(aigvr),
   };
 }
@@ -343,15 +364,19 @@ export async function runMonitorAgent(
 
   await emit({ event_type: 'milestone', payload: { label: 'Monitor started', step: 1, totalSteps: 5 } });
 
-  // 1. Sample prompts (stage-balanced, bounded)
+  // 1. Sample prompts — key prompts always included (close monitoring), rest
+  //    stage-balanced for breadth.
   const totalPrompts = input.promptSet.reduce((n, c) => n + (c.prompts?.length || 0), 0);
-  const sampled = sampleAcrossStages(input.promptSet, SAMPLE_CAP);
+  const keyPrompts = input.keyPrompts || [];
+  const sampled = selectSample(input.promptSet, keyPrompts, SAMPLE_CAP);
+  const keyUsed = sampled.filter((s) => s.key).length;
   await emit({ event_type: 'milestone', payload: { label: 'Sampling prompt set', step: 2, totalSteps: 5 } });
   await emit({
     event_type: 'log',
     payload: {
       text: `Measuring ${sampled.length} of ${totalPrompts} prompts × ${engines.length} engines = ${sampled.length * engines.length} queries` +
-        (serpKey ? ' (incl. real Google AI Overview).' : ' (Poe model APIs; Google AI Overview off — no SERP key).'),
+        (keyPrompts.length ? ` (incl. all ${keyUsed} key prompts)` : '') +
+        (serpKey ? ' · with real Google AI Overview.' : ' · Poe model APIs; Google AI Overview off (no SERP key).'),
     },
   });
 
@@ -398,6 +423,7 @@ export async function runMonitorAgent(
           engine: engine.label,
           stage: s.stage,
           prompt: s.prompt,
+          key: s.key,
           text,
           brandPresentStr: mentions(text, brandName),
           citations,
@@ -458,6 +484,7 @@ export async function runMonitorAgent(
         engine: a.engine,
         stage: a.stage,
         prompt: a.prompt,
+        key: a.key,
         brandPresent,
         prominence: v ? v.prominence : brandPresent ? 2 : 0,
         sentiment: v ? v.sentiment : brandPresent ? 'neutral' : 'none',
@@ -479,6 +506,10 @@ export async function runMonitorAgent(
 
   const stages = Array.from(new Set(samples.map((s) => s.stage)));
   const perStage = stages.map((st) => ({ stage: st, ...computeDimensions(samples.filter((s) => s.stage === st)) }));
+
+  // Key-set breakdown — the 20 close-monitored prompts (FMVN §4.2 / KPI 2.2).
+  const keySamples = samples.filter((s) => s.key);
+  const keySet = keySamples.length ? computeDimensions(keySamples) : null;
 
   // Competitor benchmark — presence rate across all samples, brand included.
   const bench = competitors.map((c) => {
@@ -519,13 +550,21 @@ export async function runMonitorAgent(
       sentiment: overall.sentiment,
       citation: overall.citation,
       competitiveShare: overall.competitiveShare,
+      topOfMindRate: overall.topOfMindRate,
+    },
+    // KPI 2.2 — first-recommendation rate, overall and on the close-monitored key set.
+    topOfMind: {
+      overallRate: overall.topOfMindRate,
+      keyRate: keySet ? keySet.topOfMindRate : null,
+      keySampled: keyUsed,
+      keyTotal: keyPrompts.length,
     },
     weights: WEIGHTS,
     competitors,
     engines: enginesUsed,
     surfaces: { realSurfaces: serpKey ? ['Google AI Overview'] : [], proxySurfaces: ENGINES.map((e) => e.label) },
-    sampled: { total: totalPrompts, used: sampled.length, queries: samples.length },
-    metrics: { overall, perEngine, perStage },
+    sampled: { total: totalPrompts, used: sampled.length, queries: samples.length, keyUsed, keyTotal: keyPrompts.length },
+    metrics: { overall, perEngine, perStage, keySet },
     competitorBenchmark: bench,
     brandRank,
     citations: { brandCited: brandCitedCount > 0, brandCitedCount, sampleSources: allSources },
@@ -537,6 +576,7 @@ export async function runMonitorAgent(
   const summary =
     `${brandName} — AIGVR ${overall.aigvr}/100 (across ${samples.length} AI queries). ` +
     `Appears in ${overall.presence}% of answers (rank #${brandRank} of ${bench.length}); ` +
+    `top-of-mind ${overall.topOfMindRate}%${keySet ? ` (key prompts ${keySet.topOfMindRate}%)` : ''}; ` +
     `prominence ${overall.prominence}, sentiment ${overall.sentiment}, competitive share ${overall.competitiveShare}. ` +
     `Strongest on ${bestEngine?.engine} (${bestEngine?.aigvr}), weakest on ${worstEngine?.engine} (${worstEngine?.aigvr}). ` +
     `${gaps.length} high-intent gaps.`;

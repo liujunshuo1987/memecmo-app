@@ -221,8 +221,9 @@ export async function executeAgentRun(
       const mon = await runStep('phase-monitor', async () => {
         await persistAndEmit({ event_type: 'milestone', payload: { label: 'Phase 2/3 · Monitor', step: 2, totalSteps: 3 } });
         const promptSet = ((disc.output as { promptSet?: unknown[] }).promptSet as { category: string; label: string; prompts: string[] }[]) || [];
+        const keyPrompts = ((disc.output as { keyPrompts?: unknown[] }).keyPrompts as string[]) || [];
         // No nested stepper: this whole phase is already one step.
-        const m = await runMonitorAgent({ ...base, promptSet }, bandedEmit(33, 33));
+        const m = await runMonitorAgent({ ...base, promptSet, keyPrompts }, bandedEmit(33, 33));
         const sa = await recordCitationsAndIndex(sb, project.id, runId, domainOf(project.brand_url || ''), (m.output as { rawSamples?: any[] }).rawSamples || []);
         (m.output as Record<string, unknown>).sourceAuthority = sa;
         await sb.from('assets').insert({
@@ -276,8 +277,11 @@ export async function executeAgentRun(
         throw new Error('No Discovery prompt set found for this project. Run Discovery first.');
       }
       let promptSet: { category: string; label: string; prompts: string[] }[] = [];
+      let keyPrompts: string[] = [];
       try {
-        promptSet = JSON.parse(psAsset.content)?.promptSet ?? [];
+        const ps = JSON.parse(psAsset.content);
+        promptSet = ps?.promptSet ?? [];
+        keyPrompts = Array.isArray(ps?.keyPrompts) ? ps.keyPrompts : [];
       } catch {
         throw new Error('Discovery prompt set asset is corrupted — re-run Discovery.');
       }
@@ -292,6 +296,7 @@ export async function executeAgentRun(
           targetLanguage: project.target_language,
           industry: project.industry,
           promptSet,
+          keyPrompts,
         },
         persistAndEmit,
       );

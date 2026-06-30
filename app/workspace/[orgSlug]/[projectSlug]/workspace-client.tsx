@@ -31,6 +31,7 @@ function pointFromOutput(runId: string, ts: string, output: any): ScanPoint | nu
     aigvr: sc.aigvrScore ?? null, presence: d.presence ?? null, rank: sc.brandRank ?? null,
     gaps: (sc.gaps || []).length, prominence: d.prominence ?? null, sentiment: d.sentiment ?? null,
     citation: d.citation ?? null, competitive: d.competitiveShare ?? null,
+    topOfMind: sc.topOfMind?.overallRate ?? d.topOfMindRate ?? null,
   };
 }
 
@@ -82,6 +83,8 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     Optimize: '内容', Site: '主页', Distribute: '分发', Encyclopedia: '百科', 'Copy kit': '复制全套', 'Copy brief': '复制简报',
     'Copy page': '复制页面', 'Copy schema': '复制 schema', 'Copy plan': '复制方案', 'Copy Markdown': '复制 Markdown',
     'AIGVR trend': 'AIGVR 趋势', 'vs previous scan': '对比上次扫描', 'Run another scan to track change.': '再扫一次即可追踪变化。',
+    'Top-of-mind rate': '首位推荐率', 'featured / first recommendation': '被作为首选/首位推荐',
+    'Top-of-mind · key prompts': '首位推荐率 · 重点 Prompt', 'key prompts monitored': '条重点 Prompt 已监测',
   },
   vi: {
     'Run full GEO scan': 'Chạy quét GEO đầy đủ', '…focus the agents': '…định hướng cho agent',
@@ -93,6 +96,8 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Key findings': 'Phát hiện chính', Recommendations: 'Khuyến nghị', 'Quick wins': 'Việc cần làm', Deliverables: 'Sản phẩm',
     'Full Scan': 'Quét đầy đủ', Profile: 'Hồ sơ', Discovery: 'Khám phá', Monitor: 'Giám sát', Report: 'Báo cáo',
     Optimize: 'Nội dung', Site: 'Trang chủ', Distribute: 'Phân phối', Encyclopedia: 'Bách khoa',
+    'Top-of-mind rate': 'Tỷ lệ đề xuất đầu tiên', 'featured / first recommendation': 'được đề xuất đầu tiên',
+    'Top-of-mind · key prompts': 'Đề xuất đầu tiên · prompt trọng điểm', 'key prompts monitored': 'prompt trọng điểm được theo dõi',
   },
 };
 function t(s: string): string {
@@ -535,6 +540,7 @@ function TrendPanel({ history }: { history: ScanPoint[] }) {
   const prev = history.length >= 2 ? history[history.length - 2] : null;
   const dA = prev && last.aigvr != null && prev.aigvr != null ? last.aigvr - prev.aigvr : null;
   const dP = prev && last.presence != null && prev.presence != null ? last.presence - prev.presence : null;
+  const dT = prev && last.topOfMind != null && prev.topOfMind != null ? last.topOfMind - prev.topOfMind : null;
   const dG = prev ? last.gaps - prev.gaps : null;
 
   // AIGVR sparkline
@@ -569,6 +575,7 @@ function TrendPanel({ history }: { history: ScanPoint[] }) {
       {prev ? (
         <div className="space-y-1 pt-1">
           <div className="flex items-center justify-between text-[11px]"><span className="text-faint">{t('Presence (SoV)')}</span><span className={dColor(dP)}>{arrow(dP)} {dP == null ? '—' : `${Math.abs(dP)}%`}</span></div>
+          <div className="flex items-center justify-between text-[11px]"><span className="text-faint">{t('Top-of-mind rate')}</span><span className={dColor(dT)}>{arrow(dT)} {dT == null ? '—' : `${Math.abs(dT)}%`}</span></div>
           <div className="flex items-center justify-between text-[11px]"><span className="text-faint">{t('High-intent gaps')}</span><span className={dColor(dG, false)}>{arrow(dG)} {dG == null ? '—' : Math.abs(dG)}</span></div>
           <div className="text-[10px] text-faint pt-1">{t('vs previous scan')}</div>
         </div>
@@ -588,6 +595,7 @@ function ContextPanel({ headlineAigvr, scoreRun, runsByAgent, totalAgents }: {
   const sc = scoreRun?.output?.scorecard ?? scoreRun?.output;
   const readyCount = Object.values(runsByAgent).filter((r) => r.status === 'completed').length;
   const presence = sc?.dimensions?.presence;
+  const topOfMind = sc?.topOfMind?.overallRate;
   const gaps = (sc?.gaps || []).length;
   const rank = sc?.brandRank;
   const benchN = (sc?.competitorBenchmark || []).length;
@@ -603,6 +611,7 @@ function ContextPanel({ headlineAigvr, scoreRun, runsByAgent, totalAgents }: {
         <div className="rounded-lg border border-edge bg-surface p-3 space-y-2">
           <div className="text-[10px] uppercase tracking-widest text-faint">{t('Latest scan')}</div>
           <ContextMetric label="Presence (SoV)" value={presence != null ? `${presence}%` : '—'} />
+          {topOfMind != null && <ContextMetric label="Top-of-mind rate" value={`${topOfMind}%`} />}
           <ContextMetric label="Brand rank" value={rank ? `#${rank} of ${benchN}` : '—'} />
           <ContextMetric label="High-intent gaps" value={String(gaps)} />
           <ContextMetric label="Cited sources" value={String(sources)} />
@@ -1289,6 +1298,9 @@ function SiteResult({ o }: { o: Record<string, any> }) {
 
 function DiscoveryResult({ o }: { o: Record<string, any> }) {
   const cats: any[] = o.promptSet || [];
+  const nk = (p: string) => p.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const keySet = new Set((o.keyPrompts || []).map((p: string) => nk(p)));
+  const isKey = (p: string) => keySet.has(nk(p));
   return (
     <div className="rounded-xl border border-edge bg-surface p-5 space-y-4">
       <div className="flex items-start justify-between gap-3">
@@ -1298,7 +1310,9 @@ function DiscoveryResult({ o }: { o: Record<string, any> }) {
         </div>
         <div className="text-right shrink-0">
           <div className="text-2xl font-bold text-ink leading-none tabular-nums">{o.promptCount ?? '—'}</div>
-          <div className="text-[10px] text-faint uppercase tracking-wider mt-0.5">prompts · {cats.length} stages</div>
+          <div className="text-[10px] text-faint uppercase tracking-wider mt-0.5">
+            prompts · {cats.length} stages{keySet.size ? ` · ${keySet.size} key` : ''}
+          </div>
         </div>
       </div>
 
@@ -1322,7 +1336,7 @@ function DiscoveryResult({ o }: { o: Record<string, any> }) {
               {(c.prompts || []).map((p: string, j: number) => (
                 <li key={j} className="flex gap-2 text-[12px] text-dim leading-snug">
                   <span className="text-faint flex-none tabular-nums">{j + 1}.</span>
-                  <span>{p}</span>
+                  <span>{p}{isKey(p) && <span className="ml-1.5 text-[9px] align-middle px-1 py-0.5 rounded bg-gold/15 text-gold uppercase tracking-wider">key</span>}</span>
                 </li>
               ))}
             </ul>
@@ -1355,6 +1369,8 @@ function MonitorResult({ o }: { o: Record<string, any> }) {
   const maxSov = Math.max(1, ...bench.map((b) => b.sovPct || 0));
   const gaps: any[] = o.gaps || [];
   const score = o.aigvrScore ?? 0;
+  const tom = o.topOfMind || {};
+  const hasTom = tom.overallRate != null;
 
   return (
     <div className="rounded-xl border border-edge bg-surface p-5 space-y-5">
@@ -1371,6 +1387,24 @@ function MonitorResult({ o }: { o: Record<string, any> }) {
           </div>
         </div>
       </div>
+
+      {/* Top-of-Mind / first-recommendation rate — the contract headline KPI */}
+      {hasTom && (
+        <div className="flex flex-wrap gap-2">
+          <div className="flex-1 min-w-[140px] rounded-lg border border-brand/40 bg-brand-soft/40 px-3 py-2">
+            <div className="text-[10px] uppercase tracking-wider text-faint">{t('Top-of-mind rate')}</div>
+            <div className="text-lg font-semibold text-ink tabular-nums">{tom.overallRate}%</div>
+            <div className="text-[10px] text-faint">{t('featured / first recommendation')}</div>
+          </div>
+          {tom.keyRate != null && (
+            <div className="flex-1 min-w-[140px] rounded-lg border border-gold/40 bg-gold/10 px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wider text-faint">{t('Top-of-mind · key prompts')}</div>
+              <div className="text-lg font-semibold text-ink tabular-nums">{tom.keyRate}%</div>
+              <div className="text-[10px] text-faint">{tom.keySampled}/{tom.keyTotal} {t('key prompts monitored')}</div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Radar + per-dimension breakdown */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">

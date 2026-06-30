@@ -155,6 +155,7 @@ export interface ScanPoint {
   sentiment: number | null;
   citation: number | null;
   competitive: number | null;
+  topOfMind: number | null;
 }
 
 export async function getScanHistory(projectId: string): Promise<ScanPoint[]> {
@@ -182,6 +183,7 @@ export async function getScanHistory(projectId: string): Promise<ScanPoint[]> {
         sentiment: d.sentiment ?? null,
         citation: d.citation ?? null,
         competitive: d.competitiveShare ?? null,
+        topOfMind: sc.topOfMind?.overallRate ?? d.topOfMindRate ?? null,
       };
     })
     .filter((p) => p.aigvr != null);
