@@ -56,10 +56,12 @@ const ENGINES: Engine[] = [
 const AIO_ENGINE: Engine = { key: 'google_aio', label: 'Google AI Overview', model: 'serpapi', kind: 'serp' };
 
 // Sample size balances rigor (more n per stage×engine cell = less noisy %)
-// against latency/cost. 24 prompts × 4 engines ≈ 96 queries (~5 min) gives
-// medium-to-high confidence per stage without the ~12 min a full 40 cost.
+// against latency/cost. Engines run concurrently, so wall-time ≈ the slowest
+// single engine, not the sum — keeps a single-invocation run under the ceiling.
 const SAMPLE_CAP = 24;
-const QUERY_CONCURRENCY = 8;
+const QUERY_CONCURRENCY = 5;     // per Poe engine (×4 engines in parallel ≈ 20 concurrent Poe calls)
+const SERP_CONCURRENCY = 6;      // Google AI Overview via SerpApi
+const SERP_TIMEOUT_MS = 30_000;  // bound the slowest engine: 24/6 × 30s ≈ 120s worst case
 
 // AIGVR composite weights (sum = 1.0).
 const WEIGHTS = { presence: 0.3, prominence: 0.25, sentiment: 0.15, citation: 0.1, competitiveShare: 0.2 };
@@ -385,13 +387,16 @@ export async function runMonitorAgent(
   const totalQueries = sampled.length * engines.length;
   let done = 0;
 
-  for (const engine of engines) {
+  // Engines run CONCURRENTLY (was sequential — that serialized ~250s of queries
+  // and pushed a single-invocation Monitor past the Vercel function-duration
+  // ceiling). Each engine still bounds its own internal concurrency.
+  await Promise.all(engines.map(async (engine) => {
     await emit({
       event_type: 'tool_call',
       payload: { tool: 'engine.query', engine: engine.label, model: engine.model, prompts: sampled.length, real: engine.kind === 'serp' },
     });
     try {
-      const conc = engine.kind === 'serp' ? 3 : QUERY_CONCURRENCY; // be gentle on the SERP API
+      const conc = engine.kind === 'serp' ? SERP_CONCURRENCY : QUERY_CONCURRENCY;
       const answers = await mapLimit(sampled, conc, async (s) => {
         let text = '';
         let citations: string[];
@@ -399,7 +404,7 @@ export async function runMonitorAgent(
           // Per-query resilience: one slow/failed AIO fetch must not sink the
           // whole engine. A timeout = "no AI Overview shown for this query".
           try {
-            const aio = await fetchGoogleAio(s.prompt, { gl: loc.gl, hl: loc.hl, key: serpKey! });
+            const aio = await fetchGoogleAio(s.prompt, { gl: loc.gl, hl: loc.hl, key: serpKey!, signal: AbortSignal.timeout(SERP_TIMEOUT_MS) });
             text = aio.text;
             citations = aio.citations;
           } catch {
@@ -446,7 +451,7 @@ export async function runMonitorAgent(
         payload: { text: `${engine.label} unavailable: ${err instanceof Error ? err.message : String(err)}` },
       });
     }
-  }
+  }));
 
   const allRaw = Array.from(rawByEngine.values()).flat();
   if (allRaw.length === 0) throw new Error('All engines failed — no measurements collected.');
@@ -459,13 +464,14 @@ export async function runMonitorAgent(
     payload: { text: competitors.length ? `Competitors named by the engines: ${competitors.join(', ')}` : 'No competitor brands surfaced.' },
   });
 
-  // 4. Judge pass — prominence + sentiment, per engine (one call each).
+  // 4. Judge pass — prominence + sentiment, per engine (one call each), run
+  //    concurrently across engines.
   await emit({ event_type: 'milestone', payload: { label: 'Scoring prominence & sentiment', step: 4, totalSteps: 5 } });
   const samples: Sample[] = [];
   let judgedEngines = 0;
-  for (const engine of engines) {
+  await Promise.all(engines.map(async (engine) => {
     const answers = rawByEngine.get(engine.label);
-    if (!answers || !answers.length) continue;
+    if (!answers || !answers.length) return;
     let verdicts: (Verdict | null)[] = new Array(answers.length).fill(null);
     try {
       verdicts = await judgeEngineAnswers(answers, brandName, competitors);
@@ -494,7 +500,7 @@ export async function runMonitorAgent(
         snippet: a.text.slice(0, 400),
       });
     });
-  }
+  }));
 
   // 5. Aggregate scorecard
   await emit({ event_type: 'milestone', payload: { label: 'Computing AIGVR scorecard', step: 5, totalSteps: 5 } });
