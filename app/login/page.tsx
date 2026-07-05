@@ -19,7 +19,9 @@ function LoginPageContent() {
   const [error, setError] = useState('');
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get('redirect') || '/dashboard';
+  // Accept both param names: server pages and the invite flow send ?next=,
+  // older links send ?redirect=.
+  const redirect = searchParams.get('redirect') || searchParams.get('next') || '/dashboard';
   const callbackError = searchParams.get('error');
   const { t } = useLanguage();
   const supabase = createClient();
@@ -177,12 +179,23 @@ function LoginPageContent() {
 
         <p className="text-center text-sm text-[#64748B] mt-6">
           {t('auth.noAccount')}{' '}
-          <Link
-            href="/waitlist"
-            className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors"
-          >
-            加入等待列表 →
-          </Link>
+          {redirect.startsWith('/invite/') ? (
+            // Invited users must be able to register directly — never funnel
+            // an invite into the waitlist.
+            <Link
+              href={`/signup?redirect=${encodeURIComponent(redirect)}`}
+              className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors"
+            >
+              创建账号 / Create account →
+            </Link>
+          ) : (
+            <Link
+              href="/waitlist"
+              className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors"
+            >
+              加入等待列表 →
+            </Link>
+          )}
         </p>
       </motion.div>
     </div>

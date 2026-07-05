@@ -53,12 +53,20 @@ export default async function InvitePage({ params }: { params: { token: string }
             </p>
 
             {!user && (
-              <Link
-                href={`/login?next=/invite/${params.token}`}
-                className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-brand px-4 py-2.5 text-sm font-medium text-on-brand"
-              >
-                Sign in to accept
-              </Link>
+              <div className="mt-6 space-y-2">
+                <Link
+                  href={`/signup?redirect=${encodeURIComponent(`/invite/${params.token}`)}&email=${encodeURIComponent(invite.email)}`}
+                  className="inline-flex w-full items-center justify-center rounded-xl bg-brand px-4 py-2.5 text-sm font-medium text-on-brand"
+                >
+                  Create account &amp; join
+                </Link>
+                <Link
+                  href={`/login?next=${encodeURIComponent(`/invite/${params.token}`)}`}
+                  className="inline-flex w-full items-center justify-center rounded-xl border border-edge px-4 py-2.5 text-sm font-medium text-ink hover:bg-raised"
+                >
+                  I already have an account
+                </Link>
+              </div>
             )}
 
             {user && emailMatches && <AcceptButton token={params.token} />}

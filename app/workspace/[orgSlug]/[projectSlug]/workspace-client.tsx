@@ -277,7 +277,8 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
       });
       const data = await res.json();
       if (!res.ok) {
-        setRunStatus({ status: 'failed', progress_pct: 0, summary: data.error || res.statusText, agentId, output: null });
+        // Prefer the human-readable message (e.g. quota_exceeded ships one).
+        setRunStatus({ status: 'failed', progress_pct: 0, summary: data.message || data.error || res.statusText, agentId, output: null });
         setSending(false);
         return;
       }

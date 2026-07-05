@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Mail, Lock, User, Building2, Eye, EyeOff, ArrowRight, CircleAlert as AlertCircle, CircleCheck as CheckCircle } from 'lucide-react';
@@ -11,9 +11,14 @@ import { createClient } from '@/lib/supabase/client';
 import { useLanguage } from '@/contexts/language-context';
 import OAuthButtons from '@/components/oauth-buttons';
 
-export default function SignupPage() {
+function SignupForm() {
+  const searchParams = useSearchParams();
+  // Honor both param names (invite flow / server pages send ?next= or ?redirect=)
+  // so a user who registers mid-flow lands back where they started (e.g. the
+  // invite-accept page) instead of an empty dashboard.
+  const redirect = searchParams.get('redirect') || searchParams.get('next') || '/dashboard';
   const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(searchParams.get('email') ?? '');
   const [password, setPassword] = useState('');
   const [company, setCompany] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -59,7 +64,7 @@ export default function SignupPage() {
     }
 
     if (data.session) {
-      router.push('/dashboard');
+      router.push(redirect);
       router.refresh();
       return;
     }
@@ -138,7 +143,7 @@ export default function SignupPage() {
             </motion.div>
           )}
 
-          <OAuthButtons redirectTo="/dashboard" />
+          <OAuthButtons redirectTo={redirect} />
 
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
@@ -262,7 +267,7 @@ export default function SignupPage() {
         <p className="text-center text-sm text-[#64748B] mt-6">
           {t('auth.hasAccount')}{' '}
           <Link
-            href="/login"
+            href={redirect !== '/dashboard' ? `/login?redirect=${encodeURIComponent(redirect)}` : '/login'}
             className="text-[#1D4ED8] hover:text-[#3B82F6] font-medium transition-colors"
           >
             {t('auth.signIn')}
@@ -270,5 +275,15 @@ export default function SignupPage() {
         </p>
       </motion.div>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  // useSearchParams requires a Suspense boundary for static prerender (same
+  // pattern as /login).
+  return (
+    <Suspense>
+      <SignupForm />
+    </Suspense>
   );
 }
