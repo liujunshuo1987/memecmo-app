@@ -86,6 +86,7 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Top-of-mind rate': '首位推荐率', 'featured / first recommendation': '被作为首选/首位推荐',
     'Top-of-mind · key prompts': '首位推荐率 · 重点 Prompt', 'key prompts monitored': '条重点 Prompt 已监测',
     Answers: '标准答案', 'Standard answer library': '标准答案库', 'the answer we want AI to give': '我们希望 AI 给出的答案',
+    'Export PDF': '导出 PDF',
   },
   vi: {
     'Run full GEO scan': 'Chạy quét GEO đầy đủ', '…focus the agents': '…định hướng cho agent',
@@ -100,6 +101,7 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Top-of-mind rate': 'Tỷ lệ đề xuất đầu tiên', 'featured / first recommendation': 'được đề xuất đầu tiên',
     'Top-of-mind · key prompts': 'Đề xuất đầu tiên · prompt trọng điểm', 'key prompts monitored': 'prompt trọng điểm được theo dõi',
     Answers: 'Câu trả lời chuẩn', 'Standard answer library': 'Thư viện câu trả lời chuẩn', 'the answer we want AI to give': 'câu trả lời ta muốn AI đưa ra',
+    'Export PDF': 'Xuất PDF',
   },
 };
 function t(s: string): string {
@@ -182,6 +184,25 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
       resultTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }, [isTerminal, runStatus?.output]);
+
+  // PDF export: closed <details> don't print their content — open them for the
+  // print pass, restore afterwards. Covers both the Export button and ⌘P.
+  useEffect(() => {
+    const opened: HTMLDetailsElement[] = [];
+    const before = () => {
+      document.querySelectorAll<HTMLDetailsElement>('main details:not([open])').forEach((d) => {
+        d.open = true;
+        opened.push(d);
+      });
+    };
+    const after = () => { opened.splice(0).forEach((d) => { d.open = false; }); };
+    window.addEventListener('beforeprint', before);
+    window.addEventListener('afterprint', after);
+    return () => {
+      window.removeEventListener('beforeprint', before);
+      window.removeEventListener('afterprint', after);
+    };
+  }, []);
 
   // Poll the read-only run observer while a run is active. Execution happens
   // in Inngest (server-side, durable) — this only reads status + new events.
@@ -290,9 +311,9 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
   };
 
   return (
-    <div className="min-h-screen lg:h-screen lg:overflow-hidden bg-canvas text-ink flex flex-col">
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden print:!h-auto print:!overflow-visible bg-canvas text-ink flex flex-col">
       {/* Top bar */}
-      <header className="border-b border-edge px-6 py-3 flex items-center justify-between bg-canvas/95 backdrop-blur z-10 shrink-0">
+      <header className="print-hide border-b border-edge px-6 py-3 flex items-center justify-between bg-canvas/95 backdrop-blur z-10 shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           <a href="/dashboard" className="text-xs tracking-[0.2em] text-faint uppercase hover:text-dim">MemeCMO.ai</a>
           <span className="text-faint">/</span>
@@ -342,7 +363,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
       </header>
 
       {/* Three-zone shell: nav rail | stage | context */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)_300px] min-h-0">
+      <div className="wz-shell flex-1 grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)_300px] min-h-0">
         {/* LEFT — deliverables nav */}
         <aside className="lg:border-r border-edge lg:overflow-y-auto px-4 py-4 space-y-4 lg:min-h-0">
           <div className="space-y-2">
@@ -393,7 +414,16 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3">
+              {/* Branded header — appears only on the exported PDF */}
+              <div className="print-only border-b-2 pb-3 mb-4" style={{ borderColor: 'var(--brand)' }}>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-xs tracking-[0.25em] uppercase text-dim">MemeCMO · GEO</span>
+                  <span className="text-xs text-faint">{new Date().toISOString().slice(0, 10)}</span>
+                </div>
+                <div className="text-xl font-semibold mt-1">{AGENTS[runStatus.agentId ?? '']?.displayName ?? 'Deliverable'}</div>
+                <div className="text-sm text-dim mt-0.5">{project.brand_name} · {project.target_country}</div>
+              </div>
+              <div className="print-hide flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-sm font-medium truncate flex items-center gap-2">
                     <span className="text-brand"><Icon name={runStatus.agentId ?? ''} size={16} /></span>
@@ -402,6 +432,14 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
                   <div className="text-[11px] text-faint">{runStatus.status} · {runStatus.progress_pct ?? 0}%</div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
+                  {isTerminal && runStatus.output && (
+                    <button
+                      onClick={() => window.print()}
+                      className="text-[11px] px-2.5 py-1 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition"
+                    >
+                      ⤓ {t('Export PDF')}
+                    </button>
+                  )}
                   {isTerminal && runStatus.agentId && (
                     <button
                       onClick={() => dispatchAgent(runStatus.agentId!)}
@@ -434,7 +472,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
                     onVersions={(v) => { if (activeRunId) setSandboxVersions((m) => ({ ...m, [activeRunId]: v })); }}
                     onDispatch={dispatchAgent}
                   />
-                  <details className="rounded border border-edge bg-surface">
+                  <details className="print-hide rounded border border-edge bg-surface">
                     <summary className="cursor-pointer px-3 py-2 text-[11px] uppercase tracking-widest text-faint select-none hover:text-dim">Process log · {activity.length} steps</summary>
                     <div className="px-3 pb-3 font-mono text-xs space-y-2 border-t border-edge pt-2">
                       {activity.map((ev) => (<ActivityRow key={ev.id} ev={ev} />))}
@@ -884,7 +922,7 @@ function AdvisoryChat({ projectId, agentId, output, onDispatch }: {
   };
   const QUICK = ['哪个缺口最该先打?', '为什么某些引擎上我可见度低?', '最该先做哪件事?'];
   return (
-    <div className="rounded-xl border border-edge bg-surface p-4 space-y-2">
+    <div className="print-hide rounded-xl border border-edge bg-surface p-4 space-y-2">
       <div className="text-[10px] uppercase tracking-widest text-faint">{t('Ask about this result')}</div>
       {thread.map((t, i) => (
         <div key={i} className="space-y-1">

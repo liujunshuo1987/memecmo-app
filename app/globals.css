@@ -90,6 +90,32 @@ body {
   color: var(--ink);
 }
 
+/* ── Deliverable export (print → Save as PDF) ─────────────────────────────
+   The browser is the PDF engine: hide app chrome, force the day palette,
+   let the stage flow as a document. `.print-only` blocks (branded header)
+   appear only on paper. */
+.print-only { display: none; }
+@media print {
+  /* Paper is white — force day palette regardless of active theme. */
+  .theme-night, .theme-day {
+    --canvas: #FFFFFF; --surface: #FFFFFF; --raised: #F4ECE6;
+    --edge: rgba(58,30,34,0.16); --edge-strong: rgba(58,30,34,0.26);
+    --ink: #2A2024; --dim: #574B48; --faint: #7C6E6A;
+    --brand: #C76B7A; --on-brand: #FFFFFF; --brand-soft: rgba(199,107,122,0.10);
+    --gold: #B6863A; --sage: #3F7D58; --garnet: #C0455C;
+  }
+  * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  /* All interactive chrome disappears from the document. */
+  button, textarea, input, select, .print-hide { display: none !important; }
+  .print-only { display: block !important; }
+  /* Collapse the 3-zone shell into a single flowing document. */
+  .wz-shell { display: block !important; }
+  .wz-shell > aside { display: none !important; }
+  .wz-shell > main { overflow: visible !important; height: auto !important; }
+  html, body { overflow: visible !important; height: auto !important; }
+  @page { margin: 14mm; }
+}
+
 ::selection {
   background: var(--brand-soft);
   color: var(--ink);
