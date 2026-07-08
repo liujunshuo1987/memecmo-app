@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Join the waitlist · MemeCMO.ai',
     description:
-      'Multi-agent GEO platform for Vietnam, Thailand, Indonesia, Philippines, Singapore, Malaysia. Built on the Guanlan Agent Library (观澜智能体库) R&D stack. Invite-only beta.',
+      'Multi-agent GEO platform for Vietnam, Thailand, Indonesia, Philippines, Singapore, Malaysia. Invite-only beta.',
     type: 'website',
   },
   robots: { index: true, follow: true },

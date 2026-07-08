@@ -9,9 +9,9 @@ import { useAuth } from '@/contexts/auth-context';
 
 const navLinks = [
   { label: '核心服务', href: '#ecosystem' },
-  { label: 'AI基线体检', href: '#ai-baseline' },
+  { label: 'AIGVR 扫描', href: '#ai-baseline' },
   { label: '方案定价', href: '/pricing' },
-  { label: '关于我们', href: '#founder' },
+  { label: '常见问题', href: '#faq' },
 ];
 
 const langLabels: Record<string, string> = {

@@ -26,7 +26,7 @@ export default function Hero() {
           <MemeCMOLogo height={48} className="opacity-95" showWordmark />
           <div className="h-10 w-px bg-white/15 hidden sm:block" />
           <span className="text-xs sm:text-sm tracking-[0.15em] text-gray-500 font-light uppercase">
-            by NeuronSpark Media-Tech
+            Generative Engine Optimization
           </span>
         </motion.div>
 

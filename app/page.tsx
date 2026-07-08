@@ -27,7 +27,9 @@ export default function Home() {
         </section>
         <GEOAuditSystem />
         <SEACommandCenterSection />
-        <FAQSection />
+        <section id="faq">
+          <FAQSection />
+        </section>
       </main>
       <Footer />
     </>

@@ -10,9 +10,6 @@ export default function SchemaOrg() {
     alternateName: [
       'MemeCMO',
       'MemeCMO.ai — GEO multi-agent platform',
-      '觀瀾智能體庫',
-      '观澜智能体库',
-      'Guanlan Agent Library',
     ],
     legalName: 'NeuronSpark Media-Tech Limited',
     taxID: '79792171',
@@ -26,10 +23,8 @@ export default function SchemaOrg() {
       addressCountry: 'HK',
     },
     description:
-      'MemeCMO.ai is the consumer-facing GEO (Generative Engine Optimization) multi-agent platform operated by NeuronSpark Media-Tech Limited (research arm: Guanlan Agent Library / 觀瀾智能體庫). MemeCMO.ai delivers AIGVR diagnostics, schema deployment, content seeding and competitive monitoring across ChatGPT, Perplexity, Gemini, Claude — purpose-built for brands entering Vietnam, Thailand, Indonesia, Philippines, Singapore, Malaysia.',
-    disambiguatingDescription:
-      'MemeCMO.ai is the product brand; Guanlan Agent Library (觀瀾智能體庫) is the R&D / research entity that develops the underlying multi-agent models. Both operate under NeuronSpark Media-Tech Limited (Hong Kong).',
-    slogan: 'Bridging the AI Perception Gap Between Global and Chinese LLM Ecosystems',
+      'MemeCMO.ai is a GEO (Generative Engine Optimization) multi-agent platform operated by NeuronSpark Media-Tech Limited. It measures and improves brand visibility across ChatGPT, Perplexity, Gemini, Claude and Google AI Overviews — AIGVR diagnostics, schema deployment, content assets and competitive monitoring, purpose-built for brands entering Vietnam, Thailand, Indonesia, Philippines, Singapore, Malaysia.',
+    slogan: 'Be the brand AI recommends — GEO for Southeast Asia',
     url: 'https://memecmo.ai',
     logo: {
       '@type': 'ImageObject',
@@ -58,63 +53,59 @@ export default function SchemaOrg() {
       'AI Visibility Optimization',
       'Cross-border AI Strategy',
     ],
-    sameAs: [
-      'https://www.linkedin.com/company/neurospark-media-tech',
-      'https://twitter.com/neurosparkmedia',
-    ],
   };
 
   const serviceSchema = {
     '@context': 'https://schema.org',
     '@type': 'Service',
     '@id': 'https://memecmo.ai/#service',
-    name: 'MemeCMO.ai GEO 諮詢服務',
+    name: 'MemeCMO.ai GEO 平台服務',
     description:
-      'MemeCMO.ai Media-Tech 提供跨越中美大模型的生成式引擎優化（GEO）與計算公關服務，包括業務架構重構、雙生態穿透、AI基線體檢與文獻級語料工程',
+      'MemeCMO.ai 提供面向東南亞市場的生成式引擎優化（GEO）SaaS 服務：AIGVR 可見度監測、GEO 內容資產生產、官網結構化數據部署與競品監測。',
     provider: {
       '@id': 'https://memecmo.ai/#organization',
     },
     url: 'https://memecmo.ai',
-    areaServed: ['CN', 'US', 'HK'],
-    serviceType: 'Business Consulting',
+    areaServed: ['VN', 'TH', 'ID', 'PH', 'SG', 'MY', 'HK'],
+    serviceType: 'Software as a Service',
     hasOfferCatalog: {
       '@type': 'OfferCatalog',
-      name: '核心服務目錄',
+      name: '核心產品目錄',
       itemListElement: [
         {
           '@type': 'Offer',
           itemOffered: {
             '@type': 'Service',
-            name: '業務架構重構',
+            name: 'AIGVR 可見度監測',
             description:
-              '基於GEO方法論，重新定義企業在AI生態中的戰略定位與業務模型',
+              '跨 ChatGPT、Gemini、Perplexity、Claude 與 Google AI Overview 的品牌可見度五維評分、首位推薦率與競品基準',
           },
         },
         {
           '@type': 'Offer',
           itemOffered: {
             '@type': 'Service',
-            name: '雙生態穿透',
+            name: 'GEO 內容資產',
             description:
-              '打通傳統搜索引擎與AI對話引擎雙生態，實現品牌認知的全域覆蓋與深度滲透',
+              '基於實測缺口自動生成目標語言的發佈級內容、FAQ 與標準答案庫',
           },
         },
         {
           '@type': 'Offer',
           itemOffered: {
             '@type': 'Service',
-            name: 'AI基線體檢',
+            name: '官網 Schema 部署',
             description:
-              '量化評估企業在主流AI模型（OpenAI、Claude、文心一言、通義千問等）中的認知基線',
+              '為官網生成可直接貼入的 schema.org JSON-LD 與 AEO 改造清單',
           },
         },
         {
           '@type': 'Offer',
           itemOffered: {
             '@type': 'Service',
-            name: '文獻級語料工程',
+            name: '第三方媒體投放與百科',
             description:
-              '構建高質量、結構化的企業知識語料庫，提升AI模型對品牌的認知準確度',
+              '基於 Source-Authority 引用索引產出媒體投遞稿、目錄提交與百科建設路徑',
           },
         },
       ],
@@ -124,7 +115,7 @@ export default function SchemaOrg() {
       audienceType: 'B2B Enterprise',
       geographicArea: {
         '@type': 'Place',
-        name: '全球',
+        name: 'Southeast Asia',
       },
     },
   };

@@ -98,7 +98,7 @@ export function ExecutiveSummary() {
               <span className="text-muted-foreground">建议响应周期: 14 工作日内</span>
             </div>
             <div className="flex items-center gap-2 text-muted-foreground">
-              <span>分析师: 观澜 GEO-VIET 小组</span>
+              <span>分析师: MemeCMO GEO-VIET 小组</span>
               <span className="text-border">|</span>
               <span>审核: L3 通过</span>
             </div>
