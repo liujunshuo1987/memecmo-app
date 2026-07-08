@@ -7,6 +7,14 @@ const nextConfig = {
   async redirects() {
     return [
       {
+        // app.memecmo.ai is the product domain; the marketing homepage lives
+        // on memecmo.ai (separate deployment). Config-level redirect ensures
+        // a proper Location header (a static page-level redirect() does not).
+        source: '/',
+        destination: '/dashboard',
+        permanent: false,
+      },
+      {
         source: '/privacy-policy',
         destination: '/privacy',
         permanent: true,
