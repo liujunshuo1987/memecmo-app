@@ -116,7 +116,7 @@ function SignupForm() {
         className="relative w-full max-w-md"
       >
         <div className="text-center mb-8">
-          <Link href="/" className="inline-block mb-6">
+          <Link href="https://memecmo.ai" className="inline-block mb-6">
             <img
               src="/logo.svg"
               alt="MemeCMO.ai Media-Tech"

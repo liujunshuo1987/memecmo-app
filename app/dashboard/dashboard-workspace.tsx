@@ -82,7 +82,7 @@ export default function DashboardClient({ groups, userEmail, isRootAdmin, billin
   return (
     <div className="min-h-screen bg-canvas text-ink">
       <header className="border-b border-edge px-6 py-3 flex items-center justify-between sticky top-0 bg-canvas/95 backdrop-blur z-10">
-        <a href="/" className="text-xs tracking-[0.2em] text-dim uppercase hover:text-ink">
+        <a href="https://memecmo.ai" className="text-xs tracking-[0.2em] text-dim uppercase hover:text-ink">
           MemeCMO.ai
         </a>
         <div className="flex items-center gap-3 text-xs text-dim">

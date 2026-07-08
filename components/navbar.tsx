@@ -7,11 +7,12 @@ import MemeCMOLogo from './memecmo-logo';
 import { useLanguage } from '@/contexts/language-context';
 import { useAuth } from '@/contexts/auth-context';
 
+// The marketing homepage lives on https://memecmo.ai; this navbar serves the
+// product pages (pricing/waitlist/terms/…) on app.memecmo.ai.
 const navLinks = [
-  { label: '核心服务', href: '#ecosystem' },
-  { label: 'AIGVR 扫描', href: '#ai-baseline' },
+  { label: '首页', href: 'https://memecmo.ai' },
   { label: '方案定价', href: '/pricing' },
-  { label: '常见问题', href: '#faq' },
+  { label: '工作台', href: '/dashboard' },
 ];
 
 const langLabels: Record<string, string> = {
@@ -40,9 +41,9 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-3 group">
+            <a href="https://memecmo.ai" className="flex items-center gap-3 group">
               <MemeCMOLogo height={30} className="opacity-90 group-hover:opacity-100 transition-opacity duration-300" showWordmark />
-            </Link>
+            </a>
           </div>
 
           <div className="hidden lg:flex items-center gap-1">

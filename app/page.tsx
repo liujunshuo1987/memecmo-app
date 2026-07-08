@@ -1,37 +1,11 @@
-import Navbar from '@/components/navbar';
-import Hero from '@/components/hero';
-import DualEcosystem from '@/components/dual-ecosystem';
-import MethodologySection from '@/components/methodology-section';
-import AIVisibilityScanner from '@/components/ai-visibility-scanner';
-import GEOAuditSystem from '@/components/geo-audit-system';
-import FAQSection from '@/components/faq-section';
-import Footer from '@/components/footer';
-import SchemaOrg from '@/components/schema-org';
-import { GEOStructuredData } from '@/components/geo-structured-data';
-import SEACommandCenterSection from '@/components/sea-command-center-section';
-import { SEACommandCenterSchemaLD } from '@/components/sea-command-center-schema';
+// app.memecmo.ai is the product domain — the marketing homepage lives on
+// https://memecmo.ai (separate deployment). The legacy marketing page that
+// used to render here confused the two brands, so the app root now routes
+// straight into the product: /dashboard (which itself redirects to /login
+// when unauthenticated).
+
+import { redirect } from 'next/navigation';
 
 export default function Home() {
-  return (
-    <>
-      <SchemaOrg />
-      <GEOStructuredData />
-      <SEACommandCenterSchemaLD />
-      <Navbar />
-      <main className="flex-1">
-        <Hero />
-        <DualEcosystem />
-        <MethodologySection />
-        <section id="ai-baseline">
-          <AIVisibilityScanner />
-        </section>
-        <GEOAuditSystem />
-        <SEACommandCenterSection />
-        <section id="faq">
-          <FAQSection />
-        </section>
-      </main>
-      <Footer />
-    </>
-  );
+  redirect('/dashboard');
 }

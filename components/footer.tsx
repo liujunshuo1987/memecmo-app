@@ -27,8 +27,8 @@ export default function Footer() {
             <h4 className="text-sm font-semibold text-white tracking-wide">产品 Product</h4>
             <ul className="space-y-2.5">
               <li>
-                <a href="#ai-baseline" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
-                  AIGVR 扫描 · AI Visibility Scan
+                <a href="https://memecmo.ai" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
+                  首页 · Home
                 </a>
               </li>
               <li>
