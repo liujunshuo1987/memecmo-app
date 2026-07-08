@@ -235,6 +235,7 @@ function InviteModal({ org, onClose }: { org: Organization; onClose: () => void 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [link, setLink] = useState<string | null>(null);
+  const [emailSent, setEmailSent] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const submit = async () => {
@@ -248,6 +249,7 @@ function InviteModal({ org, onClose }: { org: Organization; onClose: () => void 
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Failed to create invite'); setBusy(false); return; }
       setLink(data.acceptUrl);
+      setEmailSent(!!data.emailSent);
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
     setBusy(false);
   };
@@ -291,7 +293,15 @@ function InviteModal({ org, onClose }: { org: Organization; onClose: () => void 
           </>
         ) : (
           <>
-            <p className="text-xs text-faint">Send this link to <span className="text-ink">{email}</span>. It expires in 14 days.</p>
+            {emailSent ? (
+              <div className="text-xs text-sage bg-sage/10 border border-sage/40 rounded px-3 py-2">
+                ✉️ Invitation emailed to <span className="font-medium">{email}</span>. The link below works too — it expires in 14 days.
+              </div>
+            ) : (
+              <div className="text-xs text-gold bg-gold/10 border border-gold/40 rounded px-3 py-2">
+                Email could not be auto-sent (sender domain pending verification) — copy the link below and send it to <span className="font-medium">{email}</span> yourself. It expires in 14 days.
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <input readOnly value={link} className="flex-1 bg-raised border border-edge rounded-md px-3 py-2 text-xs text-dim" />
               <button onClick={copy} className="text-xs px-3 py-2 rounded-md bg-brand text-on-brand hover:brightness-110 transition whitespace-nowrap">

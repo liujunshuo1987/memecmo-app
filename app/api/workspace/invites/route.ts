@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { serviceClient } from '@/lib/commerce';
+import { sendInviteEmail } from '@/lib/email';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -70,7 +71,25 @@ export async function POST(req: NextRequest) {
 
   const base = process.env.NEXT_PUBLIC_SITE_URL || req.nextUrl.origin;
   const acceptUrl = `${base}/invite/${invite.token}`;
-  return NextResponse.json({ ok: true, invite: { ...invite, token: undefined }, acceptUrl, org: { name: org.name, slug: org.slug } });
+
+  // Auto-send the invite email (best-effort). The accept link is always
+  // returned too, so a failed send degrades to manual sharing, never blocks.
+  const emailResult = await sendInviteEmail({
+    to: email,
+    orgName: org.name,
+    role,
+    acceptUrl,
+    expiresAt: invite.expires_at,
+  });
+
+  return NextResponse.json({
+    ok: true,
+    invite: { ...invite, token: undefined },
+    acceptUrl,
+    emailSent: emailResult.sent,
+    emailError: emailResult.sent ? undefined : emailResult.error,
+    org: { name: org.name, slug: org.slug },
+  });
 }
 
 export async function GET(req: NextRequest) {
