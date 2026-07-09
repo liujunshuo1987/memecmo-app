@@ -60,6 +60,17 @@ interface ProjectLite {
   industry: string | null;
 }
 
+// Frozen competitor set (score stability) lives on projects.metadata.
+async function loadCompetitorSet(sb: ReturnType<typeof svc>, projectId: string): Promise<any | null> {
+  const { data } = await sb.from('projects').select('metadata').eq('id', projectId).maybeSingle();
+  return (data?.metadata as any)?.competitorSet ?? null;
+}
+async function persistCompetitorSet(sb: ReturnType<typeof svc>, projectId: string, set: unknown): Promise<void> {
+  const { data } = await sb.from('projects').select('metadata').eq('id', projectId).maybeSingle();
+  const metadata = { ...((data?.metadata as Record<string, unknown>) || {}), competitorSet: set };
+  await sb.from('projects').update({ metadata }).eq('id', projectId);
+}
+
 function svc() {
   return createServiceClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -209,6 +220,35 @@ export async function executeAgentRun(
       // they run exactly once even if a later phase resumes the function.
       const disc = await runStep('phase-discovery', async () => {
         await persistAndEmit({ event_type: 'milestone', payload: { label: 'Phase 1/3 · Discovery', step: 1, totalSteps: 3 } });
+        // Panel stability: regenerating the prompt library on every scan was
+        // the #1 source of score volatility (different questions → different
+        // numbers). Reuse the existing library unless it is missing, stale
+        // (>30 days), too small, or the user typed a fresh intent.
+        if (!userPrompt) {
+          const { data: ps } = await sb
+            .from('assets')
+            .select('content, created_at')
+            .eq('project_id', project.id)
+            .eq('type', 'prompt_set')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (ps?.content) {
+            try {
+              const parsed = JSON.parse(ps.content);
+              const count = (parsed.promptSet || []).reduce((n: number, c: any) => n + (c.prompts || []).length, 0);
+              const ageDays = (Date.now() - new Date(ps.created_at).getTime()) / 86400000;
+              if (count >= 100 && ageDays < 30) {
+                await persistAndEmit({
+                  event_type: 'log',
+                  payload: { text: `Reusing the existing ${count}-prompt library (built ${Math.round(ageDays)}d ago) so scores stay comparable scan-to-scan. The library refreshes monthly, or run Discovery with a new focus to rebuild it.` },
+                });
+                await persistAndEmit({ event_type: 'progress', payload: { pct: 33 } });
+                return { summary: `Reused existing prompt library (${count} prompts).`, output: parsed };
+              }
+            } catch { /* corrupted asset → regenerate below */ }
+          }
+        }
         const d = await runDiscoveryAgent(base, bandedEmit(0, 33));
         await sb.from('assets').insert({
           project_id: project.id, agent_run_id: runId, type: 'prompt_set',
@@ -224,9 +264,15 @@ export async function executeAgentRun(
         const promptSet = ((disc.output as { promptSet?: unknown[] }).promptSet as { category: string; label: string; prompts: string[] }[]) || [];
         const keyPrompts = ((disc.output as { keyPrompts?: unknown[] }).keyPrompts as string[]) || [];
         // No nested stepper: this whole phase is already one step.
-        const m = await runMonitorAgent({ ...base, promptSet, keyPrompts }, bandedEmit(33, 33));
+        const m = await runMonitorAgent(
+          { ...base, promptSet, keyPrompts, competitorSet: await loadCompetitorSet(sb, project.id) },
+          bandedEmit(33, 33),
+        );
         const sa = await recordCitationsAndIndex(sb, project.id, runId, domainOf(project.brand_url || ''), (m.output as { rawSamples?: any[] }).rawSamples || []);
         (m.output as Record<string, unknown>).sourceAuthority = sa;
+        if ((m.output as any).competitorSetRefreshed) {
+          await persistCompetitorSet(sb, project.id, (m.output as any).competitorSet);
+        }
         await sb.from('assets').insert({
           project_id: project.id, agent_run_id: runId, type: 'geo_scorecard',
           title: `${project.brand_name} — GEO visibility scorecard`, format: 'json',
@@ -330,11 +376,15 @@ export async function executeAgentRun(
           industry: project.industry,
           promptSet,
           keyPrompts,
+          competitorSet: await loadCompetitorSet(sb, project.id),
         },
         persistAndEmit,
       );
       const sa = await recordCitationsAndIndex(sb, project.id, runId, domainOf(project.brand_url || ''), (result.output as { rawSamples?: any[] }).rawSamples || []);
       (result.output as Record<string, unknown>).sourceAuthority = sa;
+      if ((result.output as any).competitorSetRefreshed) {
+        await persistCompetitorSet(sb, project.id, (result.output as any).competitorSet);
+      }
     } else if (agentId === 'report') {
       // Report turns the latest Monitor scorecard into a client deliverable.
       const { data: scAsset } = await sb

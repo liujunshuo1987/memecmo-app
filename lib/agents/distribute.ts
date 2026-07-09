@@ -101,7 +101,7 @@ export async function runDistributeAgent(
     .filter(Boolean)
     .join('\n');
 
-  await emit({ event_type: 'tool_call', payload: { tool: 'poe.chat', args: { model: DEFAULT_MODEL, purpose: 'Draft distribution kit' } } });
+  await emit({ event_type: 'tool_call', payload: { tool: 'engine.chat', args: { model: DEFAULT_MODEL, purpose: 'Draft distribution kit' } } });
   await emit({ event_type: 'progress', payload: { pct: 30 } });
 
   const res = await poeChat({
@@ -114,7 +114,7 @@ export async function runDistributeAgent(
     temperature: 0.5,
   });
 
-  await emit({ event_type: 'tool_result', payload: { tool: 'poe.chat', tokens: res.usage?.total ?? null, latencyMs: res.latencyMs } });
+  await emit({ event_type: 'tool_result', payload: { tool: 'engine.chat', tokens: res.usage?.total ?? null, latencyMs: res.latencyMs } });
   await emit({ event_type: 'progress', payload: { pct: 70 } });
 
   let parsed: { targets: Target[] };
@@ -151,7 +151,7 @@ export async function runDistributeAgent(
       language: langCode,
       targets: list,
       fullMarkdown: mdStr,
-      generatedBy: `poe:${res.model}`,
+      generatedBy: `${res.model}`,
     },
   };
 }

@@ -136,7 +136,7 @@ export async function runSiteAgent(
       'this brand. Return ONLY the JSON, nothing after it.',
   ].join('\n');
 
-  await emit({ event_type: 'tool_call', payload: { tool: 'poe.chat', args: { model: DEFAULT_MODEL, purpose: 'AEO site audit' } } });
+  await emit({ event_type: 'tool_call', payload: { tool: 'engine.chat', args: { model: DEFAULT_MODEL, purpose: 'AEO site audit' } } });
   await emit({ event_type: 'progress', payload: { pct: 55 } });
 
   const res = await poeChat({
@@ -149,7 +149,7 @@ export async function runSiteAgent(
     temperature: 0.4,
   });
 
-  await emit({ event_type: 'tool_result', payload: { tool: 'poe.chat', tokens: res.usage?.total ?? null, latencyMs: res.latencyMs } });
+  await emit({ event_type: 'tool_result', payload: { tool: 'engine.chat', tokens: res.usage?.total ?? null, latencyMs: res.latencyMs } });
   await emit({ event_type: 'progress', payload: { pct: 80 } });
 
   let parsed: SiteAuditJson;
@@ -195,7 +195,7 @@ export async function runSiteAgent(
       homepageEdits: edits,
       schema,
       fullMarkdown: md,
-      generatedBy: `poe:${res.model}`,
+      generatedBy: `${res.model}`,
     },
   };
 }

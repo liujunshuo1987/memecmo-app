@@ -38,12 +38,27 @@ export default async function WorkspacePage({ params }: PageProps) {
   const recentRuns = await getRecentRuns(projectAndOrg.project.id, 25);
   const scanHistory = await getScanHistory(projectAndOrg.project.id);
 
+  // Operators (members of the MemeCMO root org) may open the raw execution
+  // trace; clients see the curated progress view only.
+  const { data: rootOrg } = await supabase.from('organizations').select('id').eq('type', 'root').maybeSingle();
+  let isOperator = false;
+  if (rootOrg) {
+    const { data: mem } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', rootOrg.id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    isOperator = !!mem;
+  }
+
   return (
     <WorkspaceClient
       project={projectAndOrg.project}
       organization={projectAndOrg.organization}
       initialRuns={recentRuns}
       scanHistory={scanHistory}
+      isOperator={isOperator}
     />
   );
 }

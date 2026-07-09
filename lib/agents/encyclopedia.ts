@@ -95,7 +95,7 @@ export async function runEncyclopediaAgent(
     'Rules: be candid in the verdict. If not_yet/borderline, still provide a SHORT draft (so it is ready when notability is reached) but emphasize existingArticleTargets + build_notability_first. Keep the draft to a lead + 2-4 short sections. All prose in ' + languageName + '. Return ONLY the JSON.',
   ].join('\n');
 
-  await emit({ event_type: 'tool_call', payload: { tool: 'poe.chat', args: { model: DEFAULT_MODEL, purpose: 'Encyclopedia notability + draft' } } });
+  await emit({ event_type: 'tool_call', payload: { tool: 'engine.chat', args: { model: DEFAULT_MODEL, purpose: 'Encyclopedia notability + draft' } } });
   await emit({ event_type: 'progress', payload: { pct: 40 } });
 
   const res = await poeChat({
@@ -108,7 +108,7 @@ export async function runEncyclopediaAgent(
     temperature: 0.4,
   });
 
-  await emit({ event_type: 'tool_result', payload: { tool: 'poe.chat', tokens: res.usage?.total ?? null, latencyMs: res.latencyMs } });
+  await emit({ event_type: 'tool_result', payload: { tool: 'engine.chat', tokens: res.usage?.total ?? null, latencyMs: res.latencyMs } });
   await emit({ event_type: 'progress', payload: { pct: 75 } });
 
   let parsed: EncyclopediaJson;
@@ -158,7 +158,7 @@ export async function runEncyclopediaAgent(
       citationPlan: parsed.citationPlan || [],
       existingArticleTargets: parsed.existingArticleTargets || [],
       fullMarkdown: md,
-      generatedBy: `poe:${res.model}`,
+      generatedBy: `${res.model}`,
     },
   };
 }

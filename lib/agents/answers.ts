@@ -151,7 +151,7 @@ export async function runStandardAnswersAgent(
     localLangName: localLang,
     count: answers.length,
     answers,
-    generatedBy: `poe:${DEFAULT_MODEL}`,
+    generatedBy: `${DEFAULT_MODEL}`,
   };
 
   return {

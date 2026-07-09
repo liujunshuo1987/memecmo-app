@@ -91,7 +91,7 @@ export async function runProfileAgent(
     .filter(Boolean)
     .join('\n');
 
-  await emit({ event_type: 'tool_call', payload: { tool: 'poe.chat', args: { model: DEFAULT_MODEL, purpose: 'Synthesize brand profile' } } });
+  await emit({ event_type: 'tool_call', payload: { tool: 'engine.chat', args: { model: DEFAULT_MODEL, purpose: 'Synthesize brand profile' } } });
   await emit({ event_type: 'progress', payload: { pct: 60 } });
 
   const res = await poeChat({
@@ -104,7 +104,7 @@ export async function runProfileAgent(
     temperature: 0.3,
   });
 
-  await emit({ event_type: 'tool_result', payload: { tool: 'poe.chat', tokens: res.usage?.total ?? null, latencyMs: res.latencyMs } });
+  await emit({ event_type: 'tool_result', payload: { tool: 'engine.chat', tokens: res.usage?.total ?? null, latencyMs: res.latencyMs } });
   await emit({ event_type: 'progress', payload: { pct: 85 } });
 
   let p: BrandProfile;
@@ -123,6 +123,6 @@ export async function runProfileAgent(
 
   return {
     summary: `Canonical brand profile: ${p.definition} (${(p.services || []).length} services, ${(p.facts || []).length} facts). ${site.ok ? 'Verified against homepage.' : 'From brand knowledge.'}`,
-    output: { ...p, sourcedFromHomepage: site.ok, generatedBy: `poe:${res.model}` },
+    output: { ...p, sourcedFromHomepage: site.ok, generatedBy: `${res.model}` },
   };
 }

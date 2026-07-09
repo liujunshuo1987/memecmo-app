@@ -184,7 +184,7 @@ export async function runReportAgent(
       'English. Be specific to this brand and market.',
   ].join('\n');
 
-  await emit({ event_type: 'tool_call', payload: { tool: 'poe.chat', args: { model: DEFAULT_MODEL, purpose: 'Compose GEO report' } } });
+  await emit({ event_type: 'tool_call', payload: { tool: 'engine.chat', args: { model: DEFAULT_MODEL, purpose: 'Compose GEO report' } } });
   await emit({ event_type: 'progress', payload: { pct: 25 } });
 
   const res = await poeChat({
@@ -197,7 +197,7 @@ export async function runReportAgent(
     temperature: 0.5,
   });
 
-  await emit({ event_type: 'tool_result', payload: { tool: 'poe.chat', tokens: res.usage?.total ?? null, latencyMs: res.latencyMs } });
+  await emit({ event_type: 'tool_result', payload: { tool: 'engine.chat', tokens: res.usage?.total ?? null, latencyMs: res.latencyMs } });
   await emit({ event_type: 'progress', payload: { pct: 65 } });
 
   let parsed: ReportJson;
@@ -236,7 +236,7 @@ export async function runReportAgent(
       aigvrScore: sc?.aigvrScore ?? null,
       ...parsed,
       markdown,
-      generatedBy: `poe:${res.model}`,
+      generatedBy: `${res.model}`,
     },
   };
 }

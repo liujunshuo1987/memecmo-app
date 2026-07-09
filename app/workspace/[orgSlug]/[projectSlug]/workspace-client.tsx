@@ -19,6 +19,7 @@ interface Props {
   organization: Organization;
   initialRuns: AgentRun[];
   scanHistory: ScanPoint[];
+  isOperator?: boolean;
 }
 
 // Extract a trend point from a monitor / full_scan run's output (mirrors getScanHistory).
@@ -77,7 +78,7 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Sources AI engines cite · AEO targets': 'AI 引擎引用的来源 · AEO 目标', 'Key findings': '关键发现',
     Recommendations: '建议', 'Quick wins': '速赢', 'AEO checklist': 'AEO 清单', 'Homepage edits': '主页修改',
     'Citation plan': '引用计划', 'Evidence needed to qualify': '达标所需证据', 'Get mentioned in existing articles': '进入已有词条被提及',
-    'Latest scan': '最近扫描', 'Presence (SoV)': '存在(声量)', 'Brand rank': '品牌排名', 'High-intent gaps': '高意图缺口',
+    'Latest scan': '最近扫描', 'Presence': '出现率', 'Share of Voice': '声量份额', 'Brand rank': '品牌排名', 'High-intent gaps': '高意图缺口',
     'Cited sources': '被引来源', Deliverables: '交付物', 'Structured view': '结构化视图', Refine: '改写', Ask: '问',
     'Full Scan': '完整扫描', Profile: '品牌档案', Discovery: '发现', Monitor: '监测', Report: '报告',
     Optimize: '内容', Site: '主页', Distribute: '分发', Encyclopedia: '百科', 'Copy kit': '复制全套', 'Copy brief': '复制简报',
@@ -87,6 +88,17 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Top-of-mind · key prompts': '首位推荐率 · 重点 Prompt', 'key prompts monitored': '条重点 Prompt 已监测',
     Answers: '标准答案', 'Standard answer library': '标准答案库', 'the answer we want AI to give': '我们希望 AI 给出的答案',
     'Export PDF': '导出 PDF', Guide: '使用说明',
+    'Getting started…': '正在启动…', 'Technical trace': '技术轨迹', 'This takes a few minutes — the run continues on the server, so you can leave this page and come back.': '大约需要几分钟——任务在服务器持续运行,你可以离开此页稍后回来。',
+    'Phase 1/3 · Discovery': '阶段 1/3 · 构建问题集', 'Phase 2/3 · Monitor': '阶段 2/3 · 向 AI 引擎提问并打分', 'Phase 3/3 · Report': '阶段 3/3 · 撰写报告',
+    'Monitor started': '监测启动', 'Sampling prompt set': '选取问题集', 'Identifying competitors': '识别竞品', 'Scoring prominence & sentiment': '逐条评分(位置与情感)', 'Computing AIGVR scorecard': '汇总评分卡', 'AIGVR scorecard ready': '评分卡就绪',
+    'Report started': '报告启动', 'Composing report': '撰写报告', 'Report ready': '报告就绪', 'Discovery complete': '问题集完成',
+    'Standard answers started': '标准答案启动', 'Generating answers': '生成答案', 'Standard answer library ready': '答案库就绪',
+    'Brand profile started': '品牌画像启动', 'Profile compiled': '画像完成', 'Brand profile ready': '画像就绪',
+    'Optimize started': '内容优化启动', 'Assembling page': '组装页面', 'Content draft ready': '内容稿就绪',
+    'Site audit started': '官网体检启动', 'Compiling fixes': '汇总改造项', 'Site upgrade ready': '改造方案就绪',
+    'Distribution started': '投放启动', 'Assembling kit': '组装投放包', 'Distribution kit ready': '投放包就绪',
+    'Encyclopedia assessment started': '百科评估启动', 'Assembling entry + path': '组装词条与路径', 'Encyclopedia plan ready': '百科方案就绪', 'Persisting asset': '保存交付物',
+
   },
   vi: {
     'Run full GEO scan': 'Chạy quét GEO đầy đủ', '…focus the agents': '…định hướng cho agent',
@@ -102,6 +114,10 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Top-of-mind · key prompts': 'Đề xuất đầu tiên · prompt trọng điểm', 'key prompts monitored': 'prompt trọng điểm được theo dõi',
     Answers: 'Câu trả lời chuẩn', 'Standard answer library': 'Thư viện câu trả lời chuẩn', 'the answer we want AI to give': 'câu trả lời ta muốn AI đưa ra',
     'Export PDF': 'Xuất PDF', Guide: 'Hướng dẫn',
+    'Getting started…': 'Đang khởi động…', 'Technical trace': 'Nhật ký kỹ thuật', 'This takes a few minutes — the run continues on the server, so you can leave this page and come back.': 'Mất vài phút — tác vụ chạy trên máy chủ, bạn có thể rời trang và quay lại sau.',
+    'Phase 1/3 · Discovery': 'Giai đoạn 1/3 · Xây bộ câu hỏi', 'Phase 2/3 · Monitor': 'Giai đoạn 2/3 · Hỏi các công cụ AI và chấm điểm', 'Phase 3/3 · Report': 'Giai đoạn 3/3 · Viết báo cáo',
+    'Identifying competitors': 'Nhận diện đối thủ', 'Scoring prominence & sentiment': 'Chấm điểm từng câu trả lời', 'Computing AIGVR scorecard': 'Tổng hợp bảng điểm', 'AIGVR scorecard ready': 'Bảng điểm sẵn sàng',
+
   },
 };
 function t(s: string): string {
@@ -119,7 +135,7 @@ const DELIVERABLE_GROUPS: { label: string; items: string[] }[] = [
 
 type LatestRun = { runId: string; summary: string | null; status: string; output: any; createdAt: string };
 
-export default function WorkspaceClient({ project, organization, initialRuns, scanHistory }: Props) {
+export default function WorkspaceClient({ project, organization, initialRuns, scanHistory, isOperator = false }: Props) {
   const [history, setHistory] = useState<ScanPoint[]>(scanHistory);
   const [runsByAgent, setRunsByAgent] = useState<Record<string, LatestRun>>(() => {
     const m: Record<string, LatestRun> = {};
@@ -161,6 +177,9 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
   } | null>(null);
   const [sending, setSending] = useState(false);
   const activityEndRef = useRef<HTMLDivElement>(null);
+  // Progress must only ever move forward (raw per-phase percentages regress —
+  // 56→59→58 reads as "broken" to a client watching the bar).
+  const maxPctRef = useRef(0);
   const resultTopRef = useRef<HTMLDivElement>(null);
   const freshRunRef = useRef(false);
 
@@ -277,6 +296,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
   const viewRun = (runId: string, agentId?: string) => {
     if (runId === activeRunId) return;
     freshRunRef.current = false;
+    maxPctRef.current = 0;
     setActivity([]);
     setRunStatus({ status: 'loading', progress_pct: 0, summary: null, agentId, output: null });
     setActiveRunId(runId);
@@ -287,6 +307,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
     if (sending) return;
     setSending(true);
     freshRunRef.current = true;
+    maxPctRef.current = 0;
     setActivity([]);
     setRunStatus({ status: 'queued', progress_pct: 0, summary: null, agentId, output: null });
     setActiveRunId(null);
@@ -415,7 +436,11 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
               <div className="text-sm text-dim">{t('Pick a deliverable on the left, or run a full GEO scan.')}</div>
               <div className="text-xs text-faint max-w-sm">Full Scan runs Discovery → Monitor → Report; then build AEO presence with Site / Content / Distribute / Encyclopedia.</div>
             </div>
-          ) : (
+          ) : (() => {
+            // Forward-only progress for display.
+            const displayPct = Math.max(maxPctRef.current, runStatus.progress_pct ?? 0);
+            maxPctRef.current = displayPct;
+            return (
             <div className="space-y-4">
               {/* Branded header — appears only on the exported PDF */}
               <div className="print-only border-b-2 pb-3 mb-4" style={{ borderColor: 'var(--brand)' }}>
@@ -432,7 +457,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
                     <span className="text-brand"><Icon name={runStatus.agentId ?? ''} size={16} /></span>
                     {AGENTS[runStatus.agentId ?? '']?.displayName ?? 'Agent run'}
                   </div>
-                  <div className="text-[11px] text-faint">{runStatus.status} · {runStatus.progress_pct ?? 0}%</div>
+                  <div className="text-[11px] text-faint">{runStatus.status} · {displayPct}%</div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   {isTerminal && runStatus.output && (
@@ -453,7 +478,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
                     </button>
                   )}
                   <div className="w-24 h-1.5 bg-raised rounded-full overflow-hidden">
-                    <div className={`h-full transition-all ${runStatus.status === 'failed' ? 'bg-garnet' : 'bg-sage'}`} style={{ width: `${runStatus.progress_pct ?? 0}%` }} />
+                    <div className={`h-full transition-all duration-700 ${runStatus.status === 'failed' ? 'bg-garnet' : 'bg-sage'}`} style={{ width: `${displayPct}%` }} />
                   </div>
                 </div>
               </div>
@@ -485,14 +510,16 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
               ) : isTerminal && runStatus.status === 'failed' ? (
                 <div className="text-sm text-garnet">{runStatus.summary || 'Run failed.'}</div>
               ) : (
-                <div className="font-mono text-xs space-y-2">
-                  {activity.length === 0 && <div className="text-faint italic">starting…</div>}
-                  {activity.map((ev) => (<ActivityRow key={ev.id} ev={ev} />))}
-                  <div ref={activityEndRef} />
-                </div>
+                <LiveProgress
+                  activity={activity}
+                  agentId={runStatus.agentId}
+                  isOperator={isOperator}
+                  endRef={activityEndRef}
+                />
               )}
             </div>
-          )}
+            );
+          })()}
         </main>
 
         {/* RIGHT — at-a-glance context */}
@@ -618,7 +645,7 @@ function TrendPanel({ history }: { history: ScanPoint[] }) {
       </svg>
       {prev ? (
         <div className="space-y-1 pt-1">
-          <div className="flex items-center justify-between text-[11px]"><span className="text-faint">{t('Presence (SoV)')}</span><span className={dColor(dP)}>{arrow(dP)} {dP == null ? '—' : `${Math.abs(dP)}%`}</span></div>
+          <div className="flex items-center justify-between text-[11px]"><span className="text-faint">{t('Presence')}</span><span className={dColor(dP)}>{arrow(dP)} {dP == null ? '—' : `${Math.abs(dP)}%`}</span></div>
           <div className="flex items-center justify-between text-[11px]"><span className="text-faint">{t('Top-of-mind rate')}</span><span className={dColor(dT)}>{arrow(dT)} {dT == null ? '—' : `${Math.abs(dT)}%`}</span></div>
           <div className="flex items-center justify-between text-[11px]"><span className="text-faint">{t('High-intent gaps')}</span><span className={dColor(dG, false)}>{arrow(dG)} {dG == null ? '—' : Math.abs(dG)}</span></div>
           <div className="text-[10px] text-faint pt-1">{t('vs previous scan')}</div>
@@ -657,7 +684,7 @@ function ContextPanel({ headlineAigvr, scoreRun, runsByAgent, totalAgents }: {
       {sc && (
         <div className="rounded-lg border border-edge bg-surface p-3 space-y-2">
           <div className="text-[10px] uppercase tracking-widest text-faint">{t('Latest scan')}</div>
-          <ContextMetric label="Presence (SoV)" value={presence != null ? `${presence}%` : '—'} />
+          <ContextMetric label="Presence" value={presence != null ? `${presence}%` : '—'} />
           {topOfMind != null && <ContextMetric label="Top-of-mind rate" value={`${topOfMind}%`} />}
           <ContextMetric label="Brand rank" value={rank ? `#${rank} of ${benchN}` : '—'} />
           <ContextMetric label="High-intent gaps" value={String(gaps)} />
@@ -668,6 +695,54 @@ function ContextPanel({ headlineAigvr, scoreRun, runsByAgent, totalAgents }: {
         <div className="text-[10px] uppercase tracking-widest text-faint mb-1">{t('Deliverables')}</div>
         <div className="text-sm text-ink">{readyCount} / {totalAgents} {t('ready')}</div>
       </div>
+    </div>
+  );
+}
+
+// Curated live-run view (client-facing): friendly current stage + completed
+// milestones + a "takes a few minutes" hint. The raw execution trace
+// (tool calls, output chunks, engine internals) is operator-only.
+function LiveProgress({ activity, agentId, isOperator, endRef }: {
+  activity: ActivityEvent[];
+  agentId?: string;
+  isOperator: boolean;
+  endRef: React.RefObject<HTMLDivElement>;
+}) {
+  const milestones = activity.filter((ev) => ev.event_type === 'milestone');
+  const currentLabel = milestones.length
+    ? String((milestones[milestones.length - 1].payload as any)?.label ?? '')
+    : '';
+  const past = milestones.slice(0, -1);
+  const longRun = agentId === 'monitor' || agentId === 'full_scan';
+  return (
+    <div className="max-w-md mx-auto py-10 space-y-6 text-center">
+      <div className="flex items-center justify-center gap-3">
+        <span className="inline-block w-4 h-4 rounded-full border-2 border-brand border-t-transparent animate-spin" />
+        <span className="text-sm text-ink font-medium">{currentLabel ? t(currentLabel) : t('Getting started…')}</span>
+      </div>
+      {longRun && (
+        <p className="text-xs text-faint">{t('This takes a few minutes — the run continues on the server, so you can leave this page and come back.')}</p>
+      )}
+      {past.length > 0 && (
+        <ul className="text-left inline-block space-y-1.5">
+          {past.map((m) => (
+            <li key={m.id} className="text-xs text-dim flex items-center gap-2">
+              <span className="text-sage">✓</span> {t(String((m.payload as any)?.label ?? ''))}
+            </li>
+          ))}
+        </ul>
+      )}
+      {isOperator && (
+        <details className="text-left rounded border border-edge bg-surface">
+          <summary className="cursor-pointer px-3 py-2 text-[11px] uppercase tracking-widest text-faint select-none hover:text-dim">
+            {t('Technical trace')} · {activity.length}
+          </summary>
+          <div className="px-3 pb-3 font-mono text-xs space-y-2 border-t border-edge pt-2 max-h-80 overflow-y-auto">
+            {activity.map((ev) => (<ActivityRow key={ev.id} ev={ev} />))}
+          </div>
+        </details>
+      )}
+      <div ref={endRef} />
     </div>
   );
 }
@@ -1447,11 +1522,11 @@ function StandardAnswersResult({ o }: { o: Record<string, any> }) {
 function MonitorResult({ o }: { o: Record<string, any> }) {
   const d = o.dimensions || {};
   const dims: { k: string; label: string }[] = [
-    { k: 'presence', label: 'Presence (SoV)' },
+    { k: 'presence', label: 'Presence' },
     { k: 'prominence', label: 'Prominence' },
     { k: 'sentiment', label: 'Sentiment' },
     { k: 'citation', label: 'Citation (AEO)' },
-    { k: 'competitiveShare', label: 'Competitive share' },
+    { k: 'competitiveShare', label: 'Share of Voice' },
   ];
   const radar = [
     { label: 'Presence', value: d.presence ?? 0 },
@@ -1526,13 +1601,13 @@ function MonitorResult({ o }: { o: Record<string, any> }) {
           <SectionLabel>By engine</SectionLabel>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {engines.map((e, i) => (
-              <div key={i} className={`rounded-lg border bg-surface px-2.5 py-2 ${e.kind === 'serp' ? 'border-gold/40' : 'border-edge'}`}>
+              <div key={i} className={`rounded-lg border bg-surface px-2.5 py-2 ${(e.kind === 'serp' || e.kind === 'surface') ? 'border-gold/40' : 'border-edge'}`}>
                 <div className="flex items-baseline justify-between gap-1">
                   <span className="text-[11px] text-dim truncate">{e.engine}</span>
                   <span className="text-[13px] font-bold tabular-nums" style={{ color: toneColor(e.aigvr || 0) }}>{e.aigvr ?? '—'}</span>
                 </div>
-                <div className="mt-1.5"><Bar value={e.aigvr} color={e.kind === 'serp' ? 'bg-gold' : 'bg-brand'} /></div>
-                <div className="mt-1 text-[9px] uppercase tracking-wider text-faint">{e.kind === 'serp' ? '● 真实界面 real surface' : 'API proxy'}</div>
+                <div className="mt-1.5"><Bar value={e.aigvr} color={(e.kind === 'serp' || e.kind === 'surface') ? 'bg-gold' : 'bg-brand'} /></div>
+                <div className="mt-1 text-[9px] uppercase tracking-wider text-faint">{(e.kind === 'serp' || e.kind === 'surface') ? '● 真实界面 real surface' : 'API proxy'}</div>
               </div>
             ))}
           </div>

@@ -105,7 +105,7 @@ export async function runOptimizeAgent(
     .filter(Boolean)
     .join('\n');
 
-  await emit({ event_type: 'tool_call', payload: { tool: 'poe.chat', args: { model: DEFAULT_MODEL, purpose: 'Draft GEO content' } } });
+  await emit({ event_type: 'tool_call', payload: { tool: 'engine.chat', args: { model: DEFAULT_MODEL, purpose: 'Draft GEO content' } } });
   await emit({ event_type: 'progress', payload: { pct: 25 } });
 
   const res = await poeChat({
@@ -118,7 +118,7 @@ export async function runOptimizeAgent(
     temperature: 0.6,
   });
 
-  await emit({ event_type: 'tool_result', payload: { tool: 'poe.chat', tokens: res.usage?.total ?? null, latencyMs: res.latencyMs } });
+  await emit({ event_type: 'tool_result', payload: { tool: 'engine.chat', tokens: res.usage?.total ?? null, latencyMs: res.latencyMs } });
   await emit({ event_type: 'progress', payload: { pct: 70 } });
 
   let parsed: ContentJson;
@@ -158,7 +158,7 @@ export async function runOptimizeAgent(
       faq,
       schemaJsonLd: schema,
       fullMarkdown,
-      generatedBy: `poe:${res.model}`,
+      generatedBy: `${res.model}`,
     },
   };
 }

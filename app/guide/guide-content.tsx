@@ -87,7 +87,7 @@ const T: Record<Lang, any> = {
     sampleTitle: '采样设计',
     sampleBody:
       '110 条库中,20 条重点 Prompt 每次全测,其余按阶段均衡抽样至上限 24 条;× 5 引擎 ≈ 120 次真实查询。单元格样本数决定置信标注:≥12 高 · ≥6 中 · <6 低。',
-    dimName: { presence: '可见度 Presence', prominence: '显著度 Prominence', competitiveShare: '竞争声量 Competitive Share', sentiment: '情感 Sentiment', citation: '引用 Citation' },
+    dimName: { presence: '出现率 Presence', prominence: '显著度 Prominence', competitiveShare: '声量份额 Share of Voice', sentiment: '情感 Sentiment', citation: '引用 Citation' },
     dimDef: {
       presence: '提及品牌的回答占全部查询的百分比。',
       prominence: '被提及时的位置得分均值:0 未提 · 1 顺带 · 2 多选之一 · 3 首选/重点推荐;按 ÷3×100 归一。',
@@ -184,7 +184,7 @@ const T: Record<Lang, any> = {
     sampleTitle: 'Sampling design',
     sampleBody:
       'All 20 key prompts are always measured; the rest are stage-balanced up to a cap of 24 prompts, × 5 engines ≈ 120 live queries per scan. Per-cell confidence: n≥12 high · n≥6 medium · below low.',
-    dimName: { presence: 'Presence', prominence: 'Prominence', competitiveShare: 'Competitive Share', sentiment: 'Sentiment', citation: 'Citation' },
+    dimName: { presence: 'Presence', prominence: 'Prominence', competitiveShare: 'Share of Voice (competitive)', sentiment: 'Sentiment', citation: 'Citation' },
     dimDef: {
       presence: '% of all queries whose answer mentions the brand.',
       prominence: 'Average position score when mentioned: 0 absent · 1 passing · 2 one-of-several · 3 featured/top; normalized ÷3 ×100.',
@@ -281,7 +281,7 @@ const T: Record<Lang, any> = {
     sampleTitle: 'Thiết kế lấy mẫu',
     sampleBody:
       '20 prompt trọng điểm luôn được đo đủ; phần còn lại lấy mẫu cân bằng theo giai đoạn tới trần 24 prompt; × 5 công cụ ≈ 120 truy vấn thật mỗi lần quét. Độ tin cậy theo ô: n≥12 cao · n≥6 trung bình · thấp hơn là thấp.',
-    dimName: { presence: 'Hiện diện', prominence: 'Nổi bật', competitiveShare: 'Thị phần cạnh tranh', sentiment: 'Cảm xúc', citation: 'Trích dẫn' },
+    dimName: { presence: 'Hiện diện', prominence: 'Nổi bật', competitiveShare: 'Thị phần giọng nói (SoV)', sentiment: 'Cảm xúc', citation: 'Trích dẫn' },
     dimDef: {
       presence: '% truy vấn có câu trả lời nhắc tới thương hiệu.',
       prominence: 'Điểm vị trí trung bình khi được nhắc: 0 vắng · 1 thoáng qua · 2 một-trong-nhiều · 3 đề xuất hàng đầu; chuẩn hóa ÷3 ×100.',

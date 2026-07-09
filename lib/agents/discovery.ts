@@ -143,7 +143,7 @@ export async function runDiscoveryAgent(
   });
 
   // ── Phase 1: framing (industry, sub-verticals, audience) ──────────────────
-  await emit({ event_type: 'tool_call', payload: { tool: 'poe.chat', args: { model: DEFAULT_MODEL, purpose: 'Frame GEO library' } } });
+  await emit({ event_type: 'tool_call', payload: { tool: 'engine.chat', args: { model: DEFAULT_MODEL, purpose: 'Frame GEO library' } } });
   await emit({ event_type: 'progress', payload: { pct: 10 } });
   const framingRes = await poeChat({
     model: DEFAULT_MODEL,
@@ -266,7 +266,7 @@ export async function runDiscoveryAgent(
     keyPrompts,
     keyCount: keyPrompts.length,
     model: framingRes.model,
-    generatedBy: `poe:${framingRes.model}`,
+    generatedBy: `${framingRes.model}`,
   };
 
   await emit({ event_type: 'progress', payload: { pct: 100 } });

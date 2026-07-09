@@ -40,7 +40,15 @@ interface MonitorInput {
   promptSet: PromptCategory[];
   keyPrompts?: string[];
   knownCompetitors?: string[];
+  // Frozen competitor set (score stability): reused for 30 days, then
+  // re-identified. Persisted on the project by run.ts.
+  competitorSet?: CompetitorSet | null;
 }
+
+export interface CompetitorGroup { canonical: string; aliases: string[] }
+export interface CompetitorSet { groups: CompetitorGroup[]; refreshedAt: string }
+
+const COMPETITOR_SET_TTL_MS = 30 * 24 * 3600 * 1000;
 
 // The AI answer engines we measure. Poe engines proxy the model APIs; the
 // Google AI Overview engine (kind 'serp') is the REAL Google surface — added at
@@ -128,6 +136,40 @@ type Sampled = { stage: string; label: string; prompt: string; key: boolean };
 
 function normKey(s: string): string {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+// Merge name variants of the same company ("Chicilon Media" / "Chicilon
+// Digital Media") into one canonical entry. Rule: two names merge when the
+// word set of one is a subset of the other's (order-insensitive) — safe
+// against false merges like "Golden Media" vs "Golden Screen" (neither is a
+// subset). Canonical = the shortest variant (usually the base brand).
+// Brand-name variants are excluded entirely.
+function mergeVariants(names: string[], brandName: string): CompetitorGroup[] {
+  const wordsOf = (s: string) => new Set(normKey(s).split(' ').filter(Boolean));
+  const isSubset = (a: Set<string>, b: Set<string>) => {
+    for (const w of a) if (!b.has(w)) return false;
+    return true;
+  };
+  const brandW = wordsOf(brandName);
+  const clean = names.filter((n) => {
+    const w = wordsOf(n);
+    return !(isSubset(w, brandW) || isSubset(brandW, w));
+  });
+  const sorted = [...clean].sort((x, y) => wordsOf(x).size - wordsOf(y).size || x.length - y.length);
+  const groups: CompetitorGroup[] = [];
+  for (const name of sorted) {
+    const w = wordsOf(name);
+    const g = groups.find((grp) => {
+      const cw = wordsOf(grp.canonical);
+      return isSubset(cw, w) || isSubset(w, cw);
+    });
+    if (g) {
+      if (normKey(g.canonical) !== normKey(name)) g.aliases.push(name);
+    } else {
+      groups.push({ canonical: name, aliases: [] });
+    }
+  }
+  return groups;
 }
 
 // Select up to `cap` prompts to measure. The 20 "key" prompts (FMVN §4.2) are
@@ -456,13 +498,47 @@ export async function runMonitorAgent(
   const allRaw = Array.from(rawByEngine.values()).flat();
   if (allRaw.length === 0) throw new Error('All engines failed — no measurements collected.');
 
-  // 3. Identify competitors from the REAL answers (self-calibrating).
+  // 3. Competitor set — frozen for 30 days for score stability (re-identifying
+  //    every scan was a major source of AIGVR volatility). Variants of the
+  //    same company are merged before the set is fixed.
   await emit({ event_type: 'milestone', payload: { label: 'Identifying competitors', step: 3, totalSteps: 5 } });
-  const competitors = await extractCompetitorsFromAnswers(allRaw, input);
-  await emit({
-    event_type: 'log',
-    payload: { text: competitors.length ? `Competitors named by the engines: ${competitors.join(', ')}` : 'No competitor brands surfaced.' },
-  });
+  const frozen = input.competitorSet;
+  const frozenFresh = !!frozen?.groups?.length && Date.now() - new Date(frozen.refreshedAt).getTime() < COMPETITOR_SET_TTL_MS;
+  let competitorGroups: CompetitorGroup[];
+  let competitorSetRefreshedAt: string;
+  let competitorSetRefreshed = false;
+  if (frozenFresh) {
+    competitorGroups = frozen!.groups;
+    competitorSetRefreshedAt = frozen!.refreshedAt;
+    await emit({
+      event_type: 'log',
+      payload: { text: `Tracking the frozen competitor set (${competitorGroups.length} brands, identified ${frozen!.refreshedAt.slice(0, 10)}) for score comparability — re-identified monthly.` },
+    });
+  } else {
+    const rawNames = await extractCompetitorsFromAnswers(allRaw, input);
+    competitorGroups = mergeVariants(rawNames, input.brandName);
+    competitorSetRefreshedAt = new Date().toISOString();
+    competitorSetRefreshed = true;
+    await emit({
+      event_type: 'log',
+      payload: { text: competitorGroups.length ? `Competitors named by the engines: ${competitorGroups.map((g) => g.canonical).join(', ')}` : 'No competitor brands surfaced.' },
+    });
+  }
+  const competitors = competitorGroups.map((g) => g.canonical);
+  // Any variant → its canonical name (judge output + string fallback).
+  const aliasToCanonical = new Map<string, string>();
+  for (const g of competitorGroups) {
+    aliasToCanonical.set(normKey(g.canonical), g.canonical);
+    for (const a of g.aliases) aliasToCanonical.set(normKey(a), g.canonical);
+  }
+  const canonicalOf = (name: string): string | null =>
+    aliasToCanonical.get(normKey(name)) ??
+    competitors.find((c) => mentions(name, c) || mentions(c, name)) ??
+    null;
+  // Judge sees canonical names with their aliases so it tags consistently.
+  const judgeTrackList = competitorGroups.map((g) =>
+    g.aliases.length ? `${g.canonical} (also known as: ${g.aliases.join(', ')})` : g.canonical,
+  );
 
   // 4. Judge pass — prominence + sentiment, per engine (one call each), run
   //    concurrently across engines.
@@ -474,7 +550,7 @@ export async function runMonitorAgent(
     if (!answers || !answers.length) return;
     let verdicts: (Verdict | null)[] = new Array(answers.length).fill(null);
     try {
-      verdicts = await judgeEngineAnswers(answers, brandName, competitors);
+      verdicts = await judgeEngineAnswers(answers, brandName, judgeTrackList);
     } catch {
       /* fall back to string-match below */
     }
@@ -483,9 +559,13 @@ export async function runMonitorAgent(
     answers.forEach((a, i) => {
       const v = verdicts[i];
       const brandPresent = v ? v.brandMentioned : a.brandPresentStr;
+      // Map every judged/matched variant to its canonical competitor so one
+      // company never counts twice under two spellings.
       const competitorsPresent = v && v.competitors.length
-        ? competitors.filter((c) => v.competitors.some((vc) => mentions(vc, c) || mentions(c, vc)))
-        : competitors.filter((c) => mentions(a.text, c));
+        ? Array.from(new Set(v.competitors.map(canonicalOf).filter((c): c is string => !!c)))
+        : competitorGroups
+            .filter((g) => [g.canonical, ...g.aliases].some((n) => mentions(a.text, n)))
+            .map((g) => g.canonical);
       samples.push({
         engine: a.engine,
         stage: a.stage,
@@ -508,7 +588,7 @@ export async function runMonitorAgent(
   const overall = computeDimensions(samples);
 
   const enginesUsed = Array.from(new Set(samples.map((s) => s.engine)));
-  const perEngine = enginesUsed.map((eng) => ({ engine: eng, kind: kindByLabel.get(eng) ?? 'poe', ...computeDimensions(samples.filter((s) => s.engine === eng)) }));
+  const perEngine = enginesUsed.map((eng) => ({ engine: eng, kind: (kindByLabel.get(eng) ?? 'poe') === 'serp' ? 'surface' : 'api', ...computeDimensions(samples.filter((s) => s.engine === eng)) }));
 
   const stages = Array.from(new Set(samples.map((s) => s.stage)));
   const perStage = stages.map((st) => ({ stage: st, ...computeDimensions(samples.filter((s) => s.stage === st)) }));
@@ -567,6 +647,8 @@ export async function runMonitorAgent(
     },
     weights: WEIGHTS,
     competitors,
+    competitorSet: { groups: competitorGroups, refreshedAt: competitorSetRefreshedAt },
+    competitorSetRefreshed,
     engines: enginesUsed,
     surfaces: { realSurfaces: serpKey ? ['Google AI Overview'] : [], proxySurfaces: ENGINES.map((e) => e.label) },
     sampled: { total: totalPrompts, used: sampled.length, queries: samples.length, keyUsed, keyTotal: keyPrompts.length },
@@ -576,7 +658,7 @@ export async function runMonitorAgent(
     citations: { brandCited: brandCitedCount > 0, brandCitedCount, sampleSources: allSources },
     gaps,
     rawSamples: samples,
-    generatedBy: engines.map((e) => (e.kind === 'serp' ? 'serpapi:google_aio' : `poe:${e.model}`)).join('+'),
+    generatedBy: engines.map((e) => (e.kind === 'serp' ? 'Google AI Overview' : e.model)).join(' + '),
   };
 
   const summary =
