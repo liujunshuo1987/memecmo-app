@@ -86,7 +86,7 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Top-of-mind rate': '首位推荐率', 'featured / first recommendation': '被作为首选/首位推荐',
     'Top-of-mind · key prompts': '首位推荐率 · 重点 Prompt', 'key prompts monitored': '条重点 Prompt 已监测',
     Answers: '标准答案', 'Standard answer library': '标准答案库', 'the answer we want AI to give': '我们希望 AI 给出的答案',
-    'Export PDF': '导出 PDF',
+    'Export PDF': '导出 PDF', Guide: '使用说明',
   },
   vi: {
     'Run full GEO scan': 'Chạy quét GEO đầy đủ', '…focus the agents': '…định hướng cho agent',
@@ -101,7 +101,7 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Top-of-mind rate': 'Tỷ lệ đề xuất đầu tiên', 'featured / first recommendation': 'được đề xuất đầu tiên',
     'Top-of-mind · key prompts': 'Đề xuất đầu tiên · prompt trọng điểm', 'key prompts monitored': 'prompt trọng điểm được theo dõi',
     Answers: 'Câu trả lời chuẩn', 'Standard answer library': 'Thư viện câu trả lời chuẩn', 'the answer we want AI to give': 'câu trả lời ta muốn AI đưa ra',
-    'Export PDF': 'Xuất PDF',
+    'Export PDF': 'Xuất PDF', Guide: 'Hướng dẫn',
   },
 };
 function t(s: string): string {
@@ -330,6 +330,9 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <a href="/guide" className="text-[11px] px-2 py-1 rounded-md border border-edge text-dim hover:text-ink transition whitespace-nowrap">
+            {t('Guide')}
+          </a>
           <button onClick={toggleTheme} aria-label="toggle theme" className="p-1.5 rounded-md border border-edge text-dim hover:text-ink transition">
             <Icon name={theme === 'night' ? 'sun' : 'moon'} size={15} />
           </button>

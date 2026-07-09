@@ -86,6 +86,9 @@ export default function DashboardClient({ groups, userEmail, isRootAdmin, billin
           MemeCMO.ai
         </a>
         <div className="flex items-center gap-3 text-xs text-dim">
+          <a href="/guide" className="px-2 py-1 rounded border border-edge hover:border-edge-strong hover:text-ink transition">
+            使用说明 Guide
+          </a>
           <span className="hidden sm:inline">{userEmail}</span>
           <button onClick={signOut} className="px-2 py-1 rounded border border-edge hover:border-edge-strong hover:text-ink transition">
             Sign out

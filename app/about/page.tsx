@@ -71,6 +71,8 @@ const entityGraph = {
         'AI-Ready Schema Optimization',
       ],
       slogan: 'Get Your Brand Recognized by AI · 讓 AI 記住你的品牌',
+      applicationCategory: 'BusinessApplication',
+      operatingSystem: 'Web',
       sameAs: ['https://www.icris.cr.gov.hk/csci/cps_criteria.do?corpNo=80218619'],
       founder: { '@id': 'https://memecmo.ai/#chen-songyin' },
       employee: [
