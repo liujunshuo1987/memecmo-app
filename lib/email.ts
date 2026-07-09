@@ -48,6 +48,53 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+export interface ReviewEmailArgs {
+  to: string;
+  brandName: string;
+  kindLabel: { en: string; vi: string };
+  reviewUrl: string;
+}
+
+/** Client-verification request email (bilingual EN/VI). Never throws. */
+export async function sendReviewEmail(args: ReviewEmailArgs): Promise<{ sent: boolean; error?: string }> {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) return { sent: false, error: 'RESEND_API_KEY not configured' };
+  const html = `<!doctype html>
+<html><body style="margin:0;padding:0;background:#FBF7F4;font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+  <div style="max-width:520px;margin:0 auto;padding:32px 20px;">
+    <div style="font-size:11px;letter-spacing:3px;color:#9C8E8A;text-transform:uppercase;margin-bottom:18px;">MemeCMO &middot; GEO</div>
+    <div style="background:#FFFFFF;border:1px solid rgba(58,30,34,0.12);border-radius:14px;padding:28px;">
+      <h1 style="margin:0 0 6px;font-size:18px;color:#2A2024;">Please verify: ${escapeHtml(args.kindLabel.en)}</h1>
+      <p style="margin:0 0 4px;font-size:13px;color:#6E625F;">Vui l&#242;ng x&#225;c nh&#7853;n: ${escapeHtml(args.kindLabel.vi)}</p>
+      <p style="margin:12px 0 20px;font-size:14px;color:#2A2024;line-height:1.55;">
+        We prepared the <strong>${escapeHtml(args.kindLabel.en)}</strong> for <strong>${escapeHtml(args.brandName)}</strong>.
+        Please review it and confirm the facts are correct — it takes about two minutes and everything we
+        publish will be grounded on what you approve.
+      </p>
+      <a href="${args.reviewUrl}" style="display:block;text-align:center;background:#C76B7A;color:#FFFFFF;text-decoration:none;font-size:14px;font-weight:600;padding:12px 18px;border-radius:10px;">Review &amp; confirm &middot; Xem &amp; x&#225;c nh&#7853;n</a>
+      <p style="margin:18px 0 0;font-size:12px;color:#9C8E8A;line-height:1.6;">
+        If the button doesn't work, open this link:<br/>
+        <a href="${args.reviewUrl}" style="color:#C76B7A;word-break:break-all;">${args.reviewUrl}</a>
+      </p>
+    </div>
+    <p style="margin:16px 0 0;font-size:11px;color:#9C8E8A;text-align:center;">MemeCMO.ai &mdash; Generative Engine Optimization</p>
+  </div>
+</body></html>`;
+  try {
+    const resend = new Resend(key);
+    const { error } = await resend.emails.send({
+      from: FROM,
+      to: [args.to],
+      subject: `Please verify: ${args.kindLabel.en} — ${args.brandName}`,
+      html,
+    });
+    if (error) return { sent: false, error: error.message };
+    return { sent: true };
+  } catch (e) {
+    return { sent: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 /** Send the invite email. Never throws — returns whether it was accepted by Resend. */
 export async function sendInviteEmail(args: InviteEmailArgs): Promise<{ sent: boolean; error?: string }> {
   const key = process.env.RESEND_API_KEY;

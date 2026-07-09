@@ -94,7 +94,8 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Export PDF': '导出 PDF', Guide: '使用说明',
     'Position when present': '出现时位置', 'Sentiment when present': '出现时情感', 'Citation strength': '引用强度',
     'Top-of-mind': '首位推荐', key: '重点', Rank: '排名', answers: '条回答', 'queries competitors win': '竞品占优的问题',
-    'By intent': '按意图', 'High intent': '高意图', Educational: '教育型',
+    'By intent': '按意图',
+    'Request client verification': '请客户核实', 'Awaiting client verification': '待客户确认', 'Verified by client': '客户已确认', 'Client requested changes': '客户要求修改', Send: '发送', 'Email not auto-sent — share the link:': '邮件未能自动发送——请手动分享链接:', 'High intent': '高意图', Educational: '教育型',
     'AI rarely names brands on educational questions — low presence there is normal; those prompts feed content topics.': '教育型问题里 AI 很少点名品牌——此处出现率低属正常;这些问题正是内容选题的来源。',
     'Getting started…': '正在启动…', 'Technical trace': '技术轨迹', 'This takes a few minutes — the run continues on the server, so you can leave this page and come back.': '大约需要几分钟——任务在服务器持续运行,你可以离开此页稍后回来。',
     'Phase 1/3 · Discovery': '阶段 1/3 · 构建问题集', 'Phase 2/3 · Monitor': '阶段 2/3 · 向 AI 引擎提问并打分', 'Phase 3/3 · Report': '阶段 3/3 · 撰写报告',
@@ -124,7 +125,8 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Export PDF': 'Xuất PDF', Guide: 'Hướng dẫn',
     'Position when present': 'Vị trí khi xuất hiện', 'Sentiment when present': 'Cảm xúc khi xuất hiện', 'Citation strength': 'Sức mạnh trích dẫn',
     'Top-of-mind': 'Đề xuất đầu tiên', key: 'trọng điểm', Rank: 'Hạng', answers: 'câu trả lời', 'queries competitors win': 'câu hỏi đối thủ thắng',
-    'By intent': 'Theo ý định', 'High intent': 'Ý định cao', Educational: 'Giáo dục',
+    'By intent': 'Theo ý định',
+    'Request client verification': 'Gửi khách xác nhận', 'Awaiting client verification': 'Chờ khách xác nhận', 'Verified by client': 'Khách đã xác nhận', 'Client requested changes': 'Khách yêu cầu chỉnh sửa', Send: 'Gửi', 'Email not auto-sent — share the link:': 'Email chưa gửi tự động — chia sẻ link:', 'High intent': 'Ý định cao', Educational: 'Giáo dục',
     'AI rarely names brands on educational questions — low presence there is normal; those prompts feed content topics.': 'AI hiếm khi nêu tên thương hiệu ở câu hỏi giáo dục — hiện diện thấp là bình thường; các câu này là nguồn chủ đề nội dung.',
     'Getting started…': 'Đang khởi động…', 'Technical trace': 'Nhật ký kỹ thuật', 'This takes a few minutes — the run continues on the server, so you can leave this page and come back.': 'Mất vài phút — tác vụ chạy trên máy chủ, bạn có thể rời trang và quay lại sau.',
     'Phase 1/3 · Discovery': 'Giai đoạn 1/3 · Xây bộ câu hỏi', 'Phase 2/3 · Monitor': 'Giai đoạn 2/3 · Hỏi các công cụ AI và chấm điểm', 'Phase 3/3 · Report': 'Giai đoạn 3/3 · Viết báo cáo',
@@ -920,8 +922,11 @@ function RunResult({ agentId, output, projectId, runId, versions, onVersions, on
   onDispatch?: (agentId: string) => void;
 }) {
   const advisory = agentId === 'monitor' || agentId === 'report' || agentId === 'full_scan';
+  // Deliverables the CLIENT should sign off on (agency workflow).
+  const reviewKind = agentId === 'profile' ? 'brand_profile' : agentId === 'discovery' ? 'prompt_set' : agentId === 'monitor' ? 'competitor_set' : null;
   return (
     <div className="mt-4 font-sans text-sm text-ink space-y-4">
+      {reviewKind && projectId && <VerificationBar projectId={projectId} kind={reviewKind} />}
       {agentId === 'full_scan' ? (
         <>
           {output.scorecard && <MonitorResult o={output.scorecard} />}
@@ -1528,6 +1533,92 @@ function StandardAnswersResult({ o }: { o: Record<string, any> }) {
           </details>
         ))}
       </div>
+    </div>
+  );
+}
+
+// Client sign-off status + request control for profile / prompts / competitors
+// (agency workflow: the client verifies the foundations before we build on them).
+function VerificationBar({ projectId, kind }: { projectId: string; kind: string }) {
+  const [review, setReview] = useState<any | null | undefined>(undefined); // undefined=loading
+  const [email, setEmail] = useState('');
+  const [showForm, setShowForm] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [sentInfo, setSentInfo] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/workspace/reviews?projectId=${projectId}&kind=${kind}`)
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled) setReview(d.reviews?.[kind] ?? null); })
+      .catch(() => { if (!cancelled) setReview(null); });
+    return () => { cancelled = true; };
+  }, [projectId, kind]);
+
+  const request = async () => {
+    if (!email.trim() || busy) return;
+    setBusy(true); setSentInfo(null);
+    try {
+      const res = await fetch('/api/workspace/reviews', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, kind, email: email.trim() }),
+      });
+      const d = await res.json();
+      if (!res.ok) { setSentInfo(d.error || 'Failed'); setBusy(false); return; }
+      setReview(d.review);
+      setShowForm(false);
+      setSentInfo(d.emailSent ? null : `${t('Email not auto-sent — share the link:')} ${d.reviewUrl}`);
+    } catch (e) { setSentInfo(e instanceof Error ? e.message : 'Network error'); }
+    setBusy(false);
+  };
+
+  if (review === undefined) return null;
+
+  if (review?.status === 'approved') {
+    return (
+      <div className="flex items-center gap-2 text-[11px] text-sage rounded-lg border border-sage/40 bg-sage/10 px-3 py-1.5">
+        ✓ {t('Verified by client')} · {review.client_email} · {String(review.decided_at || '').slice(0, 10)}
+      </div>
+    );
+  }
+  if (review?.status === 'changes_requested') {
+    return (
+      <div className="rounded-lg border border-gold/40 bg-gold/10 px-3 py-2 space-y-1">
+        <div className="text-[11px] text-gold font-medium">✎ {t('Client requested changes')} · {review.client_email}</div>
+        {review.note && <div className="text-[12px] text-dim whitespace-pre-wrap">{review.note}</div>}
+      </div>
+    );
+  }
+  if (review?.status === 'pending') {
+    return (
+      <div className="flex items-center gap-2 text-[11px] text-dim rounded-lg border border-edge bg-surface px-3 py-1.5">
+        ⏳ {t('Awaiting client verification')} · {review.client_email}
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-edge bg-surface px-3 py-2">
+      {!showForm ? (
+        <button onClick={() => setShowForm(true)} className="text-[11px] text-dim hover:text-brand transition">
+          ✉ {t('Request client verification')}
+        </button>
+      ) : (
+        <div className="flex items-center gap-2">
+          <input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            type="email"
+            placeholder="client@company.com"
+            className="flex-1 bg-raised border border-edge rounded px-2 py-1 text-[12px] text-ink placeholder:text-faint focus:outline-none focus:border-brand/50"
+          />
+          <button onClick={request} disabled={busy || !email.trim()} className="text-[11px] px-2.5 py-1 rounded bg-brand text-on-brand disabled:opacity-50">
+            {busy ? '…' : t('Send')}
+          </button>
+          <button onClick={() => setShowForm(false)} className="text-[11px] text-faint hover:text-dim">✕</button>
+        </div>
+      )}
+      {sentInfo && <div className="mt-1 text-[10px] text-gold break-all">{sentInfo}</div>}
     </div>
   );
 }
