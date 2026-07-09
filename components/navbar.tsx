@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/auth-context';
 const navLinks = [
   { label: '首页', href: 'https://memecmo.ai' },
   { label: '方案定价', href: '/pricing' },
+  { label: '关于我们', href: '/about' },
   { label: '工作台', href: '/dashboard' },
 ];
 

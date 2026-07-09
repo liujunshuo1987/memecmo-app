@@ -46,6 +46,11 @@ export default function Footer() {
                   申请内测 · Join waitlist
                 </Link>
               </li>
+              <li>
+                <Link href="/about" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">
+                  关于我们 · About us
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -66,9 +71,15 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="mt-10 pt-6 border-t border-white/5 text-center">
+        <div className="mt-10 pt-6 border-t border-white/5 text-center space-y-1.5">
           <p className="text-xs text-gray-600">
-            &copy; 2026 MemeCMO.ai · NeuronSpark Media-Tech Limited. All Rights Reserved.
+            &copy; 2026 MemeCMO Tech Limited. All Rights Reserved. ·{' '}
+            <Link href="/about" className="hover:text-gray-400 transition-colors duration-200 underline underline-offset-2 decoration-gray-700">
+              關於我們 About
+            </Link>
+          </p>
+          <p className="text-[11px] text-gray-700">
+            Hong Kong CR No. 80218619 · Room C03, 9/F, Kato Factory Building, 2 Cheung Yue Street, Lai Chi Kok, Kowloon, Hong Kong
           </p>
         </div>
       </div>
