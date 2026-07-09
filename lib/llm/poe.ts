@@ -79,7 +79,14 @@ export async function poeChat(opts: PoeChatOptions): Promise<PoeResult> {
           await sleep(2 ** attempt * 800 + Math.floor(Math.random() * 400));
           continue;
         }
-        throw new Error(`Poe ${res.status}: ${body.slice(0, 300)}`);
+        // Full detail to server logs only — thrown messages surface in
+        // client-visible run summaries, which must not leak the upstream
+        // provider (subprocessor hygiene).
+        console.error(`[engine-adapter] upstream ${res.status}: ${body.slice(0, 300)}`);
+        if (res.status === 402 || body.includes('insufficient_quota')) {
+          throw new Error('AI engine capacity exhausted for this billing period — the operator has been notified. Please retry later.');
+        }
+        throw new Error(`AI engine request failed (${res.status}). Please retry; if it persists, contact support.`);
       }
 
       const json: any = await res.json();
