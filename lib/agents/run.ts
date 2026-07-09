@@ -29,12 +29,29 @@ async function loadBrandProfile(sb: ReturnType<typeof svc>, projectId: string): 
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (!data?.content) return null;
-  try {
-    return JSON.parse(data.content);
-  } catch {
-    return null;
+  let profile: any = null;
+  if (data?.content) {
+    try { profile = JSON.parse(data.content); } catch { /* corrupted → docs-only below */ }
   }
+
+  // Uploaded brand documents (guidelines / positioning) join the grounding —
+  // budgeted excerpt so several docs fit without blowing the prompt.
+  const { data: docs } = await sb
+    .from('assets')
+    .select('title, content')
+    .eq('project_id', projectId)
+    .eq('type', 'brand_doc')
+    .order('created_at', { ascending: false })
+    .limit(5);
+  if (docs?.length) {
+    const BUDGET = 4000;
+    const per = Math.floor(BUDGET / docs.length);
+    const uploadedDocs = docs
+      .map((d) => `[${d.title}]\n${(d.content || '').slice(0, per)}`)
+      .join('\n---\n');
+    profile = { ...(profile || {}), uploadedDocs };
+  }
+  return profile;
 }
 
 export type AgentEvent = {

@@ -22,6 +22,9 @@ export function brandProfileBlock(p: any | null | undefined): string {
     facts ? `- Facts: ${facts}` : null,
     nap ? `- NAP: ${nap}` : null,
     p.audience ? `- Audience: ${p.audience}` : null,
+    p.uploadedDocs
+      ? `\nUPLOADED BRAND DOCUMENTS (client-provided guidelines / positioning — authoritative for tone and claims):\n${p.uploadedDocs}`
+      : null,
   ]
     .filter(Boolean)
     .join('\n');

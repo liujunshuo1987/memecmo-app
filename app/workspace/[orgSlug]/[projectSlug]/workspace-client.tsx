@@ -95,7 +95,7 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Position when present': '出现时位置', 'Sentiment when present': '出现时情感', 'Citation strength': '引用强度',
     'Top-of-mind': '首位推荐', key: '重点', Rank: '排名', answers: '条回答', 'queries competitors win': '竞品占优的问题',
     'By intent': '按意图',
-    'Request client verification': '请客户核实', 'Awaiting client verification': '待客户确认', 'Verified by client': '客户已确认', 'Client requested changes': '客户要求修改', Send: '发送', 'Email not auto-sent — share the link:': '邮件未能自动发送——请手动分享链接:', 'High intent': '高意图', Educational: '教育型',
+    'Request client verification': '请客户核实', 'Brand documents': '品牌资料', Upload: '上传', 'Uploading…': '上传中…', 'Upload brand guidelines or positioning docs (.txt \/ .md \/ text-based .pdf) — content agents will ground on them.': '上传品牌指南或定位文档(.txt / .md / 文本型 .pdf)——内容智能体将以其为准绳。', 'Awaiting client verification': '待客户确认', 'Verified by client': '客户已确认', 'Client requested changes': '客户要求修改', Send: '发送', 'Email not auto-sent — share the link:': '邮件未能自动发送——请手动分享链接:', 'High intent': '高意图', Educational: '教育型',
     'AI rarely names brands on educational questions — low presence there is normal; those prompts feed content topics.': '教育型问题里 AI 很少点名品牌——此处出现率低属正常;这些问题正是内容选题的来源。',
     'Getting started…': '正在启动…', 'Technical trace': '技术轨迹', 'This takes a few minutes — the run continues on the server, so you can leave this page and come back.': '大约需要几分钟——任务在服务器持续运行,你可以离开此页稍后回来。',
     'Phase 1/3 · Discovery': '阶段 1/3 · 构建问题集', 'Phase 2/3 · Monitor': '阶段 2/3 · 向 AI 引擎提问并打分', 'Phase 3/3 · Report': '阶段 3/3 · 撰写报告',
@@ -126,7 +126,7 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Position when present': 'Vị trí khi xuất hiện', 'Sentiment when present': 'Cảm xúc khi xuất hiện', 'Citation strength': 'Sức mạnh trích dẫn',
     'Top-of-mind': 'Đề xuất đầu tiên', key: 'trọng điểm', Rank: 'Hạng', answers: 'câu trả lời', 'queries competitors win': 'câu hỏi đối thủ thắng',
     'By intent': 'Theo ý định',
-    'Request client verification': 'Gửi khách xác nhận', 'Awaiting client verification': 'Chờ khách xác nhận', 'Verified by client': 'Khách đã xác nhận', 'Client requested changes': 'Khách yêu cầu chỉnh sửa', Send: 'Gửi', 'Email not auto-sent — share the link:': 'Email chưa gửi tự động — chia sẻ link:', 'High intent': 'Ý định cao', Educational: 'Giáo dục',
+    'Request client verification': 'Gửi khách xác nhận', 'Brand documents': 'Tài liệu thương hiệu', Upload: 'Tải lên', 'Uploading…': 'Đang tải…', 'Awaiting client verification': 'Chờ khách xác nhận', 'Verified by client': 'Khách đã xác nhận', 'Client requested changes': 'Khách yêu cầu chỉnh sửa', Send: 'Gửi', 'Email not auto-sent — share the link:': 'Email chưa gửi tự động — chia sẻ link:', 'High intent': 'Ý định cao', Educational: 'Giáo dục',
     'AI rarely names brands on educational questions — low presence there is normal; those prompts feed content topics.': 'AI hiếm khi nêu tên thương hiệu ở câu hỏi giáo dục — hiện diện thấp là bình thường; các câu này là nguồn chủ đề nội dung.',
     'Getting started…': 'Đang khởi động…', 'Technical trace': 'Nhật ký kỹ thuật', 'This takes a few minutes — the run continues on the server, so you can leave this page and come back.': 'Mất vài phút — tác vụ chạy trên máy chủ, bạn có thể rời trang và quay lại sau.',
     'Phase 1/3 · Discovery': 'Giai đoạn 1/3 · Xây bộ câu hỏi', 'Phase 2/3 · Monitor': 'Giai đoạn 2/3 · Hỏi các công cụ AI và chấm điểm', 'Phase 3/3 · Report': 'Giai đoạn 3/3 · Viết báo cáo',
@@ -927,6 +927,7 @@ function RunResult({ agentId, output, projectId, runId, versions, onVersions, on
   return (
     <div className="mt-4 font-sans text-sm text-ink space-y-4">
       {reviewKind && projectId && <VerificationBar projectId={projectId} kind={reviewKind} />}
+      {agentId === 'profile' && projectId && <BrandDocsPanel projectId={projectId} />}
       {agentId === 'full_scan' ? (
         <>
           {output.scorecard && <MonitorResult o={output.scorecard} />}
@@ -1533,6 +1534,68 @@ function StandardAnswersResult({ o }: { o: Record<string, any> }) {
           </details>
         ))}
       </div>
+    </div>
+  );
+}
+
+// Brand documents (guidelines / positioning) — uploaded text becomes grounding
+// input for every content agent alongside the canonical profile.
+function BrandDocsPanel({ projectId }: { projectId: string }) {
+  const [docs, setDocs] = useState<any[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const load = () => {
+    fetch(`/api/workspace/brand-docs?projectId=${projectId}`)
+      .then((r) => r.json())
+      .then((d) => setDocs(d.docs ?? []))
+      .catch(() => {});
+  };
+  useEffect(load, [projectId]);
+
+  const upload = async (file: File) => {
+    setBusy(true); setErr(null);
+    try {
+      const form = new FormData();
+      form.append('projectId', projectId);
+      form.append('file', file);
+      const res = await fetch('/api/workspace/brand-docs', { method: 'POST', body: form });
+      const d = await res.json();
+      if (!res.ok) { setErr(d.error || 'Upload failed'); } else { load(); }
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Network error'); }
+    setBusy(false);
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const remove = async (id: string) => {
+    await fetch(`/api/workspace/brand-docs?assetId=${id}`, { method: 'DELETE' }).catch(() => {});
+    load();
+  };
+
+  return (
+    <div className="rounded-lg border border-edge bg-surface px-3 py-2.5 space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] uppercase tracking-wider text-faint">{t('Brand documents')}</span>
+        <label className={`text-[11px] px-2 py-1 rounded border border-edge text-dim hover:text-brand hover:border-brand/50 transition cursor-pointer ${busy ? 'opacity-50 pointer-events-none' : ''}`}>
+          {busy ? t('Uploading…') : `+ ${t('Upload')}`}
+          <input ref={fileRef} type="file" accept=".txt,.md,.pdf" className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); }} />
+        </label>
+      </div>
+      {docs.length === 0 ? (
+        <p className="text-[11px] text-faint">{t('Upload brand guidelines or positioning docs (.txt / .md / text-based .pdf) — content agents will ground on them.')}</p>
+      ) : (
+        <ul className="space-y-1">
+          {docs.map((d) => (
+            <li key={d.id} className="flex items-center justify-between gap-2 text-[12px] text-dim">
+              <span className="truncate">📄 {d.title} <span className="text-faint">({d.meta?.chars ?? '—'} chars)</span></span>
+              <button onClick={() => remove(d.id)} className="text-faint hover:text-garnet transition shrink-0">✕</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {err && <p className="text-[11px] text-garnet">{err}</p>}
     </div>
   );
 }
