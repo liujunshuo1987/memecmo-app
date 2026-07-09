@@ -97,27 +97,27 @@ export default function PricingPage() {
 
   const planColors: Record<string, { bg: string; border: string; text: string; badge: string }> = {
     free: {
-      bg: 'bg-[#1E293B]',
-      border: 'border-[#334155]',
-      text: 'text-[#94A3B8]',
-      badge: 'bg-[#334155] text-[#94A3B8]',
+      bg: 'bg-surface',
+      border: 'border-edge',
+      text: 'text-dim',
+      badge: 'bg-raised text-dim',
     },
     professional: {
-      bg: 'bg-gradient-to-b from-[#1D4ED8]/10 to-[#1E293B]',
-      border: 'border-[#1D4ED8]/40',
-      text: 'text-[#3B82F6]',
-      badge: 'bg-[#1D4ED8]/20 text-[#3B82F6]',
+      bg: 'bg-gradient-to-b from-brand/10 to-surface',
+      border: 'border-brand/40',
+      text: 'text-brand',
+      badge: 'bg-brand-soft text-brand',
     },
     enterprise: {
-      bg: 'bg-gradient-to-b from-[#F97316]/10 to-[#1E293B]',
-      border: 'border-[#F97316]/40',
-      text: 'text-[#F97316]',
-      badge: 'bg-[#F97316]/20 text-[#F97316]',
+      bg: 'bg-gradient-to-b from-gold/10 to-surface',
+      border: 'border-gold/40',
+      text: 'text-gold',
+      badge: 'bg-gold/20 text-gold',
     },
   };
 
   return (
-    <div className="min-h-screen bg-[#0F172A]">
+    <div className="min-h-screen bg-canvas">
       <Navbar />
 
       <main className="pt-32 pb-20 px-4">
@@ -127,23 +127,23 @@ export default function PricingPage() {
             animate={{ opacity: 1, y: 0 }}
             className="text-center mb-16"
           >
-            <Badge className="mb-4 bg-[#1D4ED8]/20 text-[#3B82F6] border-[#1D4ED8]/40 px-4 py-1.5">
+            <Badge className="mb-4 bg-brand-soft text-brand border-brand/40 px-4 py-1.5">
               {t('pricing.badge')}
             </Badge>
-            <h1 className="text-4xl md:text-5xl font-bold text-[#F8FAFC] mb-4">
+            <h1 className="text-4xl md:text-5xl font-bold text-ink mb-4">
               {t('pricing.title')}
             </h1>
-            <p className="text-[#94A3B8] text-lg max-w-2xl mx-auto mb-10">
+            <p className="text-dim text-lg max-w-2xl mx-auto mb-10">
               {t('pricing.subtitle')}
             </p>
 
-            <div className="inline-flex items-center bg-[#1E293B] border border-[#334155] rounded-xl p-1.5">
+            <div className="inline-flex items-center bg-surface border border-edge rounded-xl p-1.5">
               <button
                 onClick={() => setBillingCycle('monthly')}
                 className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                   billingCycle === 'monthly'
-                    ? 'bg-[#1D4ED8] text-[#F8FAFC] shadow-lg shadow-[#1D4ED8]/30'
-                    : 'text-[#94A3B8] hover:text-[#F8FAFC]'
+                    ? 'bg-brand text-on-brand shadow-lg shadow-brand/30'
+                    : 'text-dim hover:text-ink'
                 }`}
               >
                 {t('pricing.monthly')}
@@ -152,12 +152,12 @@ export default function PricingPage() {
                 onClick={() => setBillingCycle('yearly')}
                 className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
                   billingCycle === 'yearly'
-                    ? 'bg-[#1D4ED8] text-[#F8FAFC] shadow-lg shadow-[#1D4ED8]/30'
-                    : 'text-[#94A3B8] hover:text-[#F8FAFC]'
+                    ? 'bg-brand text-on-brand shadow-lg shadow-brand/30'
+                    : 'text-dim hover:text-ink'
                 }`}
               >
                 {t('pricing.yearly')}
-                <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full">
+                <span className="text-xs bg-brand-soft text-brand px-2 py-0.5 rounded-full">
                   -20%
                 </span>
               </button>
@@ -165,7 +165,7 @@ export default function PricingPage() {
           </motion.div>
 
           {checkoutError && (
-            <div className="max-w-md mx-auto mb-8 flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+            <div className="max-w-md mx-auto mb-8 flex items-center gap-2 p-3 bg-garnet/10 border border-garnet/40 rounded-lg text-garnet text-sm">
               {checkoutError}
             </div>
           )}
@@ -183,12 +183,12 @@ export default function PricingPage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.1 }}
                   className={`relative rounded-2xl border ${colors.border} ${colors.bg} p-8 flex flex-col ${
-                    isPro ? 'ring-2 ring-[#1D4ED8] shadow-2xl shadow-[#1D4ED8]/10 scale-[1.02]' : ''
+                    isPro ? 'ring-2 ring-brand shadow-2xl shadow-brand/10 scale-[1.02]' : ''
                   }`}
                 >
                   {isPro && (
                     <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                      <Badge className="bg-[#1D4ED8] text-[#F8FAFC] px-4 py-1 text-xs font-semibold">
+                      <Badge className="bg-brand text-on-brand px-4 py-1 text-xs font-semibold">
                         {t('pricing.mostPopular')}
                       </Badge>
                     </div>
@@ -198,39 +198,39 @@ export default function PricingPage() {
                     <div className={`inline-flex p-2.5 rounded-xl ${colors.badge} mb-4`}>
                       {planIcons[plan.plan_type]}
                     </div>
-                    <h3 className="text-xl font-bold text-[#F8FAFC] mb-1">
+                    <h3 className="text-xl font-bold text-ink mb-1">
                       {t(`pricing.${plan.plan_type}Name`)}
                     </h3>
-                    <p className="text-sm text-[#64748B]">
+                    <p className="text-sm text-faint">
                       {t(`pricing.${plan.plan_type}Desc`)}
                     </p>
                   </div>
 
                   <div className="mb-6">
                     <div className="flex items-baseline gap-1">
-                      <span className="text-4xl font-bold text-[#F8FAFC]">
+                      <span className="text-4xl font-bold text-ink">
                         ${plan.price_usd}
                       </span>
                       {plan.price_usd > 0 && (
-                        <span className="text-[#64748B] text-sm">
+                        <span className="text-faint text-sm">
                           /{billingCycle === 'monthly' ? t('pricing.mo') : t('pricing.mo')}
                         </span>
                       )}
                     </div>
                     {plan.price_hkd > 0 && (
-                      <p className="text-xs text-[#475569] mt-1">
+                      <p className="text-xs text-faint mt-1">
                         HK${plan.price_hkd}/{t('pricing.mo')}
                       </p>
                     )}
                     {billingCycle === 'yearly' && plan.price_usd > 0 && (
-                      <p className="text-xs text-emerald-400 mt-1">
+                      <p className="text-xs text-brand mt-1">
                         {t('pricing.billedYearly')} ${plan.price_usd * 12}/{t('pricing.yr')}
                       </p>
                     )}
                   </div>
 
                   <div className="flex-1 mb-8">
-                    <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-4">
+                    <p className="text-xs font-semibold text-faint uppercase tracking-wider mb-4">
                       {t('pricing.includes')}
                     </p>
                     <ul className="space-y-3">
@@ -246,7 +246,7 @@ export default function PricingPage() {
                   {isCurrentPlan ? (
                     <Button
                       disabled
-                      className="w-full bg-[#334155] text-[#94A3B8] cursor-not-allowed rounded-xl py-3"
+                      className="w-full bg-raised text-dim cursor-not-allowed rounded-xl py-3"
                     >
                       {t('pricing.currentPlan')}
                     </Button>
@@ -254,7 +254,7 @@ export default function PricingPage() {
                     <Link href={user ? '/dashboard' : '/signup'}>
                       <Button
                         variant="outline"
-                        className="w-full border-[#334155] text-[#F8FAFC] hover:bg-[#1E293B] rounded-xl py-3"
+                        className="w-full border-edge text-ink hover:bg-surface rounded-xl py-3"
                       >
                         {user ? t('pricing.goToDashboard') : t('pricing.getStartedFree')}
                       </Button>
@@ -263,7 +263,7 @@ export default function PricingPage() {
                     <Button
                       onClick={() => handleSubscribe(plan)}
                       disabled={loading}
-                      className="w-full bg-gradient-to-r from-[#F97316] to-[#EA580C] hover:from-[#EA580C] hover:to-[#F97316] text-[#F8FAFC] font-semibold rounded-xl py-3 transition-all duration-300 hover:shadow-lg hover:shadow-[#F97316]/30"
+                      className="w-full bg-brand hover:brightness-110 text-on-brand font-semibold rounded-xl py-3 transition-all duration-300 hover:shadow-lg hover:shadow-brand/30"
                     >
                       <span className="flex items-center justify-center gap-2">
                         {t('pricing.contactSales')}
@@ -274,7 +274,7 @@ export default function PricingPage() {
                     <Button
                       onClick={() => handleSubscribe(plan)}
                       disabled={loading}
-                      className="w-full bg-gradient-to-r from-[#1D4ED8] to-[#1E40AF] hover:from-[#1E40AF] hover:to-[#1D4ED8] text-[#F8FAFC] font-semibold rounded-xl py-3 transition-all duration-300 hover:shadow-lg hover:shadow-[#1D4ED8]/30"
+                      className="w-full bg-brand hover:brightness-110 text-on-brand font-semibold rounded-xl py-3 transition-all duration-300 hover:shadow-lg hover:shadow-brand/30"
                     >
                       <span className="flex items-center justify-center gap-2">
                         {t('pricing.subscribe')}
@@ -295,27 +295,27 @@ export default function PricingPage() {
           >
             {[
               {
-                icon: <Shield className="w-6 h-6 text-[#3B82F6]" />,
+                icon: <Shield className="w-6 h-6 text-brand" />,
                 title: t('pricing.securePayments'),
                 desc: t('pricing.securePaymentsDesc'),
               },
               {
-                icon: <Clock className="w-6 h-6 text-emerald-400" />,
+                icon: <Clock className="w-6 h-6 text-brand" />,
                 title: t('pricing.cancelAnytime'),
                 desc: t('pricing.cancelAnytimeDesc'),
               },
               {
-                icon: <Users className="w-6 h-6 text-[#F97316]" />,
+                icon: <Users className="w-6 h-6 text-gold" />,
                 title: t('pricing.teamReady'),
                 desc: t('pricing.teamReadyDesc'),
               },
             ].map((item, i) => (
               <div key={i} className="text-center">
-                <div className="inline-flex p-3 bg-[#1E293B] border border-[#334155] rounded-xl mb-3">
+                <div className="inline-flex p-3 bg-surface border border-edge rounded-xl mb-3">
                   {item.icon}
                 </div>
-                <h4 className="text-sm font-semibold text-[#F8FAFC] mb-1">{item.title}</h4>
-                <p className="text-xs text-[#64748B]">{item.desc}</p>
+                <h4 className="text-sm font-semibold text-ink mb-1">{item.title}</h4>
+                <p className="text-xs text-faint">{item.desc}</p>
               </div>
             ))}
           </motion.div>

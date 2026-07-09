@@ -38,7 +38,7 @@ export default function OAuthButtons({ redirectTo = '/dashboard' }: OAuthButtons
         variant="outline"
         onClick={() => handleOAuth('google')}
         disabled={loadingProvider !== null}
-        className="w-full bg-[#0F172A] border-[#334155] text-[#F8FAFC] hover:bg-[#1E293B] hover:border-[#475569] rounded-xl py-3 transition-all duration-200"
+        className="w-full bg-surface border-edge text-ink hover:bg-raised hover:border-edge-strong rounded-xl py-3 transition-all duration-200"
       >
         {loadingProvider === 'google' ? (
           <svg className="animate-spin h-4 w-4 mr-2" viewBox="0 0 24 24">
@@ -61,7 +61,7 @@ export default function OAuthButtons({ redirectTo = '/dashboard' }: OAuthButtons
         variant="outline"
         onClick={() => handleOAuth('facebook')}
         disabled={loadingProvider !== null}
-        className="w-full bg-[#0F172A] border-[#334155] text-[#F8FAFC] hover:bg-[#1E293B] hover:border-[#475569] rounded-xl py-3 transition-all duration-200"
+        className="w-full bg-surface border-edge text-ink hover:bg-raised hover:border-edge-strong rounded-xl py-3 transition-all duration-200"
       >
         {loadingProvider === 'facebook' ? (
           <svg className="animate-spin h-4 w-4 mr-2" viewBox="0 0 24 24">

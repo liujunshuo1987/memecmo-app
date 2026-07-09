@@ -115,32 +115,32 @@ export default function AboutContent() {
   const c = COPY[(language as Lang) in COPY ? (language as Lang) : 'en'];
 
   return (
-    <main className="min-h-screen bg-[#0B1220] text-white">
+    <main className="min-h-screen bg-canvas text-ink">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-20 space-y-16">
         <section className="space-y-5">
-          <p className="text-xs tracking-[0.25em] uppercase text-gray-500">{c.eyebrow}</p>
+          <p className="text-xs tracking-[0.25em] uppercase text-faint">{c.eyebrow}</p>
           <h1 className="text-3xl sm:text-4xl font-bold leading-tight">MemeCMO Tech Limited</h1>
-          <p className="text-base text-gray-300 leading-relaxed">{c.intro}</p>
-          <p className="text-sm text-gray-500 leading-relaxed">{c.introSecondary}</p>
+          <p className="text-base text-dim leading-relaxed">{c.intro}</p>
+          <p className="text-sm text-faint leading-relaxed">{c.introSecondary}</p>
         </section>
 
         <section className="space-y-5">
           <h2 className="text-xl font-semibold">{c.regTitle}</h2>
-          <div className="rounded-xl border border-white/10 divide-y divide-white/5 overflow-hidden">
+          <div className="rounded-xl border border-edge divide-y divide-edge overflow-hidden">
             {c.facts.map((f) => (
-              <div key={f.label} className="grid grid-cols-1 sm:grid-cols-[220px_1fr] gap-1 sm:gap-4 px-5 py-3.5 bg-white/[0.02]">
-                <div className="text-xs text-gray-500 uppercase tracking-wider self-center">{f.label}</div>
-                <div className="text-sm text-gray-200">{f.value}</div>
+              <div key={f.label} className="grid grid-cols-1 sm:grid-cols-[220px_1fr] gap-1 sm:gap-4 px-5 py-3.5 bg-surface">
+                <div className="text-xs text-faint uppercase tracking-wider self-center">{f.label}</div>
+                <div className="text-sm text-ink">{f.value}</div>
               </div>
             ))}
           </div>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-faint">
             {c.registryLabel}:{' '}
             <a
               href="https://www.icris.cr.gov.hk/csci/cps_criteria.do?corpNo=80218619"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-gray-400 underline underline-offset-2 hover:text-white"
+              className="text-dim underline underline-offset-2 hover:text-ink"
             >
               Hong Kong Companies Registry (ICRIS) · CR 80218619
             </a>
@@ -151,12 +151,12 @@ export default function AboutContent() {
           <h2 className="text-xl font-semibold">{c.peopleTitle}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {c.people.map((p) => (
-              <div key={p.nameEn} className="rounded-xl border border-white/10 bg-white/[0.02] p-6 space-y-2">
+              <div key={p.nameEn} className="rounded-xl border border-edge bg-surface p-6 space-y-2">
                 <div className="text-lg font-semibold">
-                  {p.name} <span className="text-gray-400 font-normal">{p.nameEn}</span>
+                  {p.name} <span className="text-dim font-normal">{p.nameEn}</span>
                 </div>
-                <div className="text-xs tracking-wider uppercase text-blue-300/80">{p.title}</div>
-                <p className="text-sm text-gray-300 leading-relaxed">{p.body}</p>
+                <div className="text-xs tracking-wider uppercase text-brand">{p.title}</div>
+                <p className="text-sm text-dim leading-relaxed">{p.body}</p>
               </div>
             ))}
           </div>
@@ -164,15 +164,15 @@ export default function AboutContent() {
 
         <section className="space-y-5">
           <h2 className="text-xl font-semibold">{c.structureTitle}</h2>
-          <ul className="space-y-3 text-sm text-gray-300">
+          <ul className="space-y-3 text-sm text-dim">
             {c.holders.map((h) => (
               <li key={h.share} className="flex gap-3">
-                <span className="text-gray-500 shrink-0 w-14">{h.share}</span>
+                <span className="text-faint shrink-0 w-14">{h.share}</span>
                 <span>{h.text}</span>
               </li>
             ))}
-            <li className="flex gap-3 pt-2 border-t border-white/5">
-              <span className="text-gray-500 shrink-0 w-14">{c.clientLabel}</span>
+            <li className="flex gap-3 pt-2 border-t border-edge">
+              <span className="text-faint shrink-0 w-14">{c.clientLabel}</span>
               <span>{c.clientText}</span>
             </li>
           </ul>

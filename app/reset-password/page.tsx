@@ -7,6 +7,7 @@ import { Mail, ArrowLeft, CircleAlert as AlertCircle, CircleCheck as CheckCircle
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { createClient } from '@/lib/supabase/client';
+import MemeCMOLogo from '@/components/memecmo-logo';
 import { useLanguage } from '@/contexts/language-context';
 
 export default function ResetPasswordPage() {
@@ -50,11 +51,7 @@ export default function ResetPasswordPage() {
       >
         <div className="text-center mb-8">
           <Link href="/" className="inline-block mb-6">
-            <img
-              src="/logo.svg"
-              alt="MemeCMO.ai Media-Tech"
-              className="h-12 w-auto mx-auto"
-            />
+            <span className="inline-flex justify-center"><MemeCMOLogo height={36} showWordmark /></span>
           </Link>
           <h1 className="text-2xl font-bold text-[#F8FAFC] mb-2">
             {t('auth.resetTitle')}

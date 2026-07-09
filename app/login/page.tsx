@@ -8,6 +8,7 @@ import { Mail, Lock, Eye, EyeOff, ArrowRight, CircleAlert as AlertCircle } from 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { createClient } from '@/lib/supabase/client';
+import MemeCMOLogo from '@/components/memecmo-logo';
 import { useLanguage } from '@/contexts/language-context';
 import OAuthButtons from '@/components/oauth-buttons';
 
@@ -51,10 +52,10 @@ function LoginPageContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0F172A] flex items-center justify-center px-4">
+    <div className="min-h-screen bg-canvas flex items-center justify-center px-4">
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#1D4ED8]/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#F97316]/5 rounded-full blur-3xl" />
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-brand/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gold/5 rounded-full blur-3xl" />
       </div>
 
       <motion.div
@@ -65,26 +66,22 @@ function LoginPageContent() {
       >
         <div className="text-center mb-8">
           <Link href="https://memecmo.ai" className="inline-block mb-6">
-            <img
-              src="/logo.svg"
-              alt="MemeCMO.ai Media-Tech"
-              className="h-12 w-auto mx-auto"
-            />
+            <span className="inline-flex justify-center"><MemeCMOLogo height={36} showWordmark /></span>
           </Link>
-          <h1 className="text-2xl font-bold text-[#F8FAFC] mb-2">
+          <h1 className="text-2xl font-bold text-ink mb-2">
             {t('auth.loginTitle')}
           </h1>
-          <p className="text-[#94A3B8] text-sm">
+          <p className="text-dim text-sm">
             {t('auth.loginSubtitle')}
           </p>
         </div>
 
-        <div className="bg-[#1E293B]/80 backdrop-blur-xl border border-[#334155] rounded-2xl p-8">
+        <div className="bg-surface backdrop-blur-xl border border-edge rounded-2xl p-8">
           {(error || callbackError) && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mb-4 flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm"
+              className="mb-4 flex items-center gap-2 p-3 bg-garnet/10 border border-garnet/40 rounded-lg text-garnet text-sm"
             >
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               {error || t('auth.oauthError')}
@@ -95,10 +92,10 @@ function LoginPageContent() {
 
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-[#334155]" />
+              <div className="w-full border-t border-edge" />
             </div>
             <div className="relative flex justify-center text-xs">
-              <span className="px-3 bg-[#1E293B] text-[#64748B]">
+              <span className="px-3 bg-surface text-faint">
                 {t('auth.orContinueWith')}
               </span>
             </div>
@@ -106,48 +103,48 @@ function LoginPageContent() {
 
           <form onSubmit={handleEmailLogin} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-[#94A3B8] mb-1.5">
+              <label className="block text-sm font-medium text-dim mb-1.5">
                 {t('auth.email')}
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-faint" />
                 <Input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                   required
-                  className="pl-10 bg-[#0F172A] border-[#334155] text-[#F8FAFC] placeholder:text-[#475569] focus:border-[#1D4ED8] focus:ring-[#1D4ED8]/20"
+                  className="pl-10 bg-canvas border-edge text-ink placeholder:text-faint focus:border-brand/50 focus:ring-brand/30"
                 />
               </div>
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-sm font-medium text-[#94A3B8]">
+                <label className="text-sm font-medium text-dim">
                   {t('auth.password')}
                 </label>
                 <Link
                   href="/reset-password"
-                  className="text-xs text-[#1D4ED8] hover:text-[#3B82F6] transition-colors"
+                  className="text-xs text-brand hover:brightness-110 transition-colors"
                 >
                   {t('auth.forgotPassword')}
                 </Link>
               </div>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-faint" />
                 <Input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="********"
                   required
-                  className="pl-10 pr-10 bg-[#0F172A] border-[#334155] text-[#F8FAFC] placeholder:text-[#475569] focus:border-[#1D4ED8] focus:ring-[#1D4ED8]/20"
+                  className="pl-10 pr-10 bg-canvas border-edge text-ink placeholder:text-faint focus:border-brand/50 focus:ring-brand/30"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748B] hover:text-[#94A3B8]"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-faint hover:text-dim"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -157,7 +154,7 @@ function LoginPageContent() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-[#1D4ED8] to-[#1E40AF] hover:from-[#1E40AF] hover:to-[#1D4ED8] text-[#F8FAFC] font-semibold py-3 rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-[#1D4ED8]/30"
+              className="w-full bg-brand hover:brightness-110 text-on-brand font-semibold py-3 rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-brand/30"
             >
               {loading ? (
                 <span className="flex items-center gap-2">
@@ -177,21 +174,21 @@ function LoginPageContent() {
           </form>
         </div>
 
-        <p className="text-center text-sm text-[#64748B] mt-6">
+        <p className="text-center text-sm text-faint mt-6">
           {t('auth.noAccount')}{' '}
           {redirect.startsWith('/invite/') ? (
             // Invited users must be able to register directly — never funnel
             // an invite into the waitlist.
             <Link
               href={`/signup?redirect=${encodeURIComponent(redirect)}`}
-              className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors"
+              className="text-brand hover:text-brand font-medium transition-colors"
             >
               创建账号 / Create account →
             </Link>
           ) : (
             <Link
               href="/waitlist"
-              className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors"
+              className="text-brand hover:text-brand font-medium transition-colors"
             >
               加入等待列表 →
             </Link>

@@ -75,8 +75,8 @@ export default function AccountPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0F172A] flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-2 border-[#1D4ED8] border-t-transparent rounded-full" />
+      <div className="min-h-screen bg-canvas flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-2 border-brand border-t-transparent rounded-full" />
       </div>
     );
   }
@@ -127,70 +127,70 @@ export default function AccountPage() {
   };
 
   const statusColors: Record<string, string> = {
-    active: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-    trialing: 'bg-[#1D4ED8]/20 text-[#3B82F6] border-[#1D4ED8]/30',
+    active: 'bg-brand-soft text-brand border-brand/50',
+    trialing: 'bg-brand-soft text-brand border-brand/40',
     past_due: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-    canceled: 'bg-red-500/20 text-red-400 border-red-500/30',
+    canceled: 'bg-red-500/20 text-garnet border-red-500/30',
   };
 
   return (
-    <div className="min-h-screen bg-[#0F172A]">
+    <div className="min-h-screen bg-canvas">
       <Navbar />
 
       <main className="pt-28 pb-20 px-4">
         <div className="max-w-3xl mx-auto space-y-6">
           <div>
-            <h1 className="text-2xl font-bold text-[#F8FAFC]">{t('account.title')}</h1>
-            <p className="text-[#64748B] text-sm mt-1">{t('account.subtitle')}</p>
+            <h1 className="text-2xl font-bold text-ink">{t('account.title')}</h1>
+            <p className="text-faint text-sm mt-1">{t('account.subtitle')}</p>
           </div>
 
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-            <Card className="bg-[#1E293B] border-[#334155]">
-              <CardHeader className="border-b border-[#334155]">
-                <CardTitle className="text-[#F8FAFC] text-base flex items-center gap-2">
-                  <User className="w-4 h-4 text-[#3B82F6]" />
+            <Card className="bg-surface border-edge">
+              <CardHeader className="border-b border-edge">
+                <CardTitle className="text-ink text-base flex items-center gap-2">
+                  <User className="w-4 h-4 text-brand" />
                   {t('account.profile')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-[#94A3B8] mb-1.5">
+                  <label className="block text-sm font-medium text-dim mb-1.5">
                     {t('auth.email')}
                   </label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#475569]" />
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-faint" />
                     <Input
                       value={user.email || ''}
                       disabled
-                      className="pl-10 bg-[#0F172A] border-[#334155] text-[#64748B] cursor-not-allowed"
+                      className="pl-10 bg-canvas border-edge text-faint cursor-not-allowed"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-[#94A3B8] mb-1.5">
+                  <label className="block text-sm font-medium text-dim mb-1.5">
                     {t('auth.fullName')}
                   </label>
                   <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#475569]" />
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-faint" />
                     <Input
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      className="pl-10 bg-[#0F172A] border-[#334155] text-[#F8FAFC] focus:border-[#1D4ED8]"
+                      className="pl-10 bg-canvas border-edge text-ink focus:border-brand/50"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-[#94A3B8] mb-1.5">
+                  <label className="block text-sm font-medium text-dim mb-1.5">
                     {t('account.company')}
                   </label>
                   <div className="relative">
-                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#475569]" />
+                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-faint" />
                     <Input
                       value={company}
                       onChange={(e) => setCompany(e.target.value)}
-                      className="pl-10 bg-[#0F172A] border-[#334155] text-[#F8FAFC] focus:border-[#1D4ED8]"
+                      className="pl-10 bg-canvas border-edge text-ink focus:border-brand/50"
                     />
                   </div>
                 </div>
@@ -199,12 +199,12 @@ export default function AccountPage() {
                   <Button
                     onClick={handleSaveProfile}
                     disabled={saving}
-                    className="bg-[#1D4ED8] text-[#F8FAFC] rounded-lg"
+                    className="bg-brand text-on-brand rounded-lg"
                   >
                     {saving ? t('account.saving') : t('account.saveChanges')}
                   </Button>
                   {saveSuccess && (
-                    <span className="text-sm text-emerald-400">{t('account.saved')}</span>
+                    <span className="text-sm text-brand">{t('account.saved')}</span>
                   )}
                 </div>
               </CardContent>
@@ -212,18 +212,18 @@ export default function AccountPage() {
           </motion.div>
 
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-            <Card className="bg-[#1E293B] border-[#334155]">
-              <CardHeader className="border-b border-[#334155]">
-                <CardTitle className="text-[#F8FAFC] text-base flex items-center gap-2">
-                  <CreditCard className="w-4 h-4 text-emerald-400" />
+            <Card className="bg-surface border-edge">
+              <CardHeader className="border-b border-edge">
+                <CardTitle className="text-ink text-base flex items-center gap-2">
+                  <CreditCard className="w-4 h-4 text-brand" />
                   {t('account.subscription')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <p className="text-sm text-[#94A3B8]">{t('account.currentPlan')}</p>
-                    <p className="text-lg font-semibold text-[#F8FAFC]">
+                    <p className="text-sm text-dim">{t('account.currentPlan')}</p>
+                    <p className="text-lg font-semibold text-ink">
                       {planLabels[subscription?.plan_type || 'free']}
                     </p>
                   </div>
@@ -236,7 +236,7 @@ export default function AccountPage() {
                 </div>
 
                 {subscription?.current_period_end && (
-                  <div className="flex items-center gap-4 text-xs text-[#64748B] mb-4">
+                  <div className="flex items-center gap-4 text-xs text-faint mb-4">
                     <div className="flex items-center gap-1">
                       <Calendar className="w-3 h-3" />
                       {t('account.periodStart')}: {new Date(subscription.current_period_start).toLocaleDateString()}
@@ -248,10 +248,10 @@ export default function AccountPage() {
                   </div>
                 )}
 
-                <Separator className="bg-[#334155] my-4" />
+                <Separator className="bg-raised my-4" />
 
                 {portalError && (
-                  <div className="mb-4 flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+                  <div className="mb-4 flex items-center gap-2 p-3 bg-garnet/10 border border-garnet/40 rounded-lg text-garnet text-sm">
                     {portalError}
                   </div>
                 )}
@@ -262,7 +262,7 @@ export default function AccountPage() {
                       onClick={handleOpenPortal}
                       disabled={portalLoading}
                       variant="outline"
-                      className="border-[#334155] text-[#CBD5E1] hover:bg-[#0F172A] rounded-lg"
+                      className="border-edge text-[#CBD5E1] hover:bg-canvas rounded-lg"
                     >
                       <ExternalLink className="w-4 h-4 mr-2" />
                       {t('account.manageBilling')}
@@ -271,7 +271,7 @@ export default function AccountPage() {
                   {subscription?.plan_type === 'free' && (
                     <Button
                       onClick={() => router.push('/pricing')}
-                      className="bg-gradient-to-r from-[#1D4ED8] to-[#1E40AF] text-[#F8FAFC] rounded-lg"
+                      className="bg-brand text-on-brand rounded-lg"
                     >
                       {t('dashboard.upgrade')}
                     </Button>
@@ -283,10 +283,10 @@ export default function AccountPage() {
 
           {payments.length > 0 && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-              <Card className="bg-[#1E293B] border-[#334155]">
-                <CardHeader className="border-b border-[#334155]">
-                  <CardTitle className="text-[#F8FAFC] text-base flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-[#F97316]" />
+              <Card className="bg-surface border-edge">
+                <CardHeader className="border-b border-edge">
+                  <CardTitle className="text-ink text-base flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-gold" />
                     {t('account.paymentHistory')}
                   </CardTitle>
                 </CardHeader>
@@ -295,10 +295,10 @@ export default function AccountPage() {
                     {payments.map((payment) => (
                       <div key={payment.id} className="flex items-center justify-between px-6 py-4">
                         <div>
-                          <p className="text-sm font-medium text-[#F8FAFC]">
+                          <p className="text-sm font-medium text-ink">
                             ${payment.amount.toFixed(2)} {payment.currency.toUpperCase()}
                           </p>
-                          <p className="text-xs text-[#64748B]">
+                          <p className="text-xs text-faint">
                             {new Date(payment.created_at).toLocaleDateString()}
                           </p>
                         </div>
@@ -307,7 +307,7 @@ export default function AccountPage() {
                             variant="outline"
                             className={
                               payment.status === 'succeeded'
-                                ? 'border-emerald-500/30 text-emerald-400'
+                                ? 'border-brand/50 text-brand'
                                 : 'border-amber-500/30 text-amber-400'
                             }
                           >
@@ -318,7 +318,7 @@ export default function AccountPage() {
                               href={payment.invoice_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-[#3B82F6] hover:text-[#60A5FA]"
+                              className="text-brand hover:text-[#60A5FA]"
                             >
                               <ExternalLink className="w-4 h-4" />
                             </a>
@@ -333,17 +333,17 @@ export default function AccountPage() {
           )}
 
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-            <Card className="bg-[#1E293B] border-red-500/20">
+            <Card className="bg-surface border-garnet/40">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-[#F8FAFC]">{t('account.signOutTitle')}</p>
-                    <p className="text-xs text-[#64748B]">{t('account.signOutDesc')}</p>
+                    <p className="text-sm font-medium text-ink">{t('account.signOutTitle')}</p>
+                    <p className="text-xs text-faint">{t('account.signOutDesc')}</p>
                   </div>
                   <Button
                     onClick={handleSignOut}
                     variant="outline"
-                    className="border-red-500/30 text-red-400 hover:bg-red-500/10 rounded-lg"
+                    className="border-red-500/30 text-garnet hover:bg-garnet/10 rounded-lg"
                   >
                     <LogOut className="w-4 h-4 mr-2" />
                     {t('account.signOut')}

@@ -8,6 +8,7 @@ import { Mail, Lock, User, Building2, Eye, EyeOff, ArrowRight, CircleAlert as Al
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { createClient } from '@/lib/supabase/client';
+import MemeCMOLogo from '@/components/memecmo-logo';
 import { useLanguage } from '@/contexts/language-context';
 import OAuthButtons from '@/components/oauth-buttons';
 
@@ -75,24 +76,24 @@ function SignupForm() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-[#0F172A] flex items-center justify-center px-4">
+      <div className="min-h-screen bg-canvas flex items-center justify-center px-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           className="w-full max-w-md text-center"
         >
-          <div className="bg-[#1E293B]/80 backdrop-blur-xl border border-[#334155] rounded-2xl p-8">
-            <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="w-8 h-8 text-emerald-400" />
+          <div className="bg-surface backdrop-blur-xl border border-edge rounded-2xl p-8">
+            <div className="w-16 h-16 bg-brand rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-8 h-8 text-brand" />
             </div>
-            <h2 className="text-xl font-bold text-[#F8FAFC] mb-2">
+            <h2 className="text-xl font-bold text-ink mb-2">
               {t('auth.signupSuccess')}
             </h2>
-            <p className="text-[#94A3B8] text-sm mb-6">
+            <p className="text-dim text-sm mb-6">
               {t('auth.checkEmail')}
             </p>
             <Link href="/login">
-              <Button className="w-full bg-gradient-to-r from-[#1D4ED8] to-[#1E40AF] text-[#F8FAFC] rounded-xl">
+              <Button className="w-full bg-brand text-on-brand rounded-xl">
                 {t('auth.backToLogin')}
               </Button>
             </Link>
@@ -103,10 +104,10 @@ function SignupForm() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0F172A] flex items-center justify-center px-4 py-12">
+    <div className="min-h-screen bg-canvas flex items-center justify-center px-4 py-12">
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-[#1D4ED8]/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/3 left-1/3 w-96 h-96 bg-[#F97316]/5 rounded-full blur-3xl" />
+        <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-brand/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/3 left-1/3 w-96 h-96 bg-gold/5 rounded-full blur-3xl" />
       </div>
 
       <motion.div
@@ -117,26 +118,22 @@ function SignupForm() {
       >
         <div className="text-center mb-8">
           <Link href="https://memecmo.ai" className="inline-block mb-6">
-            <img
-              src="/logo.svg"
-              alt="MemeCMO.ai Media-Tech"
-              className="h-12 w-auto mx-auto"
-            />
+            <span className="inline-flex justify-center"><MemeCMOLogo height={36} showWordmark /></span>
           </Link>
-          <h1 className="text-2xl font-bold text-[#F8FAFC] mb-2">
+          <h1 className="text-2xl font-bold text-ink mb-2">
             {t('auth.signupTitle')}
           </h1>
-          <p className="text-[#94A3B8] text-sm">
+          <p className="text-dim text-sm">
             {t('auth.signupSubtitle')}
           </p>
         </div>
 
-        <div className="bg-[#1E293B]/80 backdrop-blur-xl border border-[#334155] rounded-2xl p-8">
+        <div className="bg-surface backdrop-blur-xl border border-edge rounded-2xl p-8">
           {error && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mb-4 flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm"
+              className="mb-4 flex items-center gap-2 p-3 bg-garnet/10 border border-garnet/40 rounded-lg text-garnet text-sm"
             >
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               {error}
@@ -147,10 +144,10 @@ function SignupForm() {
 
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-[#334155]" />
+              <div className="w-full border-t border-edge" />
             </div>
             <div className="relative flex justify-center text-xs">
-              <span className="px-3 bg-[#1E293B] text-[#64748B]">
+              <span className="px-3 bg-surface text-faint">
                 {t('auth.orContinueWith')}
               </span>
             </div>
@@ -158,73 +155,73 @@ function SignupForm() {
 
           <form onSubmit={handleSignup} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-[#94A3B8] mb-1.5">
+              <label className="block text-sm font-medium text-dim mb-1.5">
                 {t('auth.fullName')}
               </label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]" />
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-faint" />
                 <Input
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder={t('auth.fullNamePlaceholder')}
                   required
-                  className="pl-10 bg-[#0F172A] border-[#334155] text-[#F8FAFC] placeholder:text-[#475569] focus:border-[#1D4ED8] focus:ring-[#1D4ED8]/20"
+                  className="pl-10 bg-canvas border-edge text-ink placeholder:text-faint focus:border-brand/50 focus:ring-brand/30"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[#94A3B8] mb-1.5">
+              <label className="block text-sm font-medium text-dim mb-1.5">
                 {t('auth.email')}
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-faint" />
                 <Input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                   required
-                  className="pl-10 bg-[#0F172A] border-[#334155] text-[#F8FAFC] placeholder:text-[#475569] focus:border-[#1D4ED8] focus:ring-[#1D4ED8]/20"
+                  className="pl-10 bg-canvas border-edge text-ink placeholder:text-faint focus:border-brand/50 focus:ring-brand/30"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[#94A3B8] mb-1.5">
+              <label className="block text-sm font-medium text-dim mb-1.5">
                 {t('auth.companyOptional')}
               </label>
               <div className="relative">
-                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]" />
+                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-faint" />
                 <Input
                   type="text"
                   value={company}
                   onChange={(e) => setCompany(e.target.value)}
                   placeholder={t('auth.companyPlaceholder')}
-                  className="pl-10 bg-[#0F172A] border-[#334155] text-[#F8FAFC] placeholder:text-[#475569] focus:border-[#1D4ED8] focus:ring-[#1D4ED8]/20"
+                  className="pl-10 bg-canvas border-edge text-ink placeholder:text-faint focus:border-brand/50 focus:ring-brand/30"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[#94A3B8] mb-1.5">
+              <label className="block text-sm font-medium text-dim mb-1.5">
                 {t('auth.password')}
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-faint" />
                 <Input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="********"
                   required
-                  className="pl-10 pr-10 bg-[#0F172A] border-[#334155] text-[#F8FAFC] placeholder:text-[#475569] focus:border-[#1D4ED8] focus:ring-[#1D4ED8]/20"
+                  className="pl-10 pr-10 bg-canvas border-edge text-ink placeholder:text-faint focus:border-brand/50 focus:ring-brand/30"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748B] hover:text-[#94A3B8]"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-faint hover:text-dim"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -232,8 +229,8 @@ function SignupForm() {
               <div className="mt-2 space-y-1">
                 {passwordRequirements.map((req) => (
                   <div key={req.label} className="flex items-center gap-2 text-xs">
-                    <div className={`w-1.5 h-1.5 rounded-full ${req.met ? 'bg-emerald-400' : 'bg-[#475569]'}`} />
-                    <span className={req.met ? 'text-emerald-400' : 'text-[#64748B]'}>
+                    <div className={`w-1.5 h-1.5 rounded-full ${req.met ? 'bg-sage' : 'bg-raised'}`} />
+                    <span className={req.met ? 'text-brand' : 'text-faint'}>
                       {req.label}
                     </span>
                   </div>
@@ -244,7 +241,7 @@ function SignupForm() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-[#1D4ED8] to-[#1E40AF] hover:from-[#1E40AF] hover:to-[#1D4ED8] text-[#F8FAFC] font-semibold py-3 rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-[#1D4ED8]/30"
+              className="w-full bg-brand hover:brightness-110 text-on-brand font-semibold py-3 rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-brand/30"
             >
               {loading ? (
                 <span className="flex items-center gap-2">
@@ -264,11 +261,11 @@ function SignupForm() {
           </form>
         </div>
 
-        <p className="text-center text-sm text-[#64748B] mt-6">
+        <p className="text-center text-sm text-faint mt-6">
           {t('auth.hasAccount')}{' '}
           <Link
             href={redirect !== '/dashboard' ? `/login?redirect=${encodeURIComponent(redirect)}` : '/login'}
-            className="text-[#1D4ED8] hover:text-[#3B82F6] font-medium transition-colors"
+            className="text-brand hover:brightness-110 font-medium transition-colors"
           >
             {t('auth.signIn')}
           </Link>

@@ -21,7 +21,7 @@ export default function MemeCMOLogo({
   const badge = (
     <div
       aria-label="MemeCMO.ai"
-      className={`inline-flex items-center justify-center rounded-[22%] text-white font-extrabold ${className}`}
+      className={`inline-flex items-center justify-center rounded-[22%] text-ink font-extrabold ${className}`}
       style={{
         width: height,
         height,
@@ -41,7 +41,7 @@ export default function MemeCMOLogo({
     <div className="inline-flex items-center gap-3">
       {badge}
       <span
-        className="font-semibold tracking-[0.25em] text-white/85"
+        className="font-semibold tracking-[0.25em] text-ink/85"
         style={{ fontSize: Math.round(height * 0.42) }}
       >
         MEMECMO.AI

@@ -164,36 +164,36 @@ export default function WaitlistClient({ initialStats }: { initialStats: PublicS
         transition={{ duration: 0.6 }}
         className="text-center max-w-3xl mx-auto"
       >
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/5 text-emerald-400 text-xs tracking-[0.2em] uppercase mb-6">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-brand/50 bg-brand-soft text-brand text-xs tracking-[0.2em] uppercase mb-6">
           <Sparkles className="w-3 h-3" />
           受邀测试期 · Invite-only beta
         </div>
-        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white leading-tight tracking-tight mb-6">
+        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-ink leading-tight tracking-tight mb-6">
           出海品牌的生成式引擎可见度
           <br />
-          <span className="bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-400 bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-brand via-garnet to-gold bg-clip-text text-transparent">
             正在被重新定义
           </span>
         </h1>
-        <p className="text-base sm:text-lg text-gray-400 max-w-2xl mx-auto leading-relaxed">
+        <p className="text-base sm:text-lg text-dim max-w-2xl mx-auto leading-relaxed">
           MemeCMO.ai —— 面向东南亚的多智能体 GEO 平台。
           我们正在邀请第一批同行者，专注出海品牌在 ChatGPT、Perplexity、Gemini、Claude 答案里的可见度、引用份额与情感倾向。
         </p>
 
         {/* Public counter */}
-        <div className="mt-8 inline-flex items-center gap-4 px-5 py-3 rounded-xl border border-white/10 bg-white/[0.02] backdrop-blur-sm">
-          <div className="flex items-center gap-2 text-sm text-gray-300">
-            <span className="text-emerald-400 font-mono font-bold tabular-nums">
+        <div className="mt-8 inline-flex items-center gap-4 px-5 py-3 rounded-xl border border-edge bg-surface backdrop-blur-sm">
+          <div className="flex items-center gap-2 text-sm text-dim">
+            <span className="text-brand font-mono font-bold tabular-nums">
               {initialStats.total_joined.toLocaleString()}
             </span>
-            <span className="text-gray-500">brands joined</span>
+            <span className="text-faint">brands joined</span>
           </div>
-          <span className="text-gray-600">·</span>
-          <div className="flex items-center gap-2 text-sm text-gray-300">
-            <span className="text-cyan-400 font-mono font-bold tabular-nums">
+          <span className="text-faint">·</span>
+          <div className="flex items-center gap-2 text-sm text-dim">
+            <span className="text-gold font-mono font-bold tabular-nums">
               {initialStats.joined_this_week.toLocaleString()}
             </span>
-            <span className="text-gray-500">本周新增</span>
+            <span className="text-faint">本周新增</span>
           </div>
         </div>
       </motion.div>
@@ -204,7 +204,7 @@ export default function WaitlistClient({ initialStats }: { initialStats: PublicS
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, delay: 0.15 }}
-        className="max-w-2xl mx-auto bg-[#0F172A]/80 backdrop-blur-xl border border-white/10 rounded-2xl p-6 sm:p-8 space-y-5 shadow-2xl"
+        className="max-w-2xl mx-auto bg-canvas/80 backdrop-blur-xl border border-edge rounded-2xl p-6 sm:p-8 space-y-5 shadow-2xl"
       >
         <Field
           label="邮箱"
@@ -263,7 +263,7 @@ export default function WaitlistClient({ initialStats }: { initialStats: PublicS
 
         {/* Optional fields divider */}
         <div className="pt-2">
-          <div className="flex items-center gap-3 text-[10px] tracking-[0.25em] uppercase text-gray-500 my-3">
+          <div className="flex items-center gap-3 text-[10px] tracking-[0.25em] uppercase text-faint my-3">
             <div className="h-px flex-1 bg-white/5" />
             以下选填 · 完整填写有助于优先审核
             <div className="h-px flex-1 bg-white/5" />
@@ -329,7 +329,7 @@ export default function WaitlistClient({ initialStats }: { initialStats: PublicS
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="flex items-start gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-sm"
+              className="flex items-start gap-2 px-3 py-2 rounded-lg bg-garnet/10 border border-red-500/30 text-red-300 text-sm"
             >
               <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
               <span>{error}</span>
@@ -340,7 +340,7 @@ export default function WaitlistClient({ initialStats }: { initialStats: PublicS
         <button
           type="submit"
           disabled={submitting || !email || !brandOrCompany || !brandOfInterest}
-          className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-[#0a1628] font-semibold text-sm tracking-wide hover:from-emerald-400 hover:to-cyan-400 disabled:from-gray-600 disabled:to-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed transition-all shadow-lg shadow-emerald-500/20 disabled:shadow-none"
+          className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-sage to-gold text-[var(--canvas)] font-semibold text-sm tracking-wide hover:from-sage hover:to-gold disabled:from-gray-600 disabled:to-gray-700 disabled:text-dim disabled:cursor-not-allowed transition-all shadow-lg shadow-sage/20 disabled:shadow-none"
         >
           {submitting ? (
             <>
@@ -353,7 +353,7 @@ export default function WaitlistClient({ initialStats }: { initialStats: PublicS
           )}
         </button>
 
-        <p className="text-[11px] text-gray-500 text-center leading-relaxed">
+        <p className="text-[11px] text-faint text-center leading-relaxed">
           下次审核：周三 09:00 UTC（{nextBatchHuman}）。等候期间会发送脱敏样本报告与行业观察邮件。
         </p>
       </motion.form>
@@ -366,10 +366,10 @@ export default function WaitlistClient({ initialStats }: { initialStats: PublicS
         className="max-w-2xl mx-auto"
       >
         <details className="group">
-          <summary className="flex items-center justify-center gap-2 text-sm text-gray-400 hover:text-gray-200 cursor-pointer transition select-none list-none">
+          <summary className="flex items-center justify-center gap-2 text-sm text-dim hover:text-ink cursor-pointer transition select-none list-none">
             <ShieldCheck className="w-4 h-4" />
             已经加入过？查看排队进度
-            <span className="text-gray-600 group-open:rotate-180 transition-transform">▾</span>
+            <span className="text-faint group-open:rotate-180 transition-transform">▾</span>
           </summary>
           <form onSubmit={handleStatusCheck} className="mt-4 flex flex-col sm:flex-row gap-2 max-w-md mx-auto">
             <input
@@ -383,7 +383,7 @@ export default function WaitlistClient({ initialStats }: { initialStats: PublicS
             <button
               type="submit"
               disabled={statusLoading || !statusEmail}
-              className="px-4 py-2.5 rounded-lg border border-white/15 text-gray-200 hover:bg-white/5 disabled:opacity-40 text-sm transition"
+              className="px-4 py-2.5 rounded-lg border border-edge-strong text-ink hover:bg-white/5 disabled:opacity-40 text-sm transition"
             >
               {statusLoading ? '查询中…' : '查询'}
             </button>
@@ -394,9 +394,9 @@ export default function WaitlistClient({ initialStats }: { initialStats: PublicS
           {statusResult && (
             <div className="mt-3 max-w-md mx-auto text-sm">
               {statusResult.found ? (
-                <div className="px-4 py-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 text-emerald-200">
+                <div className="px-4 py-3 rounded-lg border border-brand/50 bg-brand text-sage">
                   <div className="flex items-center justify-between">
-                    <span>状态：<b className="text-emerald-300">{translateStatus(statusResult.status)}</b></span>
+                    <span>状态：<b className="text-brand">{translateStatus(statusResult.status)}</b></span>
                     {statusResult.status === 'pending' && (
                       <span className="font-mono">
                         #{statusResult.queue_position} / {statusResult.total_pending}
@@ -404,12 +404,12 @@ export default function WaitlistClient({ initialStats }: { initialStats: PublicS
                     )}
                   </div>
                   {statusResult.status === 'pending' && (
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-dim mt-1">
                       下次审核：周三 09:00 UTC（{nextBatchHuman}）
                     </p>
                   )}
                   {statusResult.status === 'approved' && (
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-dim mt-1">
                       你的访问邀请已发送到邮箱，检查收件箱。
                     </p>
                   )}
@@ -472,13 +472,13 @@ function Field({
 }) {
   return (
     <label className="block">
-      <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-1.5">
-        <span className="text-gray-500">{icon}</span>
+      <div className="flex items-center gap-1.5 text-xs text-dim mb-1.5">
+        <span className="text-faint">{icon}</span>
         <span>{label}</span>
-        {required && <span className="text-emerald-400">*</span>}
+        {required && <span className="text-brand">*</span>}
       </div>
       {input}
-      {hint && <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">{hint}</p>}
+      {hint && <p className="text-[11px] text-faint mt-1 leading-relaxed">{hint}</p>}
     </label>
   );
 }
@@ -517,18 +517,18 @@ function SuccessCard({
       transition={{ duration: 0.6 }}
       className="max-w-2xl mx-auto"
     >
-      <div className="bg-[#0F172A]/80 backdrop-blur-xl border border-emerald-500/30 rounded-2xl p-8 sm:p-10 text-center shadow-2xl shadow-emerald-500/10">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-500/15 border border-emerald-500/40 mb-6">
-          <Check className="w-7 h-7 text-emerald-400" />
+      <div className="bg-canvas/80 backdrop-blur-xl border border-brand/50 rounded-2xl p-8 sm:p-10 text-center shadow-2xl shadow-sage/10">
+        <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-brand border border-brand/50 mb-6">
+          <Check className="w-7 h-7 text-brand" />
         </div>
 
         {isApproved ? (
           <>
-            <h2 className="text-3xl font-bold text-white mb-3">
+            <h2 className="text-3xl font-bold text-ink mb-3">
               你已通过审核 🎉
             </h2>
-            <p className="text-gray-300 text-base leading-relaxed mb-6">
-              邀请邮件已发送到 <span className="text-emerald-300 font-mono">{result.email}</span>，
+            <p className="text-dim text-base leading-relaxed mb-6">
+              邀请邮件已发送到 <span className="text-brand font-mono">{result.email}</span>，
               <br />
               点开始用 → 你的首份 GEO 报告就在 60 秒后。
             </p>
@@ -536,64 +536,64 @@ function SuccessCard({
         ) : (
           <>
             {result.already_on_list ? (
-              <h2 className="text-3xl font-bold text-white mb-3">
+              <h2 className="text-3xl font-bold text-ink mb-3">
                 你已经在名单上
               </h2>
             ) : (
-              <h2 className="text-3xl font-bold text-white mb-3">
+              <h2 className="text-3xl font-bold text-ink mb-3">
                 你已加入名单
               </h2>
             )}
 
             {/* Queue position */}
             <div className="my-8">
-              <div className="text-[11px] tracking-[0.3em] uppercase text-gray-500 mb-2">
+              <div className="text-[11px] tracking-[0.3em] uppercase text-faint mb-2">
                 你的位置
               </div>
-              <div className="text-7xl sm:text-8xl font-bold bg-gradient-to-br from-emerald-400 via-cyan-400 to-blue-400 bg-clip-text text-transparent font-mono tabular-nums">
+              <div className="text-7xl sm:text-8xl font-bold bg-gradient-to-br from-brand via-garnet to-gold bg-clip-text text-transparent font-mono tabular-nums">
                 #{result.queue_position?.toLocaleString() ?? '—'}
               </div>
               {result.total_pending !== null && (
-                <div className="text-sm text-gray-400 mt-2">
+                <div className="text-sm text-dim mt-2">
                   名单当前 {result.total_pending.toLocaleString()} 人排队
                 </div>
               )}
             </div>
 
-            <div className="px-5 py-4 rounded-xl bg-white/[0.02] border border-white/10 mb-6 text-left">
+            <div className="px-5 py-4 rounded-xl bg-surface border border-edge mb-6 text-left">
               <div className="flex items-center justify-between mb-2 text-sm">
-                <span className="text-gray-400">下次批量审核</span>
-                <span className="font-mono text-emerald-300">
+                <span className="text-dim">下次批量审核</span>
+                <span className="font-mono text-brand">
                   {nextBatch.toUTCString().replace(' GMT', ' UTC')}
                 </span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-400">距下次审核</span>
-                <span className="text-gray-200">{nextBatchHuman}</span>
+                <span className="text-dim">距下次审核</span>
+                <span className="text-ink">{nextBatchHuman}</span>
               </div>
             </div>
 
-            <p className="text-sm text-gray-400 leading-relaxed mb-2">
+            <p className="text-sm text-dim leading-relaxed mb-2">
               等候期间我们会发送
-              <span className="text-gray-200 mx-1">脱敏样本报告</span>
+              <span className="text-ink mx-1">脱敏样本报告</span>
               和
-              <span className="text-gray-200 mx-1">行业观察</span>
-              到 <span className="text-emerald-300 font-mono break-all">{result.email}</span>。
+              <span className="text-ink mx-1">行业观察</span>
+              到 <span className="text-brand font-mono break-all">{result.email}</span>。
             </p>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-faint">
               不要忘了把我们的发件人加入白名单，避免进垃圾箱。
             </p>
           </>
         )}
       </div>
 
-      <div className="text-center mt-6 text-xs text-gray-500">
+      <div className="text-center mt-6 text-xs text-faint">
         想了解我们在做什么？回看
-        <a href="/" className="text-gray-300 hover:text-emerald-300 transition underline underline-offset-4 mx-1">
+        <a href="/" className="text-dim hover:text-brand transition underline underline-offset-4 mx-1">
           首页介绍
         </a>
         或
-        <a href="/sea-command-center" className="text-gray-300 hover:text-emerald-300 transition underline underline-offset-4 mx-1">
+        <a href="/sea-command-center" className="text-dim hover:text-brand transition underline underline-offset-4 mx-1">
           SEA 指挥中心
         </a>
         的工作机制。

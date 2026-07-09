@@ -38,7 +38,7 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0a1628]/95 backdrop-blur-md border-b border-white/5">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-canvas/95 backdrop-blur-md border-b border-edge">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-3">
@@ -53,7 +53,7 @@ export default function Navbar() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="px-3 py-2 text-sm text-gray-300 hover:text-white transition-colors duration-200"
+                  className="px-3 py-2 text-sm text-dim hover:text-ink transition-colors duration-200"
                 >
                   {link.label}
                 </Link>
@@ -61,7 +61,7 @@ export default function Navbar() {
                 <a
                   key={link.href}
                   href={link.href}
-                  className="px-3 py-2 text-sm text-gray-300 hover:text-white transition-colors duration-200"
+                  className="px-3 py-2 text-sm text-dim hover:text-ink transition-colors duration-200"
                 >
                   {link.label}
                 </a>
@@ -72,7 +72,7 @@ export default function Navbar() {
           <div className="flex items-center gap-3">
             <button
               onClick={handleLangToggle}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-sm text-dim hover:text-ink transition-colors"
             >
               <Globe className="w-4 h-4" />
               <span>{langLabels[language]}</span>
@@ -82,23 +82,23 @@ export default function Navbar() {
                 {user ? (
                   <>
                     <Link
-                      href="/sea-command-center"
-                      className="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors duration-200"
+                      href="/dashboard"
+                      className="bg-brand hover:brightness-110 text-on-brand text-sm font-medium px-4 py-2 rounded-lg transition-colors duration-200"
                     >
-                      SEA 指挥中心
+                      工作台
                     </Link>
                   </>
                 ) : (
                   <>
                     <Link
                       href="/login"
-                      className="hidden sm:block text-sm text-gray-300 hover:text-white transition-colors px-3 py-1.5"
+                      className="hidden sm:block text-sm text-dim hover:text-ink transition-colors px-3 py-1.5"
                     >
                       登录
                     </Link>
                     <Link
                       href="/waitlist"
-                      className="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors duration-200"
+                      className="bg-brand hover:brightness-110 text-on-brand text-sm font-medium px-4 py-2 rounded-lg transition-colors duration-200"
                     >
                       加入名单
                     </Link>
@@ -108,7 +108,7 @@ export default function Navbar() {
             ) : null}
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
-              className="lg:hidden p-2 text-gray-400 hover:text-white"
+              className="lg:hidden p-2 text-dim hover:text-ink"
             >
               {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
@@ -117,14 +117,14 @@ export default function Navbar() {
       </div>
 
       {mobileOpen && (
-        <div className="lg:hidden bg-[#0a1628]/98 backdrop-blur-md border-t border-white/5">
+        <div className="lg:hidden bg-canvas/98 backdrop-blur-md border-t border-edge">
           <div className="px-4 py-3 space-y-1">
             {navLinks.map((link) => (
               link.href.startsWith('/') ? (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="block px-3 py-2 text-sm text-gray-300 hover:text-white transition-colors"
+                  className="block px-3 py-2 text-sm text-dim hover:text-ink transition-colors"
                   onClick={() => setMobileOpen(false)}
                 >
                   {link.label}
@@ -133,17 +133,17 @@ export default function Navbar() {
                 <a
                   key={link.href}
                   href={link.href}
-                  className="block px-3 py-2 text-sm text-gray-300 hover:text-white transition-colors"
+                  className="block px-3 py-2 text-sm text-dim hover:text-ink transition-colors"
                   onClick={() => setMobileOpen(false)}
                 >
                   {link.label}
                 </a>
               )
             ))}
-            <div className="pt-2 border-t border-white/10 flex items-center gap-3">
+            <div className="pt-2 border-t border-edge flex items-center gap-3">
               <button
                 onClick={handleLangToggle}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 text-sm text-dim hover:text-ink transition-colors"
               >
                 <Globe className="w-4 h-4" />
                 <span>{langLabels[language]}</span>
@@ -151,7 +151,7 @@ export default function Navbar() {
               {!user && (
                 <Link
                   href="/login"
-                  className="text-sm text-gray-300 hover:text-white px-3 py-2"
+                  className="text-sm text-dim hover:text-ink px-3 py-2"
                   onClick={() => setMobileOpen(false)}
                 >
                   登录
