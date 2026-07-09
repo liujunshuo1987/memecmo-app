@@ -34,6 +34,11 @@ const AGENT_ROWS: { id: string; dep: string }[] = [
 const T: Record<Lang, any> = {
   zh: {
     langName: '中文',
+    shotDashboard: '工作台:组织与项目卡片、套餐配额徽章、开客户与邀请入口',
+    shotWorkspace: '工作区三栏:左侧交付物导航 · 中央 AIGVR 评分卡(仪表盘 / 首位推荐率 / 五维雷达 / 分引擎)· 右侧趋势与情报面板',
+    shotDetail: '评分卡下半部:竞品声量基准 + 高意图缺口清单(每条标注引擎 / 漏斗阶段 / 出现的竞品)',
+    shotAnswers: '标准答案库:20 条重点 Prompt 的越 / 英双语标准答案,逐条可复制,可导出 PDF',
+    shotSandbox: '内容沙箱:发布级越南语成品稿 —— 直接编辑 / 复制,或用对话让 AI 修订当前稿',
     title: '使用说明与算法白皮书',
     subtitle: '系统怎么用 · 每个数字怎么算出来 · 出问题怎么办',
     updated: '与代码同源:本页所有常量取自实际实现,若与产品表现不符即为缺陷,请反馈。',
@@ -126,6 +131,11 @@ const T: Record<Lang, any> = {
   },
   en: {
     langName: 'English',
+    shotDashboard: 'Dashboard: organization & project cards, plan-quota badge, client provisioning and invites',
+    shotWorkspace: 'The 3-zone workspace: deliverables rail · AIGVR scorecard center stage (gauge / Top-of-Mind / radar / per-engine) · trend & context rail',
+    shotDetail: 'Scorecard, lower half: competitor share-of-voice benchmark + high-intent gap list (each tagged engine / funnel stage / competitors present)',
+    shotAnswers: 'Standard Answer Library: bilingual VI/EN canonical answers for the 20 key prompts — copy per item or export PDF',
+    shotSandbox: 'Content sandbox: a publish-ready Vietnamese draft — edit or copy directly, or revise via dialogue',
     title: 'User Guide & Algorithm Notes',
     subtitle: 'How to use the system · how every number is computed · what to do when something breaks',
     updated: 'Source-of-truth: every constant on this page is extracted from the implementation. If the product disagrees with this page, that is a bug — please report it.',
@@ -218,6 +228,11 @@ const T: Record<Lang, any> = {
   },
   vi: {
     langName: 'Tiếng Việt',
+    shotDashboard: 'Bảng điều khiển: thẻ tổ chức & dự án, huy hiệu hạn mức gói, mở khách hàng và lời mời',
+    shotWorkspace: 'Không gian làm việc 3 cột: điều hướng sản phẩm · bảng điểm AIGVR ở giữa (đồng hồ / đề xuất đầu tiên / radar / theo công cụ) · cột xu hướng & tình báo',
+    shotDetail: 'Nửa dưới bảng điểm: đối sánh thị phần đối thủ + danh sách khoảng trống ý định cao (gắn nhãn công cụ / giai đoạn / đối thủ)',
+    shotAnswers: 'Thư viện câu trả lời chuẩn: đáp án song ngữ Việt/Anh cho 20 prompt trọng điểm — sao chép từng mục hoặc xuất PDF',
+    shotSandbox: 'Sandbox nội dung: bản thảo tiếng Việt sẵn xuất bản — sửa/sao chép trực tiếp, hoặc hội thoại để AI chỉnh tiếp',
     title: 'Hướng dẫn sử dụng & Thuật toán',
     subtitle: 'Cách dùng hệ thống · mỗi con số được tính thế nào · xử lý sự cố',
     updated: 'Đồng nguồn với mã: mọi hằng số trên trang này trích từ mã nguồn thực tế. Nếu sản phẩm khác với trang này, đó là lỗi — hãy báo cho chúng tôi.',
@@ -316,6 +331,16 @@ const AGENT_LABEL: Record<string, string> = {
   site: 'Site 官网', distribute: 'Distribute 投放', encyclopedia: 'Encyclopedia 百科', full_scan: 'Full Scan 全扫描',
 };
 
+function Shot({ src, caption }: { src: string; caption: string }) {
+  return (
+    <figure className="rounded-xl border border-edge overflow-hidden bg-surface">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt={caption} loading="lazy" className="w-full block" />
+      <figcaption className="px-4 py-2 text-[11px] text-faint border-t border-edge">{caption}</figcaption>
+    </figure>
+  );
+}
+
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (
     <section id={id} className="space-y-4 scroll-mt-24">
@@ -390,8 +415,8 @@ export default function GuideContent() {
           </nav>
         </div>
 
-        <Section id="quickstart" title={t.sections.quickstart}><Rows rows={t.quickstart} /></Section>
-        <Section id="layout" title={t.sections.layout}><Rows rows={t.layout} /></Section>
+        <Section id="quickstart" title={t.sections.quickstart}><Rows rows={t.quickstart} /><Shot src="/guide/dashboard.png" caption={t.shotDashboard} /></Section>
+        <Section id="layout" title={t.sections.layout}><Shot src="/guide/workspace-monitor.png" caption={t.shotWorkspace} /><Rows rows={t.layout} /></Section>
 
         <Section id="agents" title={t.sections.agents}>
           <div className="overflow-x-auto rounded-lg border border-edge">
@@ -415,6 +440,7 @@ export default function GuideContent() {
               </tbody>
             </table>
           </div>
+          <Shot src="/guide/answers.png" caption={t.shotAnswers} />
         </Section>
 
         <Section id="aigvr" title={t.sections.aigvr}>
@@ -447,6 +473,7 @@ export default function GuideContent() {
             <div className="text-sm font-medium text-ink mb-1">{t.judgeTitle}</div>
             <p className="text-[13px] text-dim leading-relaxed">{t.judgeBody}</p>
           </div>
+          <Shot src="/guide/scorecard-detail.png" caption={t.shotDetail} />
         </Section>
 
         <Section id="topofmind" title={t.sections.topofmind}>
@@ -462,7 +489,7 @@ export default function GuideContent() {
           <p className="text-[13px] text-dim leading-relaxed">{t.trendBody}</p>
         </Section>
 
-        <Section id="results" title={t.sections.results}><Rows rows={t.resultsRows} /></Section>
+        <Section id="results" title={t.sections.results}><Shot src="/guide/sandbox.png" caption={t.shotSandbox} /><Rows rows={t.resultsRows} /></Section>
         <Section id="channel" title={t.sections.channel}><Rows rows={t.channelRows} /></Section>
         <Section id="faq" title={t.sections.faq}><Rows rows={t.faqRows} /></Section>
 

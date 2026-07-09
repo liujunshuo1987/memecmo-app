@@ -637,7 +637,10 @@ function ContextPanel({ headlineAigvr, scoreRun, runsByAgent, totalAgents }: {
   totalAgents: number;
 }) {
   const sc = scoreRun?.output?.scorecard ?? scoreRun?.output;
-  const readyCount = Object.values(runsByAgent).filter((r) => r.status === 'completed').length;
+  // Count only the deliverables listed in the nav groups — full_scan is a
+  // meta-run, not a deliverable (it was inflating ready past the total: 10/9).
+  const groupIds = new Set(DELIVERABLE_GROUPS.flatMap((g) => g.items));
+  const readyCount = Object.entries(runsByAgent).filter(([id, r]) => groupIds.has(id) && r.status === 'completed').length;
   const presence = sc?.dimensions?.presence;
   const topOfMind = sc?.topOfMind?.overallRate;
   const gaps = (sc?.gaps || []).length;
