@@ -83,10 +83,10 @@ const T: Record<Lang, any> = {
       full_scan: ['全扫描:发现 → 监测 → 报告 一键串行,断点续跑(Inngest checkpoint)', '约 4–6 分钟'],
     },
     aigvrIntro:
-      '每次监测把 Prompt 库抽样后同题发给 5 个 AI 引擎,回答由评委模型(温度 0.1)逐条结构化打分,再聚合为五个维度(各 0–100)与一个综合分。',
+      '每次监测把 Prompt 库抽样后同题发给 5 个 AI 引擎,回答由评委模型(温度 0.1)逐条结构化打分,再聚合为五个维度(各 0–100)与一个综合分。界面展示名为「AI Mindset Index」(合同指标名为 AIGVR 的客户仍显示 AIGVR),算法相同。评分卡头部呈现六个互不重叠的指标:出现率 / 声量份额 / 出现时位置(首位推荐率为其重点过滤视图)/ 出现时情感 / 引用强度 / 高意图缺口数。',
     sampleTitle: '采样设计',
     sampleBody:
-      '110 条库中,20 条重点 Prompt 每次全测,其余按阶段均衡抽样至上限 24 条;× 5 引擎 ≈ 120 次真实查询。单元格样本数决定置信标注:≥12 高 · ≥6 中 · <6 低。',
+      '110 条库中,20 条重点 Prompt 每次全测,其余按阶段均衡抽样至上限 24 条;× 5 引擎 ≈ 120 次真实查询。问题按意图二分呈现:高意图(谁提供/最好/价格/比较/品牌名/地点等购买信号)与教育型——教育型里 AI 很少点名品牌,出现率低属正常,这些问题输出为内容选题。缺口清单只统计高意图问题。为保证分数可比:prompt 库与竞品名单均冻结复用、每月刷新。置信标注:单元格 n≥12 高 · ≥6 中 · <6 低。',
     dimName: { presence: '出现率 Presence', prominence: '显著度 Prominence', competitiveShare: '声量份额 Share of Voice', sentiment: '情感 Sentiment', citation: '引用 Citation' },
     dimDef: {
       presence: '提及品牌的回答占全部查询的百分比。',
@@ -180,10 +180,10 @@ const T: Record<Lang, any> = {
       full_scan: ['Full Scan: Discovery → Monitor → Report in one click, checkpointed (resumes, never double-runs)', '~4–6 min'],
     },
     aigvrIntro:
-      'Each Monitor run samples the prompt library, sends identical queries to 5 AI engines, judge-scores every answer (temperature 0.1, structured output), then aggregates five dimensions (0–100 each) and one composite.',
+      'Each Monitor run samples the prompt library, sends identical queries to 5 AI engines, judge-scores every answer (temperature 0.1, structured output), then aggregates five dimensions (0–100 each) and one composite. Displayed as "AI Mindset Index" (clients whose contract names the metric see AIGVR — same algorithm). The scorecard headline shows six non-overlapping KPIs: presence / share of voice / position-when-present (top-of-mind is its key-prompt filtered view) / sentiment-when-present / citation strength / high-intent gap count.',
     sampleTitle: 'Sampling design',
     sampleBody:
-      'All 20 key prompts are always measured; the rest are stage-balanced up to a cap of 24 prompts, × 5 engines ≈ 120 live queries per scan. Per-cell confidence: n≥12 high · n≥6 medium · below low.',
+      'All 20 key prompts are always measured; the rest are stage-balanced up to a cap of 24 prompts, × 5 engines ≈ 120 live queries per scan. Questions are presented by INTENT: high-intent (buying signals — who provides / best / price / compare / brand names / location) vs educational, where AI rarely names brands (low presence is normal; those prompts become content topics). The gap list counts high-intent questions only. For comparability, both the prompt library and the competitor set are frozen and reused, refreshed monthly. Per-cell confidence: n≥12 high · n≥6 medium · below low.',
     dimName: { presence: 'Presence', prominence: 'Prominence', competitiveShare: 'Share of Voice (competitive)', sentiment: 'Sentiment', citation: 'Citation' },
     dimDef: {
       presence: '% of all queries whose answer mentions the brand.',
@@ -277,7 +277,7 @@ const T: Record<Lang, any> = {
       full_scan: ['Full Scan: Khám phá → Giám sát → Báo cáo một chạm, có checkpoint (chạy tiếp, không chạy trùng)', '~4–6 phút'],
     },
     aigvrIntro:
-      'Mỗi lần giám sát lấy mẫu thư viện prompt, gửi cùng câu hỏi tới 5 công cụ AI, mô hình giám khảo chấm từng câu trả lời (temperature 0.1, đầu ra có cấu trúc), rồi tổng hợp 5 chiều (0–100) và một điểm tổng.',
+      'Mỗi lần giám sát lấy mẫu thư viện prompt, gửi cùng câu hỏi tới 5 công cụ AI, mô hình giám khảo chấm từng câu trả lời (temperature 0.1, đầu ra có cấu trúc), rồi tổng hợp 5 chiều (0–100) và một điểm tổng. Tên hiển thị là "AI Mindset Index" (khách có hợp đồng ghi AIGVR vẫn thấy AIGVR — cùng thuật toán). Bảng điểm hiển thị sáu KPI không trùng lặp: hiện diện / thị phần giọng nói / vị trí khi xuất hiện (đề xuất đầu tiên là góc nhìn lọc theo prompt trọng điểm) / cảm xúc / trích dẫn / số khoảng trống ý định cao.',
     sampleTitle: 'Thiết kế lấy mẫu',
     sampleBody:
       '20 prompt trọng điểm luôn được đo đủ; phần còn lại lấy mẫu cân bằng theo giai đoạn tới trần 24 prompt; × 5 công cụ ≈ 120 truy vấn thật mỗi lần quét. Độ tin cậy theo ô: n≥12 cao · n≥6 trung bình · thấp hơn là thấp.',
