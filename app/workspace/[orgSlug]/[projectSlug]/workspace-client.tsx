@@ -67,6 +67,10 @@ const COUNTRY_FLAG: Record<string, string> = {
 // of WorkspaceClient so every nested renderer can call t() without prop drilling.
 type UiLang = 'en' | 'zh' | 'vi';
 let UI_LANG: UiLang = 'en';
+// Client-facing name of the composite score. Default is the friendly
+// "AI Mindset Index"; orgs whose CONTRACT names the metric (FMVN → AIGVR)
+// override via organizations.metadata.scoreLabel.
+let SCORE_LABEL = 'AI Mindset Index';
 const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
   zh: {
     'Run full GEO scan': '运行完整 GEO 扫描', '…focus the agents': '…给智能体一个方向',
@@ -83,11 +87,15 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Full Scan': '完整扫描', Profile: '品牌档案', Discovery: '发现', Monitor: '监测', Report: '报告',
     Optimize: '内容', Site: '主页', Distribute: '分发', Encyclopedia: '百科', 'Copy kit': '复制全套', 'Copy brief': '复制简报',
     'Copy page': '复制页面', 'Copy schema': '复制 schema', 'Copy plan': '复制方案', 'Copy Markdown': '复制 Markdown',
-    'AIGVR trend': 'AIGVR 趋势', 'vs previous scan': '对比上次扫描', 'Run another scan to track change.': '再扫一次即可追踪变化。',
+    trend: '趋势', 'vs previous scan': '对比上次扫描', 'Run another scan to track change.': '再扫一次即可追踪变化。',
     'Top-of-mind rate': '首位推荐率', 'featured / first recommendation': '被作为首选/首位推荐',
     'Top-of-mind · key prompts': '首位推荐率 · 重点 Prompt', 'key prompts monitored': '条重点 Prompt 已监测',
     Answers: '标准答案', 'Standard answer library': '标准答案库', 'the answer we want AI to give': '我们希望 AI 给出的答案',
     'Export PDF': '导出 PDF', Guide: '使用说明',
+    'Position when present': '出现时位置', 'Sentiment when present': '出现时情感', 'Citation strength': '引用强度',
+    'Top-of-mind': '首位推荐', key: '重点', Rank: '排名', answers: '条回答', 'queries competitors win': '竞品占优的问题',
+    'By intent': '按意图', 'High intent': '高意图', Educational: '教育型',
+    'AI rarely names brands on educational questions — low presence there is normal; those prompts feed content topics.': '教育型问题里 AI 很少点名品牌——此处出现率低属正常;这些问题正是内容选题的来源。',
     'Getting started…': '正在启动…', 'Technical trace': '技术轨迹', 'This takes a few minutes — the run continues on the server, so you can leave this page and come back.': '大约需要几分钟——任务在服务器持续运行,你可以离开此页稍后回来。',
     'Phase 1/3 · Discovery': '阶段 1/3 · 构建问题集', 'Phase 2/3 · Monitor': '阶段 2/3 · 向 AI 引擎提问并打分', 'Phase 3/3 · Report': '阶段 3/3 · 撰写报告',
     'Monitor started': '监测启动', 'Sampling prompt set': '选取问题集', 'Identifying competitors': '识别竞品', 'Scoring prominence & sentiment': '逐条评分(位置与情感)', 'Computing AIGVR scorecard': '汇总评分卡', 'AIGVR scorecard ready': '评分卡就绪',
@@ -114,6 +122,10 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Top-of-mind · key prompts': 'Đề xuất đầu tiên · prompt trọng điểm', 'key prompts monitored': 'prompt trọng điểm được theo dõi',
     Answers: 'Câu trả lời chuẩn', 'Standard answer library': 'Thư viện câu trả lời chuẩn', 'the answer we want AI to give': 'câu trả lời ta muốn AI đưa ra',
     'Export PDF': 'Xuất PDF', Guide: 'Hướng dẫn',
+    'Position when present': 'Vị trí khi xuất hiện', 'Sentiment when present': 'Cảm xúc khi xuất hiện', 'Citation strength': 'Sức mạnh trích dẫn',
+    'Top-of-mind': 'Đề xuất đầu tiên', key: 'trọng điểm', Rank: 'Hạng', answers: 'câu trả lời', 'queries competitors win': 'câu hỏi đối thủ thắng',
+    'By intent': 'Theo ý định', 'High intent': 'Ý định cao', Educational: 'Giáo dục',
+    'AI rarely names brands on educational questions — low presence there is normal; those prompts feed content topics.': 'AI hiếm khi nêu tên thương hiệu ở câu hỏi giáo dục — hiện diện thấp là bình thường; các câu này là nguồn chủ đề nội dung.',
     'Getting started…': 'Đang khởi động…', 'Technical trace': 'Nhật ký kỹ thuật', 'This takes a few minutes — the run continues on the server, so you can leave this page and come back.': 'Mất vài phút — tác vụ chạy trên máy chủ, bạn có thể rời trang và quay lại sau.',
     'Phase 1/3 · Discovery': 'Giai đoạn 1/3 · Xây bộ câu hỏi', 'Phase 2/3 · Monitor': 'Giai đoạn 2/3 · Hỏi các công cụ AI và chấm điểm', 'Phase 3/3 · Report': 'Giai đoạn 3/3 · Viết báo cáo',
     'Identifying competitors': 'Nhận diện đối thủ', 'Scoring prominence & sentiment': 'Chấm điểm từng câu trả lời', 'Computing AIGVR scorecard': 'Tổng hợp bảng điểm', 'AIGVR scorecard ready': 'Bảng điểm sẵn sàng',
@@ -150,6 +162,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
   const [intent, setIntent] = useState('');
   const [uiLang, setUiLang] = useState<UiLang>('en');
   UI_LANG = uiLang; // module-level so nested renderers can call t()
+  SCORE_LABEL = ((organization.metadata as any)?.scoreLabel as string) || 'AI Mindset Index';
   const [theme, setTheme] = useState<'night' | 'day'>('night');
   useEffect(() => {
     try { setTheme(localStorage.getItem('memecmo-theme') === 'day' ? 'day' : 'night'); } catch { /* ignore */ }
@@ -371,7 +384,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
           {headlineAigvr != null && (
             <div className="text-right leading-none">
               <div className={`text-lg font-semibold ${headlineAigvr >= 67 ? 'text-sage' : headlineAigvr >= 34 ? 'text-gold' : 'text-garnet'}`}>{headlineAigvr}</div>
-              <div className="text-[9px] text-faint uppercase tracking-wider">AIGVR</div>
+              <div className="text-[9px] text-faint uppercase tracking-wider">{SCORE_LABEL}</div>
             </div>
           )}
           <span
@@ -630,7 +643,7 @@ function TrendPanel({ history }: { history: ScanPoint[] }) {
   return (
     <div className="rounded-lg border border-edge bg-surface p-4 space-y-2">
       <div className="flex items-center justify-between">
-        <div className="text-[10px] uppercase tracking-widest text-faint">{t('AIGVR trend')} · {history.length}</div>
+        <div className="text-[10px] uppercase tracking-widest text-faint">{SCORE_LABEL} {t('trend')} · {history.length}</div>
         {dA != null && <div className={`text-[11px] font-medium ${dColor(dA)}`}>{arrow(dA)} {Math.abs(dA)}</div>}
       </div>
       <div className="flex items-end gap-2">
@@ -677,7 +690,7 @@ function ContextPanel({ headlineAigvr, scoreRun, runsByAgent, totalAgents }: {
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-edge bg-surface p-4 text-center">
-        <div className="text-[10px] uppercase tracking-widest text-faint mb-1">AIGVR</div>
+        <div className="text-[10px] uppercase tracking-widest text-faint mb-1">{SCORE_LABEL}</div>
         <div className={`text-3xl font-semibold leading-none ${headlineAigvr == null ? 'text-faint' : headlineAigvr >= 67 ? 'text-sage' : headlineAigvr >= 34 ? 'text-gold' : 'text-garnet'}`}>{headlineAigvr ?? '—'}</div>
         <div className="text-[10px] text-faint mt-1">/ 100</div>
       </div>
@@ -846,7 +859,7 @@ function ScoreGauge({ score, size = 96 }: { score: number; size?: number }) {
         style={{ transition: 'stroke-dashoffset 0.7s ease' }}
       />
       <text x="50%" y="45%" textAnchor="middle" dominantBaseline="middle" fontSize="27" fontWeight="700" fill={col}>{s}</text>
-      <text x="50%" y="64%" textAnchor="middle" dominantBaseline="middle" fontSize="9" letterSpacing="2" fill="var(--faint)">AIGVR</text>
+      <text x="50%" y="64%" textAnchor="middle" dominantBaseline="middle" fontSize="9" letterSpacing="2" fill="var(--faint)">SCORE</text>
     </svg>
   );
 }
@@ -1519,6 +1532,16 @@ function StandardAnswersResult({ o }: { o: Record<string, any> }) {
   );
 }
 
+function KpiTile({ label, value, sub, accent }: { label: string; value: string | number; sub?: string; accent?: boolean }) {
+  return (
+    <div className={`rounded-lg border px-3 py-2 ${accent ? 'border-brand/40 bg-brand-soft/40' : 'border-edge bg-surface'}`}>
+      <div className="text-[10px] uppercase tracking-wider text-faint truncate">{label}</div>
+      <div className="text-lg font-semibold text-ink tabular-nums leading-tight">{value}</div>
+      {sub && <div className="text-[10px] text-faint truncate">{sub}</div>}
+    </div>
+  );
+}
+
 function MonitorResult({ o }: { o: Record<string, any> }) {
   const d = o.dimensions || {};
   const dims: { k: string; label: string }[] = [
@@ -1549,7 +1572,7 @@ function MonitorResult({ o }: { o: Record<string, any> }) {
       {/* Header: title + headline gauge */}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-ink tracking-wide">AIGVR Scorecard</h3>
+          <h3 className="text-sm font-semibold text-ink tracking-wide">{SCORE_LABEL} Scorecard</h3>
           <p className="text-[11px] text-faint mt-0.5">{(o.engines || []).join(' · ')} · {o.sampled?.queries ?? '—'} queries</p>
         </div>
         <div className="flex flex-col items-center shrink-0">
@@ -1560,23 +1583,17 @@ function MonitorResult({ o }: { o: Record<string, any> }) {
         </div>
       </div>
 
-      {/* Top-of-Mind / first-recommendation rate — the contract headline KPI */}
-      {hasTom && (
-        <div className="flex flex-wrap gap-2">
-          <div className="flex-1 min-w-[140px] rounded-lg border border-brand/40 bg-brand-soft/40 px-3 py-2">
-            <div className="text-[10px] uppercase tracking-wider text-faint">{t('Top-of-mind rate')}</div>
-            <div className="text-lg font-semibold text-ink tabular-nums">{tom.overallRate}%</div>
-            <div className="text-[10px] text-faint">{t('featured / first recommendation')}</div>
-          </div>
-          {tom.keyRate != null && (
-            <div className="flex-1 min-w-[140px] rounded-lg border border-gold/40 bg-gold/10 px-3 py-2">
-              <div className="text-[10px] uppercase tracking-wider text-faint">{t('Top-of-mind · key prompts')}</div>
-              <div className="text-lg font-semibold text-ink tabular-nums">{tom.keyRate}%</div>
-              <div className="text-[10px] text-faint">{tom.keySampled}/{tom.keyTotal} {t('key prompts monitored')}</div>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Six non-overlapping headline KPIs (CMO review): occurrence, share of
+          voice, position-when-present (top-of-mind folded in as its filtered
+          view), sentiment-when-present, citation strength, high-intent gaps. */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <KpiTile label={t('Presence')} value={`${Math.round(d.presence ?? 0)}%`} sub={`${o.metrics?.overall?.brandHits ?? '—'}/${o.sampled?.queries ?? '—'} ${t('answers')}`} />
+        <KpiTile label={t('Share of Voice')} value={`${Math.round(d.competitiveShare ?? 0)}%`} sub={`${t('Rank')} #${o.brandRank ?? '—'} / ${bench.length || '—'}`} />
+        <KpiTile label={t('Position when present')} value={Math.round(d.prominence ?? 0)} sub={hasTom ? `${t('Top-of-mind')} ${tom.overallRate}% · ${t('key')} ${tom.keyRate ?? '—'}%` : undefined} accent />
+        <KpiTile label={t('Sentiment when present')} value={Math.round(d.sentiment ?? 0)} />
+        <KpiTile label={t('Citation strength')} value={`${Math.round(d.citation ?? 0)}%`} />
+        <KpiTile label={t('High-intent gaps')} value={gaps.length} sub={t('queries competitors win')} accent={gaps.length > 0} />
+      </div>
 
       {/* Radar + per-dimension breakdown */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
@@ -1614,8 +1631,26 @@ function MonitorResult({ o }: { o: Record<string, any> }) {
         </div>
       )}
 
-      {/* Funnel-stage visibility */}
-      {stages.length > 0 && (
+      {/* Intent visibility (client-facing taxonomy per the CMO review);
+          legacy scorecards without perIntent fall back to funnel stages. */}
+      {(o.metrics?.perIntent || []).length > 0 ? (
+        <div>
+          <SectionLabel>{t('By intent')}</SectionLabel>
+          <div className="space-y-2">
+            {(o.metrics.perIntent as any[]).map((s2, i) => (
+              <div key={i} className="grid grid-cols-[110px_1fr_72px] items-center gap-2.5">
+                <span className="text-[11px] text-dim truncate">{s2.intent === 'high_intent' ? t('High intent') : t('Educational')}</span>
+                <Bar value={s2.presence} />
+                <span className="text-[11px] text-dim text-right tabular-nums">
+                  <span className="text-ink font-semibold">{s2.presence}%</span>
+                  <span className="text-faint"> {s2.brandHits}/{s2.queries}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-1.5 text-[10px] text-faint">{t('AI rarely names brands on educational questions — low presence there is normal; those prompts feed content topics.')}</p>
+        </div>
+      ) : stages.length > 0 && (
         <div>
           <SectionLabel>Funnel-stage visibility</SectionLabel>
           <div className="space-y-2">

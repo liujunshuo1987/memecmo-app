@@ -12,6 +12,7 @@
 
 import { poeChat, parseJsonFromLLM } from '@/lib/llm/poe';
 import { fetchGoogleAio, localeFor } from './serp';
+import { classifyIntent, type PromptIntent } from './intent';
 
 type EventEmitter = (event: {
   event_type:
@@ -132,7 +133,7 @@ function round(n: number): number {
   return Math.round(n);
 }
 
-type Sampled = { stage: string; label: string; prompt: string; key: boolean };
+type Sampled = { stage: string; label: string; prompt: string; key: boolean; intent: PromptIntent };
 
 function normKey(s: string): string {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -180,7 +181,7 @@ function selectSample(promptSet: PromptCategory[], keyPrompts: string[], cap: nu
   const flat: Sampled[] = [];
   for (const c of promptSet) {
     for (const p of c.prompts || []) {
-      flat.push({ stage: c.category || 'general', label: c.label || c.category || 'general', prompt: p, key: keySet.has(normKey(p)) });
+      flat.push({ stage: c.category || 'general', label: c.label || c.category || 'general', prompt: p, key: keySet.has(normKey(p)), intent: 'educational' });
     }
   }
   if (flat.length <= cap) return flat;
@@ -322,6 +323,7 @@ async function judgeEngineAnswers(
 interface RawAnswer {
   engine: string;
   stage: string;
+  intent: PromptIntent;
   prompt: string;
   key: boolean;
   text: string;
@@ -333,6 +335,7 @@ interface RawAnswer {
 interface Sample {
   engine: string;
   stage: string;
+  intent: PromptIntent;
   prompt: string;
   key: boolean;
   brandPresent: boolean;
@@ -413,6 +416,10 @@ export async function runMonitorAgent(
   const totalPrompts = input.promptSet.reduce((n, c) => n + (c.prompts?.length || 0), 0);
   const keyPrompts = input.keyPrompts || [];
   const sampled = selectSample(input.promptSet, keyPrompts, SAMPLE_CAP);
+  // Client-facing intent taxonomy (high-intent vs educational) — deterministic
+  // so the frozen library never needs regeneration.
+  const intentNames = [input.brandName, ...((input.competitorSet?.groups || []).map((g) => g.canonical))];
+  for (const s of sampled) s.intent = classifyIntent(s.prompt, intentNames);
   const keyUsed = sampled.filter((s) => s.key).length;
   await emit({ event_type: 'milestone', payload: { label: 'Sampling prompt set', step: 2, totalSteps: 5 } });
   await emit({
@@ -469,6 +476,7 @@ export async function runMonitorAgent(
         const a: RawAnswer = {
           engine: engine.label,
           stage: s.stage,
+          intent: s.intent,
           prompt: s.prompt,
           key: s.key,
           text,
@@ -569,6 +577,7 @@ export async function runMonitorAgent(
       samples.push({
         engine: a.engine,
         stage: a.stage,
+        intent: a.intent,
         prompt: a.prompt,
         key: a.key,
         brandPresent,
@@ -609,9 +618,18 @@ export async function runMonitorAgent(
   const brandCitedCount = samples.filter((s) => s.brandCited).length;
   const allSources = Array.from(new Set(samples.flatMap((s) => s.citations))).slice(0, 25);
 
+  // Gaps are HIGH-INTENT only (educational prompts rarely name brands — a
+  // zero there is normal, not a gap). Educational misses become content topics.
   const gaps = samples
-    .filter((s) => !s.brandPresent && s.competitorsPresent.length > 0)
-    .map((s) => ({ stage: s.stage, prompt: s.prompt, engine: s.engine, competitorsPresent: s.competitorsPresent }));
+    .filter((s) => s.intent === 'high_intent' && !s.brandPresent && s.competitorsPresent.length > 0)
+    .map((s) => ({ stage: s.stage, intent: s.intent, prompt: s.prompt, engine: s.engine, competitorsPresent: s.competitorsPresent }));
+  const educationalTopics = Array.from(new Set(
+    samples.filter((s) => s.intent === 'educational' && !s.brandPresent).map((s) => s.prompt),
+  )).slice(0, 15);
+  const perIntent = (['high_intent', 'educational'] as PromptIntent[]).map((it) => ({
+    intent: it,
+    ...computeDimensions(samples.filter((s) => s.intent === it)),
+  }));
 
   const bestEngine = [...perEngine].sort((a, b) => b.aigvr - a.aigvr)[0];
   const worstEngine = [...perEngine].sort((a, b) => a.aigvr - b.aigvr)[0];
@@ -652,11 +670,12 @@ export async function runMonitorAgent(
     engines: enginesUsed,
     surfaces: { realSurfaces: serpKey ? ['Google AI Overview'] : [], proxySurfaces: ENGINES.map((e) => e.label) },
     sampled: { total: totalPrompts, used: sampled.length, queries: samples.length, keyUsed, keyTotal: keyPrompts.length },
-    metrics: { overall, perEngine, perStage, keySet },
+    metrics: { overall, perEngine, perStage, perIntent, keySet },
     competitorBenchmark: bench,
     brandRank,
     citations: { brandCited: brandCitedCount > 0, brandCitedCount, sampleSources: allSources },
     gaps,
+    educationalTopics,
     rawSamples: samples,
     generatedBy: engines.map((e) => (e.kind === 'serp' ? 'Google AI Overview' : e.model)).join(' + '),
   };
