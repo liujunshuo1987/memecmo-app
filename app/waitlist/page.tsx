@@ -27,9 +27,13 @@ interface PublicStats {
 
 async function getPublicStats(): Promise<PublicStats> {
   try {
+    // Service role, server-side only: the stats view is security_invoker now
+    // (Security Advisor), so the anon role reads zero rows through waitlist
+    // RLS — the aggregate must be computed by a role that can see the table.
     const sb = createServerSupabase(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { persistSession: false } },
     );
     const { data } = await sb.from('waitlist_public_stats').select('*').limit(1).maybeSingle();
     return {
