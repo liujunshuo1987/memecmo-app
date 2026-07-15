@@ -15,16 +15,28 @@ interface Group {
   projects: Project[];
 }
 interface Billing {
+  planId: string;
   planName: string;
   quota: number;
   used: number;
   status: string;
+  hasStripeSub: boolean;
+}
+interface PlanRow {
+  id: string;
+  name: string;
+  price_usd_month: number | null;
+  monthly_scan_quota: number;
+  max_projects: number;
+  stripe_price_id: string | null;
 }
 interface Props {
   groups: Group[];
   userEmail: string;
   isRootAdmin: boolean;
   billing: Record<string, Billing>;
+  plansCatalog: PlanRow[];
+  stripeReady: boolean;
 }
 
 const COUNTRIES = [
@@ -53,11 +65,12 @@ function slugify(s: string): string {
     .slice(0, 40);
 }
 
-export default function DashboardClient({ groups, userEmail, isRootAdmin, billing }: Props) {
+export default function DashboardClient({ groups, userEmail, isRootAdmin, billing, plansCatalog, stripeReady }: Props) {
   const router = useRouter();
   const [modalOrg, setModalOrg] = useState<Organization | null>(null);
   const [newClientFor, setNewClientFor] = useState<Organization | null>(null);
   const [inviteOrg, setInviteOrg] = useState<Organization | null>(null);
+  const [billingOrg, setBillingOrg] = useState<Organization | null>(null);
   const [busyApprove, setBusyApprove] = useState<string | null>(null);
 
   const signOut = async () => {
@@ -145,14 +158,19 @@ export default function DashboardClient({ groups, userEmail, isRootAdmin, billin
                       </span>
                     )}
                     {bill && (
-                      <span
-                        title={`${bill.status} · resets monthly`}
-                        className={`text-[10px] px-2 py-0.5 rounded-full border uppercase tracking-wider ${
-                          bill.used >= bill.quota ? 'border-garnet/50 text-garnet bg-garnet/10' : 'border-sage/40 text-sage bg-sage/10'
-                        }`}
+                      <button
+                        onClick={() => (role === 'admin' || isRootAdmin) && setBillingOrg(org)}
+                        title={`${bill.status} · resets monthly${role === 'admin' || isRootAdmin ? ' · click to manage plan' : ''}`}
+                        className={`text-[10px] px-2 py-0.5 rounded-full border uppercase tracking-wider transition ${
+                          bill.status !== 'trialing' && bill.status !== 'active'
+                            ? 'border-garnet/50 text-garnet bg-garnet/10'
+                            : bill.used >= bill.quota
+                              ? 'border-gold/50 text-gold bg-gold/10'
+                              : 'border-sage/40 text-sage bg-sage/10'
+                        } ${role === 'admin' || isRootAdmin ? 'cursor-pointer hover:brightness-110' : 'cursor-default'}`}
                       >
-                        {bill.planName} · {bill.used}/{bill.quota} scans
-                      </span>
+                        {bill.planName} · {bill.used}/{bill.quota} scans{bill.status !== 'trialing' && bill.status !== 'active' ? ` · ${bill.status}` : ''}
+                      </button>
                     )}
                   </div>
                   <div className="flex gap-2">
@@ -228,6 +246,109 @@ export default function DashboardClient({ groups, userEmail, isRootAdmin, billin
         />
       )}
       {inviteOrg && <InviteModal org={inviteOrg} onClose={() => setInviteOrg(null)} />}
+      {billingOrg && (
+        <BillingModal
+          org={billingOrg}
+          bill={billing[billingOrg.id]}
+          plans={plansCatalog}
+          stripeReady={stripeReady}
+          onClose={() => setBillingOrg(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function BillingModal({ org, bill, plans, stripeReady, onClose }: {
+  org: Organization;
+  bill?: Billing;
+  plans: PlanRow[];
+  stripeReady: boolean;
+  onClose: () => void;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const checkout = async (planId: string) => {
+    setBusy(planId); setError(null);
+    try {
+      const res = await fetch('/api/workspace/billing/checkout', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orgId: org.id, planId }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.message || data.error || 'Checkout failed'); setBusy(null); return; }
+      window.location.href = data.url;
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); setBusy(null); }
+  };
+
+  const portal = async () => {
+    setBusy('portal'); setError(null);
+    try {
+      const res = await fetch('/api/workspace/billing/portal', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orgId: org.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.message || data.error || 'Portal unavailable'); setBusy(null); return; }
+      window.location.href = data.url;
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); setBusy(null); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" onClick={onClose}>
+      <div className="w-full max-w-2xl rounded-xl border border-edge bg-surface p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div>
+          <h3 className="text-sm font-semibold text-ink">套餐与账单 · Plan &amp; billing</h3>
+          <p className="text-xs text-faint">{org.name} · 当前 {bill?.planName ?? '—'}({bill?.status ?? '—'})· 本期已用 {bill?.used ?? 0}/{bill?.quota ?? 0} 次扫描</p>
+        </div>
+
+        {!stripeReady && (
+          <div className="text-xs text-gold bg-gold/10 border border-gold/40 rounded px-3 py-2">
+            收款通道配置中 — Stripe 密钥尚未接入,套餐可浏览、暂不可支付。
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {plans.map((p) => {
+            const current = bill?.planId === p.id;
+            return (
+              <div key={p.id} className={`rounded-lg border p-4 space-y-2 ${current ? 'border-brand/60 bg-brand-soft/40' : 'border-edge bg-canvas'}`}>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-sm font-semibold text-ink">{p.name}</span>
+                  {current && <span className="text-[9px] uppercase tracking-wider text-brand">当前</span>}
+                </div>
+                <div className="text-xl font-bold text-ink tabular-nums">
+                  {p.price_usd_month != null ? `$${p.price_usd_month}` : '—'}
+                  <span className="text-[10px] font-normal text-faint"> /月</span>
+                </div>
+                <ul className="text-[11px] text-dim space-y-0.5">
+                  <li>{p.monthly_scan_quota} 次扫描 / 月</li>
+                  <li>最多 {p.max_projects} 个项目</li>
+                </ul>
+                <button
+                  disabled={!stripeReady || current || busy !== null}
+                  onClick={() => checkout(p.id)}
+                  className="w-full text-xs px-3 py-1.5 rounded-md bg-brand text-on-brand hover:brightness-110 disabled:bg-raised disabled:text-faint transition"
+                >
+                  {busy === p.id ? '跳转中…' : current ? '使用中' : '订阅 Subscribe'}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+
+        {error && <div className="text-xs text-garnet bg-garnet/10 border border-garnet/40 rounded px-3 py-2">{error}</div>}
+
+        <div className="flex items-center justify-between pt-1">
+          {bill?.hasStripeSub ? (
+            <button onClick={portal} disabled={busy !== null} className="text-xs px-3 py-1.5 rounded-md border border-edge text-dim hover:text-ink transition disabled:opacity-50">
+              {busy === 'portal' ? '跳转中…' : '管理订阅 / 发票 →'}
+            </button>
+          ) : <span className="text-[11px] text-faint">订阅后可在此管理付款方式与发票</span>}
+          <button onClick={onClose} className="text-sm px-3 py-2 rounded-md border border-edge text-dim hover:text-ink transition">关闭</button>
+        </div>
+      </div>
     </div>
   );
 }

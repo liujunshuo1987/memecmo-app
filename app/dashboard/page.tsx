@@ -31,11 +31,11 @@ export default async function DashboardPage() {
 
   // ③ Commercial: subscription + period usage per end-client org (RLS-scoped).
   const endClientIds = orgs.filter((o) => o.type === 'end_client').map((o) => o.id);
-  const billing: Record<string, { planName: string; quota: number; used: number; status: string }> = {};
+  const billing: Record<string, { planId: string; planName: string; quota: number; used: number; status: string; hasStripeSub: boolean }> = {};
   if (endClientIds.length) {
     const { data: subs } = await supabase
       .from('org_subscriptions')
-      .select('organization_id, status, current_period_start, plans(name, monthly_scan_quota)')
+      .select('organization_id, status, current_period_start, plan_id, stripe_subscription_id, plans(name, monthly_scan_quota)')
       .in('organization_id', endClientIds);
     for (const s of subs ?? []) {
       const plan = (s as any).plans;
@@ -46,13 +46,32 @@ export default async function DashboardPage() {
         .in('kind', ['full_scan', 'monitor'])
         .gte('ts', s.current_period_start);
       billing[s.organization_id] = {
+        planId: s.plan_id,
         planName: plan?.name ?? '—',
         quota: plan?.monthly_scan_quota ?? 0,
         used: count ?? 0,
         status: s.status,
+        hasStripeSub: !!s.stripe_subscription_id,
       };
     }
   }
 
-  return <DashboardClient groups={groups} userEmail={user.email ?? ''} isRootAdmin={isRootAdmin} billing={billing} />;
+  // Plans catalogue (public read) + whether payments are live on this deploy.
+  const { data: plansCatalog } = await supabase
+    .from('plans')
+    .select('id, name, price_usd_month, monthly_scan_quota, max_projects, stripe_price_id')
+    .order('sort');
+  const stripeKey = process.env.STRIPE_SECRET_KEY || '';
+  const stripeReady = stripeKey.startsWith('sk_') && stripeKey.length > 20;
+
+  return (
+    <DashboardClient
+      groups={groups}
+      userEmail={user.email ?? ''}
+      isRootAdmin={isRootAdmin}
+      billing={billing}
+      plansCatalog={plansCatalog ?? []}
+      stripeReady={stripeReady}
+    />
+  );
 }

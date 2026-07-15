@@ -101,7 +101,8 @@ export default function AccountPage() {
     setPortalLoading(true);
     setPortalError('');
     try {
-      const res = await fetch('/api/stripe/create-portal', { method: 'POST' });
+      window.location.href = '/dashboard'; return;
+      const res = await fetch('/api/workspace/billing/portal', { method: 'POST' });
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;

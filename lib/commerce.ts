@@ -29,11 +29,13 @@ export interface QuotaStatus {
   metered: boolean;          // false for root/channel_partner — never blocked
   planId: string | null;
   planName: string | null;
+  status?: string;           // subscription status (trialing/active/past_due/canceled)
   quota: number;             // scans allowed this period
   used: number;              // metered scans used this period
   remaining: number;
   periodEnd: string | null;
   overQuota: boolean;
+  subscriptionBlocked?: boolean; // canceled / past_due — renew to continue
 }
 
 export function serviceClient(): SupabaseClient {
@@ -120,15 +122,20 @@ export async function getQuotaStatusForProject(projectId: string): Promise<Quota
     .gte('ts', sub.current_period_start);
 
   const used = count ?? 0;
+  // A canceled / past-due subscription blocks metered runs regardless of
+  // remaining quota (Stripe webhook keeps this status in sync).
+  const subscriptionBlocked = !['trialing', 'active'].includes(sub.status);
   return {
     metered: true,
     planId: sub.plan_id,
     planName: plan?.name ?? sub.plan_id,
+    status: sub.status,
     quota,
     used,
     remaining: Math.max(0, quota - used),
     periodEnd: sub.current_period_end as string,
-    overQuota: used >= quota,
+    overQuota: subscriptionBlocked || used >= quota,
+    subscriptionBlocked,
   };
 }
 

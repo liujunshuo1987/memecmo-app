@@ -64,14 +64,10 @@ export async function POST(req: NextRequest) {
   const metered = isMeteredKind(body.agentId);
   const quota = metered ? await getQuotaStatusForProject(body.projectId) : null;
   if (quota?.metered && quota.overQuota) {
-    return NextResponse.json(
-      {
-        error: 'quota_exceeded',
-        message: `Monthly scan quota reached (${quota.used}/${quota.quota} on ${quota.planName}). Upgrade the plan or wait for the next billing period.`,
-        quota,
-      },
-      { status: 402 },
-    );
+    const message = quota.subscriptionBlocked
+      ? `Subscription is ${quota.status} — renew billing in the dashboard to continue scanning.`
+      : `Monthly scan quota reached (${quota.used}/${quota.quota} on ${quota.planName}). Upgrade the plan or wait for the next billing period.`;
+    return NextResponse.json({ error: 'quota_exceeded', message, quota }, { status: 402 });
   }
 
   const { data: run, error: runError } = await supabase

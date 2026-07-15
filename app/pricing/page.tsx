@@ -63,30 +63,9 @@ export default function PricingPage() {
 
     if (!plan.stripe_price_id) return;
 
-    setLoading(true);
-    setCheckoutError('');
-    try {
-      const res = await fetch('/api/stripe/create-checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          priceId: plan.stripe_price_id,
-          planType: plan.plan_type,
-          billingCycle: plan.billing_cycle,
-        }),
-      });
-
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        setCheckoutError(data.error || t('pricing.checkoutError'));
-      }
-    } catch {
-      setCheckoutError(t('pricing.checkoutError'));
-    } finally {
-      setLoading(false);
-    }
+    // Subscriptions are per-organization — org admins subscribe from the
+    // dashboard billing modal (legacy user-level checkout removed).
+    window.location.href = '/dashboard';
   };
 
   const planIcons: Record<string, React.ReactNode> = {
