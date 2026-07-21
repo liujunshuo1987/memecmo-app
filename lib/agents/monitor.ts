@@ -453,7 +453,7 @@ export async function runMonitorAgent(
           // Per-query resilience: one slow/failed AIO fetch must not sink the
           // whole engine. A timeout = "no AI Overview shown for this query".
           try {
-            const aio = await fetchGoogleAio(s.prompt, { gl: loc.gl, hl: loc.hl, key: serpKey!, signal: AbortSignal.timeout(SERP_TIMEOUT_MS) });
+            const aio = await fetchGoogleAio(s.prompt, { gl: loc.gl, hl: loc.hl, location: loc.location, key: serpKey!, signal: AbortSignal.timeout(SERP_TIMEOUT_MS) });
             text = aio.text;
             citations = aio.citations;
           } catch {

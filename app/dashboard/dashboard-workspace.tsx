@@ -46,6 +46,11 @@ const COUNTRIES = [
   { name: 'Malaysia', lang: 'ms', flag: '🇲🇾' },
   { name: 'Indonesia', lang: 'id', flag: '🇮🇩' },
   { name: 'Singapore', lang: 'en', flag: '🇸🇬' },
+  // US Tier-1 states (state-aware GEO — us.memecmo.ai line)
+  { name: 'California, US', lang: 'en', flag: '🇺🇸' },
+  { name: 'Texas, US', lang: 'en', flag: '🇺🇸' },
+  { name: 'Florida, US', lang: 'en', flag: '🇺🇸' },
+  { name: 'New York, US', lang: 'en', flag: '🇺🇸' },
 ];
 const FLAG: Record<string, string> = Object.fromEntries(COUNTRIES.map((c) => [c.name, c.flag]));
 

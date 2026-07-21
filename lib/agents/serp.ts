@@ -34,7 +34,7 @@ function refsToLinks(refs: { link?: string }[] | undefined): string[] {
 // when Google showed no AI Overview (a real signal: no AI surface for that query).
 export async function fetchGoogleAio(
   query: string,
-  opts: { gl: string; hl: string; key: string; signal?: AbortSignal },
+  opts: { gl: string; hl: string; key: string; location?: string; signal?: AbortSignal },
 ): Promise<AioResult> {
   const params = new URLSearchParams({
     engine: 'google',
@@ -43,6 +43,7 @@ export async function fetchGoogleAio(
     hl: opts.hl,
     api_key: opts.key,
   });
+  if (opts.location) params.set('location', opts.location);
   const res = await fetch(`${SERP_URL}?${params.toString()}`, {
     signal: opts.signal ?? AbortSignal.timeout(50_000),
   });
@@ -79,6 +80,14 @@ const LOCALE: Record<string, { gl: string; hl: string }> = {
   Malaysia: { gl: 'my', hl: 'ms' },
   Singapore: { gl: 'sg', hl: 'en' },
 };
-export function localeFor(country: string, lang?: string | null): { gl: string; hl: string } {
+const US_STATES = new Set(['Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut','Delaware','Florida','Georgia','Hawaii','Idaho','Illinois','Indiana','Iowa','Kansas','Kentucky','Louisiana','Maine','Maryland','Massachusetts','Michigan','Minnesota','Mississippi','Missouri','Montana','Nebraska','Nevada','New Hampshire','New Jersey','New Mexico','New York','North Carolina','North Dakota','Ohio','Oklahoma','Oregon','Pennsylvania','Rhode Island','South Carolina','South Dakota','Tennessee','Texas','Utah','Vermont','Virginia','Washington','West Virginia','Wisconsin','Wyoming']);
+
+export function localeFor(country: string, lang?: string | null): { gl: string; hl: string; location?: string } {
+  // US-state markets ("Florida, US" or bare state name): state-precision
+  // Google surface via SerpApi's location parameter.
+  const stateName = country.replace(/,\s*(US|USA|United States)$/i, '').trim();
+  if (US_STATES.has(stateName)) {
+    return { gl: 'us', hl: 'en', location: `${stateName}, United States` };
+  }
   return LOCALE[country] || { gl: 'us', hl: lang || 'en' };
 }
