@@ -8,6 +8,7 @@
 
 import { poeChat, parseJsonFromLLM, DEFAULT_MODEL } from '@/lib/llm/poe';
 import { brandProfileBlock } from './brand-facts';
+import { stateFrameBlock } from './state-frames';
 
 type EventEmitter = (event: {
   event_type:
@@ -88,7 +89,7 @@ export async function runOptimizeAgent(
     `Market: ${input.targetCountry}` + (input.industry ? ` · ${input.industry}` : ''),
     `Write everything in ${languageName}.`,
     input.target.competitors?.length ? `Competitors currently winning this query: ${input.target.competitors.join(', ')}.` : null,
-    brandProfileBlock(input.brandProfile) || null,
+    (brandProfileBlock(input.brandProfile) + stateFrameBlock(input.targetCountry, input.industry)) || null,
     '',
     `Target buyer query to win (write the page that should rank/be-cited for it):`,
     `"${query}"`,

@@ -10,6 +10,7 @@
 
 import { poeChat, parseJsonFromLLM, DEFAULT_MODEL } from '@/lib/llm/poe';
 import { brandProfileBlock } from './brand-facts';
+import { stateFrameBlock } from './state-frames';
 
 type EventEmitter = (event: {
   event_type: 'log' | 'tool_call' | 'tool_result' | 'progress' | 'output_chunk' | 'error' | 'milestone';
@@ -82,7 +83,7 @@ export async function runEncyclopediaAgent(
     'Independent sources observed citing this brand (notability signal):',
     sourceLines,
     '',
-    brandProfileBlock(input.brandProfile),
+    brandProfileBlock(input.brandProfile) + stateFrameBlock(input.targetCountry, input.industry),
     '',
     'Assess and produce JSON of this exact shape:',
     '{',

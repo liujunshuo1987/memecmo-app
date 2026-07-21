@@ -9,6 +9,7 @@
 
 import { poeChat, parseJsonFromLLM, DEFAULT_MODEL } from '@/lib/llm/poe';
 import { brandProfileBlock } from './brand-facts';
+import { stateFrameBlock } from './state-frames';
 
 type EventEmitter = (event: {
   event_type: 'log' | 'tool_call' | 'tool_result' | 'progress' | 'output_chunk' | 'error' | 'milestone';
@@ -78,7 +79,7 @@ export async function runStandardAnswersAgent(
 ): Promise<{ summary: string; output: Record<string, unknown> }> {
   const langCode = (input.targetLanguage || 'en').toLowerCase();
   const localLang = LANGUAGE_NAMES[langCode] || 'English';
-  const profileBlock = brandProfileBlock(input.brandProfile);
+  const profileBlock = brandProfileBlock(input.brandProfile) + stateFrameBlock(input.targetCountry, input.industry);
   const prompts = (input.keyPrompts || []).filter((p) => typeof p === 'string' && p.trim());
 
   await emit({ event_type: 'milestone', payload: { label: 'Standard answers started', step: 1, totalSteps: 3 } });

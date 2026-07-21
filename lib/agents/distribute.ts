@@ -10,6 +10,7 @@
 
 import { poeChat, parseJsonFromLLM, DEFAULT_MODEL } from '@/lib/llm/poe';
 import { brandProfileBlock } from './brand-facts';
+import { stateFrameBlock } from './state-frames';
 
 type EventEmitter = (event: {
   event_type: 'log' | 'tool_call' | 'tool_result' | 'progress' | 'output_chunk' | 'error' | 'milestone';
@@ -78,7 +79,7 @@ export async function runDistributeAgent(
     `Market: ${input.targetCountry}` + (input.industry ? ` · ${input.industry}` : ''),
     `Write all submission copy in ${languageName}.`,
     input.competitors?.length ? `Competitors already present on these sources: ${input.competitors.join(', ')}.` : null,
-    brandProfileBlock(input.brandProfile) || null,
+    (brandProfileBlock(input.brandProfile) + stateFrameBlock(input.targetCountry, input.industry)) || null,
     '',
     'Target sources (the domains AI engines actually cite for this category — get the brand featured here):',
     sourceList,

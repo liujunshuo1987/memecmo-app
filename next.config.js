@@ -10,9 +10,12 @@ const nextConfig = {
         // app.memecmo.ai is the product domain; the marketing homepage lives
         // on memecmo.ai (separate deployment). Config-level redirect ensures
         // a proper Location header (a static page-level redirect() does not).
+        // us.memecmo.ai is excluded — its root is the US preview (rewritten
+        // below), not the dashboard.
         source: '/',
         destination: '/dashboard',
         permanent: false,
+        missing: [{ type: 'host', value: 'us.memecmo.ai' }],
       },
       {
         source: '/privacy-policy',
@@ -46,6 +49,17 @@ const nextConfig = {
         has: [{ type: 'host', value: 'www.neurosparkmedia.com' }],
         destination: 'https://memecmo.ai/:path*',
         permanent: true,
+      },
+    ];
+  },
+  async rewrites() {
+    return [
+      // us.memecmo.ai serves the US sub-system: its root is the state-aware
+      // GEO page (same deployment, host-scoped).
+      {
+        source: '/',
+        has: [{ type: 'host', value: 'us.memecmo.ai' }],
+        destination: '/us',
       },
     ];
   },
