@@ -69,7 +69,10 @@ export default function UsPreviewPage() {
     <div className="min-h-screen bg-canvas text-ink">
       <header className="border-b border-edge px-6 py-3 flex items-center justify-between">
         <span className="text-xs tracking-[0.2em] uppercase text-dim">MemeCMO · US</span>
-        <span className="text-[10px] px-2 py-0.5 rounded-full border border-gold/40 text-gold uppercase tracking-widest">Private preview</span>
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] px-2 py-0.5 rounded-full border border-gold/40 text-gold uppercase tracking-widest">Private preview</span>
+          <a href="/login?next=/dashboard" className="text-xs px-3 py-1.5 rounded-lg bg-brand text-on-brand font-medium hover:brightness-110 transition">Sign in →</a>
+        </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-14 space-y-16">
@@ -184,12 +187,20 @@ export default function UsPreviewPage() {
             us.memecmo.ai is in concept testing. If you run a brand in a regulated vertical and want
             to see your state-by-state AI visibility, request access:
           </p>
-          <a
-            href="mailto:liujunshuo1987@gmail.com?subject=MemeCMO%20US%20preview%20access"
-            className="inline-flex items-center px-4 py-2 rounded-lg bg-brand text-on-brand text-sm font-medium hover:brightness-110 transition"
-          >
-            Request preview access →
-          </a>
+          <div className="flex flex-wrap items-center gap-3">
+            <a
+              href="/dashboard"
+              className="inline-flex items-center px-4 py-2 rounded-lg bg-brand text-on-brand text-sm font-medium hover:brightness-110 transition"
+            >
+              Enter the workspace →
+            </a>
+            <a
+              href="mailto:liujunshuo1987@gmail.com?subject=MemeCMO%20US%20preview%20access"
+              className="text-sm text-dim underline underline-offset-2 hover:text-ink transition"
+            >
+              or email us for access
+            </a>
+          </div>
         </section>
       </main>
 
