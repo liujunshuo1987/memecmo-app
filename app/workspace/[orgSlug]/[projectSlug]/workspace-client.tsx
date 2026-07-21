@@ -91,7 +91,7 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Top-of-mind rate': '首位推荐率', 'featured / first recommendation': '被作为首选/首位推荐',
     'Top-of-mind · key prompts': '首位推荐率 · 重点 Prompt', 'key prompts monitored': '条重点 Prompt 已监测',
     Answers: '标准答案', 'Standard answer library': '标准答案库', 'the answer we want AI to give': '我们希望 AI 给出的答案',
-    'Export PDF': '导出 PDF', Guide: '使用说明',
+    'Export PDF': '导出 PDF', Guide: '使用说明', 'Not run yet for this project.': '本项目尚未运行该智能体。', 'Run now': '立即运行',
     'Position when present': '出现时位置', 'Sentiment when present': '出现时情感', 'Citation strength': '引用强度',
     'Top-of-mind': '首位推荐', key: '重点', Rank: '排名', answers: '条回答', 'queries competitors win': '竞品占优的问题',
     'By intent': '按意图',
@@ -122,7 +122,7 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Top-of-mind rate': 'Tỷ lệ đề xuất đầu tiên', 'featured / first recommendation': 'được đề xuất đầu tiên',
     'Top-of-mind · key prompts': 'Đề xuất đầu tiên · prompt trọng điểm', 'key prompts monitored': 'prompt trọng điểm được theo dõi',
     Answers: 'Câu trả lời chuẩn', 'Standard answer library': 'Thư viện câu trả lời chuẩn', 'the answer we want AI to give': 'câu trả lời ta muốn AI đưa ra',
-    'Export PDF': 'Xuất PDF', Guide: 'Hướng dẫn',
+    'Export PDF': 'Xuất PDF', Guide: 'Hướng dẫn', 'Not run yet for this project.': 'Chưa chạy cho dự án này.', 'Run now': 'Chạy ngay',
     'Position when present': 'Vị trí khi xuất hiện', 'Sentiment when present': 'Cảm xúc khi xuất hiện', 'Citation strength': 'Sức mạnh trích dẫn',
     'Top-of-mind': 'Đề xuất đầu tiên', key: 'trọng điểm', Rank: 'Hạng', answers: 'câu trả lời', 'queries competitors win': 'câu hỏi đối thủ thắng',
     'By intent': 'Theo ý định',
@@ -147,7 +147,26 @@ const DELIVERABLE_GROUPS: { label: string; items: string[] }[] = [
   { label: 'Act — build AEO presence', items: ['site', 'optimize', 'distribute', 'encyclopedia'] },
 ];
 
-type LatestRun = { runId: string; summary: string | null; status: string; output: any; createdAt: string };
+type LatestRun = { runId: string; summary: string | null; status: string; output: any; createdAt: string; local?: boolean };
+
+// Deliverable-centric bookkeeping: a completed full_scan carries its phase
+// outputs, so monitor / report / discovery count as READY even without a
+// standalone run of their own. Synthesized entries render locally (no refetch).
+function creditFullScan(m: Record<string, LatestRun>): Record<string, LatestRun> {
+  const fsRun = m['full_scan'];
+  if (!fsRun || fsRun.status !== 'completed' || !fsRun.output) return m;
+  const phases: [string, any][] = [
+    ['monitor', fsRun.output.scorecard],
+    ['report', fsRun.output.report],
+    ['discovery', fsRun.output.discovery],
+  ];
+  for (const [aid, out] of phases) {
+    if (out && (!m[aid] || m[aid].createdAt < fsRun.createdAt)) {
+      m[aid] = { runId: fsRun.runId, summary: null, status: 'completed', output: out, createdAt: fsRun.createdAt, local: true };
+    }
+  }
+  return m;
+}
 
 export default function WorkspaceClient({ project, organization, initialRuns, scanHistory, isOperator = false }: Props) {
   const [history, setHistory] = useState<ScanPoint[]>(scanHistory);
@@ -159,7 +178,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
         m[r.agent_id] = { runId: r.id, summary: r.summary, status: r.status, output: r.output, createdAt: r.created_at };
       }
     }
-    return m;
+    return creditFullScan(m);
   });
   const [intent, setIntent] = useState('');
   const [uiLang, setUiLang] = useState<UiLang>('en');
@@ -274,7 +293,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
             // A freshly-dispatched run that finished updates the deliverable hub.
             if (freshRunRef.current && data.run?.agent_id && activeRunId) {
               freshRunRef.current = false;
-              setRunsByAgent((prev) => ({
+              setRunsByAgent((prev) => creditFullScan({
                 ...prev,
                 [data.run.agent_id]: {
                   runId: activeRunId,
@@ -308,7 +327,21 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
 
   // View a completed run's result (read-only). Reuses the poller, which fetches
   // its events + output and stops (terminal).
+  const [emptyAgent, setEmptyAgent] = useState<string | null>(null);
+
   const viewRun = (runId: string, agentId?: string) => {
+    setEmptyAgent(null);
+    // Synthesized (full-scan-credited) deliverables render from local output —
+    // no run refetch, no risk of dispatching anything.
+    const entry = agentId ? runsByAgent[agentId] : undefined;
+    if (entry?.local) {
+      freshRunRef.current = false;
+      maxPctRef.current = 100;
+      setActivity([]);
+      setActiveRunId(null);
+      setRunStatus({ status: 'completed', progress_pct: 100, summary: entry.summary, agentId, output: entry.output });
+      return;
+    }
     if (runId === activeRunId) return;
     freshRunRef.current = false;
     maxPctRef.current = 0;
@@ -321,6 +354,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
   const dispatchAgent = async (agentId: string, inputPrompt?: string) => {
     if (sending) return;
     setSending(true);
+    setEmptyAgent(null);
     freshRunRef.current = true;
     maxPctRef.current = 0;
     setActivity([]);
@@ -432,9 +466,10 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
                     agentId={aid}
                     run={runsByAgent[aid]}
                     running={sending && runStatus?.agentId === aid && !isTerminal}
-                    isViewing={(!!runsByAgent[aid] && runsByAgent[aid].runId === activeRunId) || (runStatus?.agentId === aid && !runsByAgent[aid])}
+                    isViewing={runStatus?.agentId === aid || emptyAgent === aid}
                     onView={viewRun}
                     onRun={dispatchAgent}
+                    onEmpty={(id) => { setEmptyAgent(id); setActiveRunId(null); setActivity([]); setRunStatus(null); }}
                     disabled={sending}
                   />
                 ))}
@@ -445,7 +480,21 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
 
         {/* CENTER — stage */}
         <main ref={resultTopRef} className="lg:overflow-y-auto px-6 py-5 lg:min-h-0 min-w-0">
-          {!runStatus ? (
+          {!runStatus && emptyAgent ? (
+            <div className="h-full flex flex-col items-center justify-center text-center gap-3 py-16">
+              <div className="text-brand"><Icon name={emptyAgent} size={32} /></div>
+              <div className="text-sm font-medium text-ink">{AGENTS[emptyAgent]?.displayName?.replace('AIGVR', SCORE_LABEL)}</div>
+              <div className="text-xs text-faint max-w-sm">{AGENTS[emptyAgent]?.description}</div>
+              <div className="text-xs text-dim">{t('Not run yet for this project.')}</div>
+              <button
+                onClick={() => dispatchAgent(emptyAgent)}
+                disabled={sending}
+                className="mt-2 px-4 py-2 rounded-lg bg-brand text-on-brand text-sm font-medium hover:brightness-110 disabled:opacity-50 transition"
+              >
+                ▶ {t('Run now')}
+              </button>
+            </div>
+          ) : !runStatus ? (
             <div className="h-full flex flex-col items-center justify-center text-center text-faint gap-2 py-16">
               <div className="text-brand"><Icon name="full_scan" size={32} /></div>
               <div className="text-sm text-dim">{t('Pick a deliverable on the left, or run a full GEO scan.')}</div>
@@ -463,14 +512,14 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
                   <span className="text-xs tracking-[0.25em] uppercase text-dim">MemeCMO · GEO</span>
                   <span className="text-xs text-faint">{new Date().toISOString().slice(0, 10)}</span>
                 </div>
-                <div className="text-xl font-semibold mt-1">{AGENTS[runStatus.agentId ?? '']?.displayName ?? 'Deliverable'}</div>
+                <div className="text-xl font-semibold mt-1">{(AGENTS[runStatus.agentId ?? '']?.displayName ?? 'Deliverable').replace('AIGVR', SCORE_LABEL)}</div>
                 <div className="text-sm text-dim mt-0.5">{project.brand_name} · {project.target_country}</div>
               </div>
               <div className="print-hide flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-sm font-medium truncate flex items-center gap-2">
                     <span className="text-brand"><Icon name={runStatus.agentId ?? ''} size={16} /></span>
-                    {AGENTS[runStatus.agentId ?? '']?.displayName ?? 'Agent run'}
+                    {(AGENTS[runStatus.agentId ?? '']?.displayName ?? 'Agent run').replace('AIGVR', SCORE_LABEL)}
                   </div>
                   <div className="text-[11px] text-faint">{runStatus.status} · {displayPct}%</div>
                 </div>
@@ -548,7 +597,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
 }
 
 function NavItem({
-  agentId, run, running, isViewing, onView, onRun, disabled,
+  agentId, run, running, isViewing, onView, onRun, onEmpty, disabled,
 }: {
   agentId: string;
   run?: LatestRun;
@@ -556,16 +605,20 @@ function NavItem({
   isViewing: boolean;
   onView: (runId: string, agentId: string) => void;
   onRun: (agentId: string) => void;
+  onEmpty: (agentId: string) => void;
   disabled: boolean;
 }) {
   const a = AGENTS[agentId];
   const ready = !!run && run.status === 'completed';
+  // Row click NEVER dispatches a run (viewing must never spend quota) — it
+  // views the deliverable or shows the empty state. Runs are explicit: the
+  // small ▶ chip only.
   return (
-    <button
-      onClick={() => (ready ? onView(run!.runId, agentId) : onRun(agentId))}
-      disabled={disabled && !ready}
+    <div
+      onClick={() => (ready ? onView(run!.runId, agentId) : onEmpty(agentId))}
       title={a?.description}
-      className={`w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-md border transition disabled:opacity-50 ${
+      role="button"
+      className={`w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-md border transition cursor-pointer ${
         isViewing ? 'bg-sage/12 border-sage/40' : 'border-transparent hover:bg-raised'
       }`}
     >
@@ -576,9 +629,14 @@ function NavItem({
       ) : ready ? (
         <span className="w-1.5 h-1.5 rounded-full bg-sage inline-block shrink-0" title="ready" />
       ) : (
-        <span className="text-[10px] text-faint shrink-0">{t('run')}</span>
+        <span
+          onClick={(e) => { e.stopPropagation(); if (!disabled) onRun(agentId); }}
+          className={`text-[10px] shrink-0 px-1.5 py-0.5 rounded border border-edge text-faint hover:text-brand hover:border-brand/50 transition ${disabled ? 'opacity-50' : ''}`}
+        >
+          ▶ {t('run')}
+        </span>
       )}
-    </button>
+    </div>
   );
 }
 

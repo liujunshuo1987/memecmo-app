@@ -313,7 +313,9 @@ export async function executeAgentRun(
 
       result = {
         summary: rep.summary,
-        output: { aigvrScore: (mon.output as { aigvrScore?: number }).aigvrScore, scorecard: mon.output, report: rep.output },
+        // All three phase outputs ride on the run so the workspace can credit
+        // each deliverable from a full scan (deliverable-centric bookkeeping).
+        output: { aigvrScore: (mon.output as { aigvrScore?: number }).aigvrScore, scorecard: mon.output, report: rep.output, discovery: disc.output },
       };
     } else if (agentId === 'discovery') {
       result = await runDiscoveryAgent(
