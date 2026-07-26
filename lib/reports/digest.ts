@@ -377,7 +377,7 @@ function digestHtml(g: GatherResult, interp: Interpretation | null): string {
   return `<!doctype html>
 <html><body style="margin:0;padding:0;background:#FBF7F4;font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
   <div style="max-width:560px;margin:0 auto;padding:32px 20px;">
-    <div style="font-size:11px;letter-spacing:3px;color:#9C8E8A;text-transform:uppercase;margin-bottom:18px;">MemeCMO &middot; GEO</div>
+    <div style="margin-bottom:18px;"><img src="${APP_URL}/email-logo.png" width="22" height="22" alt="MemeCMO" style="vertical-align:middle;border:0;border-radius:5px;"/><span style="font-size:11px;letter-spacing:3px;color:#9C8E8A;text-transform:uppercase;vertical-align:middle;margin-left:8px;">MemeCMO &middot; GEO</span></div>
     <div style="background:#FFFFFF;border:1px solid rgba(58,30,34,0.12);border-radius:14px;padding:28px;">
       <h1 style="margin:0 0 2px;font-size:18px;color:#2A2024;">${esc(g.project.brand_name)} &middot; ${esc(g.project.target_country)}</h1>
       <div style="font-size:12px;color:#9C8E8A;">${new Date().toISOString().slice(0, 10)}</div>
@@ -391,7 +391,8 @@ function digestHtml(g: GatherResult, interp: Interpretation | null): string {
         <a href="${workspaceUrl}" style="display:inline-block;background:#C76B7A;color:#FFFFFF;text-decoration:none;font-size:13px;font-weight:600;padding:10px 16px;border-radius:9px;">Workspace →</a>
       </div>
     </div>
-    <p style="margin:16px 0 0;font-size:11px;color:#9C8E8A;text-align:center;">${esc(t.footer)}</p>
+    <div style="text-align:center;margin-top:20px;"><img src="${APP_URL}/email-logo-faint.png" width="44" height="44" alt="" style="border:0;"/></div>
+    <p style="margin:10px 0 0;font-size:11px;color:#9C8E8A;text-align:center;">${esc(t.footer)}</p>
   </div>
 </body></html>`;
 }
@@ -491,13 +492,14 @@ export async function maybeSendScanAlert(
   const html = `<!doctype html>
 <html><body style="margin:0;padding:0;background:#FBF7F4;font-family:-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
   <div style="max-width:560px;margin:0 auto;padding:32px 20px;">
-    <div style="font-size:11px;letter-spacing:3px;color:#9C8E8A;text-transform:uppercase;margin-bottom:18px;">MemeCMO &middot; GEO</div>
+    <div style="margin-bottom:18px;"><img src="${APP_URL}/email-logo.png" width="22" height="22" alt="MemeCMO" style="vertical-align:middle;border:0;border-radius:5px;"/><span style="font-size:11px;letter-spacing:3px;color:#9C8E8A;text-transform:uppercase;vertical-align:middle;margin-left:8px;">MemeCMO &middot; GEO</span></div>
     <div style="background:#FFFFFF;border:1px solid rgba(166,75,75,0.35);border-radius:14px;padding:28px;">
       <h1 style="margin:0 0 12px;font-size:17px;color:#A64B4B;">${esc(t.alertSubject(g.project.brand_name))}</h1>
       ${lines.map((l) => `<p style="margin:0 0 10px;font-size:13.5px;color:#2A2024;line-height:1.65;">${esc(l)}</p>`).join('')}
       <a href="${APP_URL}/workspace/${g.orgSlug}/${g.projectSlug}" style="display:inline-block;margin-top:8px;background:#C76B7A;color:#FFFFFF;text-decoration:none;font-size:13px;font-weight:600;padding:10px 16px;border-radius:9px;">Workspace →</a>
     </div>
-    <p style="margin:16px 0 0;font-size:11px;color:#9C8E8A;text-align:center;">${esc(t.footer)}</p>
+    <div style="text-align:center;margin-top:20px;"><img src="${APP_URL}/email-logo-faint.png" width="44" height="44" alt="" style="border:0;"/></div>
+    <p style="margin:10px 0 0;font-size:11px;color:#9C8E8A;text-align:center;">${esc(t.footer)}</p>
   </div>
 </body></html>`;
 
