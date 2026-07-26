@@ -4,6 +4,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { inngest } from './client';
 import { executeAgentRun } from '@/lib/agents/run';
 import { recordUsage, isMeteredKind } from '@/lib/commerce';
+import { sendProjectDigest, maybeSendScanAlert } from '@/lib/reports/digest';
 
 function svc() {
   return createServiceClient(
@@ -96,6 +97,14 @@ export const runAgent = inngest.createFunction(
     //    one long invocation that hits the function-duration ceiling and stalls.
     await executeAgentRun(runId, agentId, project, async () => {}, step);
 
+    // 4. Event-triggered client alert: a completed scan that shows a big score
+    //    drop or an engine collapse emails the client immediately instead of
+    //    waiting for the weekly digest. Inert unless reportSchedule.recipients
+    //    is configured; deduped per run id inside.
+    if (agentId === 'monitor' || agentId === 'full_scan') {
+      await step.run('scan-alert', () => maybeSendScanAlert(sb, projectId, runId));
+    }
+
     return { runId, agentId, status: 'done' };
   },
 );
@@ -137,4 +146,32 @@ export const scheduledMonthly = inngest.createFunction(
   },
 );
 
-export const functions = [runAgent, scheduledWeekly, scheduledMonthly];
+// Weekly client digest (Tuesdays 02:00 UTC = 09:00 ICT) — one day after the
+// Monday re-measure so the email reads FRESH data. Concise summary + detailed
+// attribution/strategy interpretation; full report stays in the workspace PDF.
+// Doubly gated like the scans: global kill-switch + per-project recipients.
+export const scheduledDigest = inngest.createFunction(
+  { id: 'scheduled-digest', name: 'Weekly client digest email', triggers: [{ cron: '0 2 * * 2' }] },
+  async ({ step }) => {
+    if (!schedulingEnabled()) return { skipped: 'SCHEDULED_SCANS_ENABLED!=1' };
+    const sb = svc();
+    const projects = await step.run('list-digest', async () => {
+      const { data } = await sb
+        .from('projects')
+        .select('id, metadata, status, organizations!inner(status)')
+        .eq('status', 'active');
+      return (data ?? [])
+        .filter((p: any) => p.organizations?.status === 'active')
+        .filter((p: any) => (p.metadata?.reportSchedule?.recipients ?? []).length > 0)
+        .map((p: any) => ({ id: p.id }));
+    });
+    let sent = 0;
+    for (const p of projects) {
+      const res = await step.run(`digest-${p.id}`, () => sendProjectDigest(sb, p.id));
+      if ((res as any)?.sent) sent++;
+    }
+    return { cadence: 'digest', projects: projects.length, sent };
+  },
+);
+
+export const functions = [runAgent, scheduledWeekly, scheduledMonthly, scheduledDigest];

@@ -95,6 +95,20 @@ export async function sendReviewEmail(args: ReviewEmailArgs): Promise<{ sent: bo
   }
 }
 
+/** Generic transactional send (digest/alert emails build their own HTML). Never throws. */
+export async function sendEmail(args: { to: string[]; subject: string; html: string }): Promise<{ sent: boolean; error?: string }> {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) return { sent: false, error: 'RESEND_API_KEY not configured' };
+  try {
+    const resend = new Resend(key);
+    const { error } = await resend.emails.send({ from: FROM, to: args.to, subject: args.subject, html: args.html });
+    if (error) return { sent: false, error: error.message };
+    return { sent: true };
+  } catch (e) {
+    return { sent: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 /** Send the invite email. Never throws — returns whether it was accepted by Resend. */
 export async function sendInviteEmail(args: InviteEmailArgs): Promise<{ sent: boolean; error?: string }> {
   const key = process.env.RESEND_API_KEY;
