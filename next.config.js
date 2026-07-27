@@ -53,15 +53,22 @@ const nextConfig = {
     ];
   },
   async rewrites() {
-    return [
+    return {
       // us.memecmo.ai serves the US sub-system: its root is the state-aware
       // GEO page (same deployment, host-scoped).
-      {
-        source: '/',
-        has: [{ type: 'host', value: 'us.memecmo.ai' }],
-        destination: '/us',
-      },
-    ];
+      //
+      // MUST be beforeFiles: a plain array is afterFiles, where the filesystem
+      // wins first — `/` matches app/page.tsx and its page-level
+      // redirect('/dashboard') fires (a 307 with no Location header) before
+      // the host condition is ever consulted.
+      beforeFiles: [
+        {
+          source: '/',
+          has: [{ type: 'host', value: 'us.memecmo.ai' }],
+          destination: '/us',
+        },
+      ],
+    };
   },
   async headers() {
     return [
