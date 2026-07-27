@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
   // Find the org (RLS hides orgs the user can't see, so non-members → 404)
   const { data: org } = await supabase
     .from('organizations')
-    .select('id, status')
+    .select('id, status, type, metadata')
     .eq('slug', body.organizationSlug)
     .maybeSingle();
   if (!org) {
@@ -56,6 +56,20 @@ export async function POST(req: NextRequest) {
       { error: `Organization is ${org.status} — projects can only be created in active orgs.` },
       { status: 403 },
     );
+  }
+
+  // Region fence: US states and SEA countries are separate product lines. A
+  // non-root org is locked to its region (metadata.region === 'us' → US line,
+  // default → SEA) — enforced here, not just hidden in the picker UI.
+  if (org.type !== 'root') {
+    const isUsMarket = /,\s*US$/i.test(body.targetCountry);
+    const isUsOrg = (org.metadata as any)?.region === 'us';
+    if (isUsMarket !== isUsOrg) {
+      return NextResponse.json(
+        { error: `This organization is on the ${isUsOrg ? 'US' : 'Southeast Asia'} line — market "${body.targetCountry}" is outside it.` },
+        { status: 403 },
+      );
+    }
   }
 
   // Insert. RLS policy requires the user be admin/editor of the org.

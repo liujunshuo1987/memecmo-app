@@ -39,19 +39,31 @@ interface Props {
   stripeReady: boolean;
 }
 
-const COUNTRIES = [
+// Two product lines share one engine but must NOT mix in the client-facing
+// market picker: SEA orgs never see US states (and vice versa). Which list an
+// org gets is decided by region — org.metadata.region === 'us' → US line;
+// anything else → SEA. The root (operator) org sees both, grouped.
+const SEA_MARKETS = [
   { name: 'Vietnam', lang: 'vi', flag: '🇻🇳' },
   { name: 'Thailand', lang: 'th', flag: '🇹🇭' },
   { name: 'Philippines', lang: 'fil', flag: '🇵🇭' },
   { name: 'Malaysia', lang: 'ms', flag: '🇲🇾' },
   { name: 'Indonesia', lang: 'id', flag: '🇮🇩' },
   { name: 'Singapore', lang: 'en', flag: '🇸🇬' },
-  // US Tier-1 states (state-aware GEO — us.memecmo.ai line)
+];
+// US Tier-1 states (state-aware GEO — us.memecmo.ai line)
+const US_MARKETS = [
   { name: 'California, US', lang: 'en', flag: '🇺🇸' },
   { name: 'Texas, US', lang: 'en', flag: '🇺🇸' },
   { name: 'Florida, US', lang: 'en', flag: '🇺🇸' },
   { name: 'New York, US', lang: 'en', flag: '🇺🇸' },
 ];
+const COUNTRIES = [...SEA_MARKETS, ...US_MARKETS];
+
+function orgRegions(org: Organization): { sea: boolean; us: boolean } {
+  if (org.type === 'root') return { sea: true, us: true };
+  return (org.metadata as any)?.region === 'us' ? { sea: false, us: true } : { sea: true, us: false };
+}
 const FLAG: Record<string, string> = Object.fromEntries(COUNTRIES.map((c) => [c.name, c.flag]));
 
 const ORG_TYPE_LABEL: Record<string, string> = {
@@ -497,9 +509,10 @@ function NewProjectModal({
   onClose: () => void;
   onCreated: (orgSlug: string, projectSlug: string) => void;
 }) {
+  const regions = orgRegions(org);
   const [brandName, setBrandName] = useState('');
   const [brandUrl, setBrandUrl] = useState('');
-  const [country, setCountry] = useState('Vietnam');
+  const [country, setCountry] = useState(regions.sea ? 'Vietnam' : 'California, US');
   const [industry, setIndustry] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -560,9 +573,24 @@ function NewProjectModal({
             <Field label="Market">
               <select value={country} onChange={(e) => setCountry(e.target.value)}
                 className="w-full bg-surface border border-edge rounded-md px-3 py-2 text-sm focus:outline-none focus:border-blue-400/50">
-                {COUNTRIES.map((c) => (
-                  <option key={c.name} value={c.name} className="bg-surface">{c.flag} {c.name}</option>
-                ))}
+                {regions.sea && regions.us ? (
+                  <>
+                    <optgroup label="Southeast Asia" className="bg-surface">
+                      {SEA_MARKETS.map((c) => (
+                        <option key={c.name} value={c.name} className="bg-surface">{c.flag} {c.name}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="United States · state-aware" className="bg-surface">
+                      {US_MARKETS.map((c) => (
+                        <option key={c.name} value={c.name} className="bg-surface">{c.flag} {c.name}</option>
+                      ))}
+                    </optgroup>
+                  </>
+                ) : (
+                  (regions.us ? US_MARKETS : SEA_MARKETS).map((c) => (
+                    <option key={c.name} value={c.name} className="bg-surface">{c.flag} {c.name}</option>
+                  ))
+                )}
               </select>
             </Field>
             <Field label="Industry (optional)">

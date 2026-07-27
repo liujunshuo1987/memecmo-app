@@ -71,7 +71,7 @@ export default function UsPreviewPage() {
         <span className="text-xs tracking-[0.2em] uppercase text-dim">MemeCMO · US</span>
         <div className="flex items-center gap-3">
           <span className="text-[10px] px-2 py-0.5 rounded-full border border-gold/40 text-gold uppercase tracking-widest">Private preview</span>
-          <a href="/login?next=/dashboard" className="text-xs px-3 py-1.5 rounded-lg bg-brand text-on-brand font-medium hover:brightness-110 transition">Sign in →</a>
+          <a href="https://app.memecmo.ai/login?next=/dashboard" className="text-xs px-3 py-1.5 rounded-lg bg-brand text-on-brand font-medium hover:brightness-110 transition">Sign in →</a>
         </div>
       </header>
 
@@ -189,7 +189,7 @@ export default function UsPreviewPage() {
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <a
-              href="/dashboard"
+              href="https://app.memecmo.ai/dashboard"
               className="inline-flex items-center px-4 py-2 rounded-lg bg-brand text-on-brand text-sm font-medium hover:brightness-110 transition"
             >
               Enter the workspace →
