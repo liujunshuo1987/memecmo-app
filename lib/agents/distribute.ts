@@ -118,7 +118,8 @@ export async function runDistributeAgent(
     'in the target language, specific to the brand — no fluff. ' +
     'COMPLIANCE RULES (hard): (1) Agents generate FACTS, never EXPERIENCES — no fake ' +
     'user testimonials or reviews, anywhere. (2) For community platforms (Reddit, ' +
-    'Quora, forums): do NOT write post text. Output an ENGAGEMENT BRIEF instead — ' +
+    'Quora, Facebook Groups, and local forums like Pantip, Voz, Tinhte, Kaskus, ' +
+    'Lowyat, PinoyExchange): do NOT write post text. Output an ENGAGEMENT BRIEF instead — ' +
     'where to engage (specific communities/thread types), what people ask there, and ' +
     'which verified facts the brand can contribute; participation is always a disclosed ' +
     'official account. Set "channelType":"community" and "format":"engagement_brief" ' +
