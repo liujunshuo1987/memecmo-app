@@ -70,6 +70,7 @@ export default function UsPreviewPage() {
       <header className="border-b border-edge px-6 py-3 flex items-center justify-between">
         <span className="text-xs tracking-[0.2em] uppercase text-dim">MemeCMO · US</span>
         <div className="flex items-center gap-3">
+          <a href="/us/guide" className="text-xs px-2.5 py-1.5 rounded-lg border border-edge text-dim hover:text-ink transition">Guide</a>
           <span className="text-[10px] px-2 py-0.5 rounded-full border border-gold/40 text-gold uppercase tracking-widest">Private preview</span>
           <a href="https://app.memecmo.ai/login?next=/dashboard" className="text-xs px-3 py-1.5 rounded-lg bg-brand text-on-brand font-medium hover:brightness-110 transition">Sign in →</a>
         </div>

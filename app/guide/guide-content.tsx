@@ -47,17 +47,19 @@ const T: Record<Lang, any> = {
       quickstart: '快速上手',
       layout: '工作区布局',
       agents: '智能体参考(10 个)',
+      sets: '竞对集与提示词库管理',
       aigvr: 'AIGVR 五维算法',
       topofmind: '首位推荐率与重点 Prompt',
       surfaces: '真实界面 vs API 代理',
       authority: 'Source-Authority 引用索引',
-      trend: 'Day-0 基线与趋势',
+      trend: 'Day-0 基线、趋势与月度环比',
       results: '结果操作:沙箱 / 顾问 / 翻译 / 导出',
-      channel: '组织、邀请与配额',
+      compliance: '合规模型:事实与体验的边界',
+      channel: '组织、邀请、配额与周报',
       faq: '常见问题排查',
     },
     quickstart: [
-      ['1 · 建项目', '工作台(Dashboard)→ 所属组织点「+ New project」:一个项目 = 一个品牌 × 一个市场(如 Focus Media × Vietnam)。'],
+      ['1 · 建项目', '工作台(Dashboard)→ 所属组织点「+ New project」:一个项目 = 一个品牌 × 一个市场(如 Focus Media × Vietnam)。品牌有多条产品线时填「产品线」字段(可选),每条线建一个项目并排对比——不同产品线的竞对集和分数完全独立,合并测会互相掩盖。'],
       ['2 · 建品牌档案', '进入项目工作区,先跑 🪪 品牌画像(Profile):抓取官网生成一份规范事实库(定义/服务/差异化/NAP),之后所有内容型智能体都以它为准,保证口径一致、不编造。'],
       ['3 · 一键全扫描', '⚡ Full Scan 串行执行 发现 → 监测 → 报告,约 4–6 分钟。首次扫描自动成为 Day-0 基线。'],
       ['4 · 读结果', '中央区看 AIGVR 评分卡与报告;右栏看趋势、声量、缺口与引用来源。'],
@@ -73,13 +75,13 @@ const T: Record<Lang, any> = {
     agentDesc: {
       profile: ['品牌画像:抓官网→规范事实库(定义/服务/差异化/量化事实/NAP),全体执行智能体共用,防编造', '约 45s'],
       discovery: ['Prompt 发现:生成 110 条(5 阶段×22)买家会问 AI 的问题 + 标记 20 条重点;支持意图聚焦', '约 60s'],
-      answers: ['标准答案库:对 20 条重点各写一条「希望 AI 给出的答案」,市场语言+英文双语,严格锚定品牌事实', '约 60s'],
+      answers: ['标准答案库:对 20 条重点各写一条「希望 AI 给出的答案」,非英语市场为市场语言+英文双语(英语市场单语),严格锚定品牌事实', '约 60s'],
       monitor: ['AIGVR 监测:抽样查询 5 引擎,评委模型逐条打分,产出五维指数+竞品基准+缺口+引用', '约 2–4 分钟'],
       report: ['报告:把最新评分卡写成高管可读的发现+建议(周报/月报体)', '约 90s'],
       optimize: ['内容优化:把最大缺口写成发布级目标语言页面 + FAQ + FAQPage JSON-LD', '约 60s'],
       site: ['官网改造:抓你的真实主页,产出可直接粘贴的 schema.org JSON-LD + 具体修改清单', '约 60s'],
-      distribute: ['媒体投放:按引用索引的高权威域名逐个生成投递稿(目录/PR/评测),分 3 档优先级', '约 60s'],
-      encyclopedia: ['百科:诚实评估维基收录资格(notability),给出草稿或先建声量的现实路径', '约 60s'],
+      distribute: ['媒体投放:按引用索引的高权威域名逐个生成投递稿(目录/PR/评测),分 3 档优先级;社区渠道(论坛/Facebook 群组)只出「互动简报」不代写帖子;未经证实的宣称会被逐条标旗', '约 60s'],
+      encyclopedia: ['百科:诚实评估维基收录资格(notability),给出草稿或先建声量的现实路径;每份输出固定附合规提交路径(付费关系披露 + 编辑请求,绝不直接发布)', '约 60s'],
       full_scan: ['全扫描:发现 → 监测 → 报告 一键串行,断点续跑(Inngest checkpoint)', '约 4–6 分钟'],
     },
     aigvrIntro:
@@ -91,7 +93,7 @@ const T: Record<Lang, any> = {
     dimDef: {
       presence: '提及品牌的回答占全部查询的百分比。',
       prominence: '被提及时的位置得分均值:0 未提 · 1 顺带 · 2 多选之一 · 3 首选/重点推荐;按 ÷3×100 归一。',
-      competitiveShare: '品牌提及次数 ÷(品牌提及 + 全部竞品提及)。竞品不是预设的——从真实回答里提取。',
+      competitiveShare: '品牌提及次数 ÷(品牌提及 + 竞品提及)。竞品从真实回答里提取,且只计关系标签为「竞对」的实体——标为合作伙伴/目录平台的(如 Payoneer 场景下的 Upwork)不进分母,评分卡会注明哪些实体被排除及原因。',
       sentiment: '被提及时的态度均值:正面 1 · 中性 0.5 · 负面 0。',
       citation: '回答中引用品牌自有域名链接的比例(AEO 信号,Perplexity 与 Google AIO 贡献最多)。',
     },
@@ -106,7 +108,7 @@ const T: Record<Lang, any> = {
     authorityBody:
       '每次扫描把所有 AI 回答中的引用链接落库(geo_citations),跨扫描聚合出「AI 在这个市场真正引用哪些域名」的排行。这是平台的专有数据资产:📣 媒体投放直接按它选投放目标——在 AI 已经信任的域名上建设内容,而不是盲投。',
     trendBody:
-      '项目的第一次监测自动成为 Day-0 基线,右栏趋势线展示 AIGVR/可见度/缺口随每次扫描的变化,合同的「较基线增长 ≥50%」即以此核验。注意:接入 Google AIO 后口径变化(多了一个引擎),新旧数据点不完全可比——趋势解读以同口径区间为准。',
+      '项目的第一次监测自动成为 Day-0 基线,右栏趋势线展示 AIGVR/可见度/缺口随每次扫描的变化,合同的「较基线增长 ≥50%」即以此核验。趋势图下方是「月度趋势 · 环比」:每个自然月取最后一次扫描为月度快照,逐月显示分数与环比变化(绝对值 + 百分比),跨月后自动生成。注意:引擎组合或竞对口径变化(如新增 Google AIO、竞对改标合作伙伴)会打断严格可比性——趋势解读以同口径区间为准,口径变更处会注明。',
     resultsRows: [
       ['沙箱 Refine(B 类:内容/官网/投放/百科)', '每个创作型交付物是可编辑工作副本:直接改文本、按快捷指令或自由对话让 AI 修订,版本栈可回退,复制即用。修订基于当前稿,不会推倒重来。'],
       ['顾问问答(A 类:监测/报告/全扫描)', '在结果下方直接提问(「哪个缺口先打?」),回答锚定当前数据,并给出下一步智能体的一键入口。'],
@@ -119,6 +121,20 @@ const T: Record<Lang, any> = {
       ['开客户', '渠道商管理员在工作台点「+ New client」→ 总部审批队列 Approve → 客户组织激活并自动获得订阅。'],
       ['邀请成员', '组织卡片「Invite」→ 填邮箱与角色(viewer 只读 / editor 可跑 / admin 管理)→ 自动发邮件(或复制链接);对方用被邀邮箱注册/登录即入组。'],
       ['套餐配额', 'Basic 2 次 / Standard 8 次 / Premium 30 次扫描每月(计量 full_scan 与 monitor;总部与渠道商不计量)。超额返回明确提示,次月重置。'],
+      ['自动周报邮件', '配置收件人后,每周二上午自动发送 GEO 摘要邮件:精简数字区(指数/分引擎/本期交付)+ 详细的效果归因与策略建议;解读口径随项目阶段自动切换(建设期不解读分数波动)。完整数据始终在工作台下载 PDF。掉分 ≥5 或某引擎归零会即时告警,不等周期。'],
+    ],
+    setsRows: [
+      ['入口', '工作区页头「竞对与提示词」按钮,项目管理员可用。所有修改存于项目配置,Discovery 原始资产与历史扫描永不改动,可随时恢复。'],
+      ['竞对集编辑', '给每个实体标关系:竞对 / 合作伙伴 / 目录平台 / 自身——只有「竞对」进声量份额、基准与缺口计算。标记会跨月度刷新自动继承:标过 partner 的实体永远不会被重新识别成竞对。也可改名、删除、手动添加。'],
+      ['提示词库编辑', '点击任意提示词排除/恢复(划线显示);底部文本框逐行添加自定义提示词。修改自下次扫描/答案生成起生效,重点 Prompt 同样受排除影响。'],
+      ['为什么要人工编辑', 'AI 从真实回答提取竞对,但「谁算竞对」是商业判断——机器负责发现,人负责定性(实测案例:AI 把 Payoneer 的合作伙伴 Upwork/Fiverr 列进了竞对)。'],
+    ],
+    complianceRows: [
+      ['通用规则:只产事实,不产体验', '所有智能体只能生成可验证的事实信息,任何第一人称用户体验口吻(中/英/越/泰/印尼/马来/菲语全覆盖检测)一律判为伪造证言并丢弃——体验只能来自真实顾客。'],
+      ['社区渠道 = 互动简报', '论坛与社群(Reddit/Quora/Facebook 群组及 Pantip/Voz/Tinhte/Kaskus 等本地论坛)不代写帖子,输出「互动简报」:去哪些社区、别人在问什么、我们能提供哪些经过验证的事实;参与必须用披露身份的官方账号。'],
+      ['未经证实宣称标旗', '「trusted by millions」「行业领先」类无出处宣称会被确定性扫描逐条标 ⚠,操作者替换为品牌档案中的事实或删除后才发送。'],
+      ['百科合规提交', '维基类内容仅由百科智能体产出,每份输出固定附:付费关系披露({{paid}})→ AfC 草稿评审或 Talk 页编辑请求 → 独立编辑审核合入。绝不直接发布。'],
+      ['真实评价', '顾客评价内容永不代写。报告智能体只会建议「真实评价招揽」:给客户自己的顾客发邀请链接,评价由真实顾客撰写。'],
     ],
     faqRows: [
       ['运行失败了', '舞台会显示具体原因;点 ↻ 重跑即可——执行层有断点续跑,已完成阶段不会重复计费。'],
@@ -144,17 +160,19 @@ const T: Record<Lang, any> = {
       quickstart: 'Quickstart',
       layout: 'Workspace layout',
       agents: 'Agent reference (10)',
+      sets: 'Managing the competitor set & prompt library',
       aigvr: 'The AIGVR five-dimension algorithm',
       topofmind: 'Top-of-Mind rate & key prompts',
       surfaces: 'Real surface vs API proxy',
       authority: 'Source-Authority citation index',
-      trend: 'Day-0 baseline & trend',
+      trend: 'Day-0 baseline, trend & monthly MoM',
       results: 'Working with results: sandbox / advisor / translate / export',
-      channel: 'Organizations, invites & quotas',
+      compliance: 'The compliance model: facts vs experiences',
+      channel: 'Organizations, invites, quotas & weekly digests',
       faq: 'Troubleshooting',
     },
     quickstart: [
-      ['1 · Create a project', 'Dashboard → “+ New project” under your organization. One project = one brand × one market (e.g. Focus Media × Vietnam).'],
+      ['1 · Create a project', 'Dashboard → “+ New project” under your organization. One project = one brand × one market (e.g. Focus Media × Vietnam). Multi-line brands: fill the optional Product line field and create one project per line — each line gets its own competitor set and score, so lines compare side by side instead of masking each other.'],
       ['2 · Build the brand profile', 'Run 🪪 Profile first: it fetches the official site and produces one canonical fact base (definition / services / differentiators / NAP). Every content agent grounds on it — consistent, no invention.'],
       ['3 · Run a Full Scan', '⚡ Full Scan chains Discovery → Monitor → Report, ~4–6 minutes. Your first scan automatically becomes the Day-0 baseline.'],
       ['4 · Read the results', 'Center stage: AIGVR scorecard and report. Right rail: trend, share of voice, gaps, cited sources.'],
@@ -170,13 +188,13 @@ const T: Record<Lang, any> = {
     agentDesc: {
       profile: ['Brand Profile: fetches the site → one canonical fact base shared by all execution agents (prevents invention)', '~45s'],
       discovery: ['Prompt Discovery: 110 buyer questions (5 funnel stages × 22) + 20 designated key prompts; supports intent focus', '~60s'],
-      answers: ['Standard Answer Library: for each key prompt, the answer we want AI to give — market language + English, strictly grounded', '~60s'],
+      answers: ['Standard Answer Library: for each key prompt, the answer we want AI to give — market language + English for non-English markets (single-language for English markets), strictly grounded', '~60s'],
       monitor: ['AIGVR Monitor: samples the prompt set across 5 engines, judge-scores every answer, outputs the 5-dimension index + competitor benchmark + gaps + citations', '~2–4 min'],
       report: ['Report: turns the latest scorecard into executive findings + prioritized recommendations', '~90s'],
       optimize: ['Content Optimize: turns the top measured gap into a publish-ready page + FAQ + FAQPage JSON-LD in the market language', '~60s'],
       site: ['Site: fetches your real homepage, returns paste-in schema.org JSON-LD + a concrete edit list', '~60s'],
-      distribute: ['Distribute: placement drafts (directory / PR / review) for each high-authority domain from the citation index, in 3 priority tiers', '~60s'],
-      encyclopedia: ['Encyclopedia: honest Wikipedia notability check; a draft or the realistic build-coverage-first path', '~60s'],
+      distribute: ['Distribute: placement drafts (directory / PR / review) for each high-authority domain from the citation index, in 3 priority tiers; community channels get engagement BRIEFS (never ghostwritten posts); unverified claims are flagged per item', '~60s'],
+      encyclopedia: ['Encyclopedia: honest Wikipedia notability check; a draft or the realistic build-coverage-first path; every output ships with the compliant submission path (paid-COI disclosure + edit request — never direct posting)', '~60s'],
       full_scan: ['Full Scan: Discovery → Monitor → Report in one click, checkpointed (resumes, never double-runs)', '~4–6 min'],
     },
     aigvrIntro:
@@ -188,7 +206,7 @@ const T: Record<Lang, any> = {
     dimDef: {
       presence: '% of all queries whose answer mentions the brand.',
       prominence: 'Average position score when mentioned: 0 absent · 1 passing · 2 one-of-several · 3 featured/top; normalized ÷3 ×100.',
-      competitiveShare: 'Brand mentions ÷ (brand + all competitor mentions). Competitors are extracted from the real answers, not guessed.',
+      competitiveShare: 'Brand mentions ÷ (brand + competitor mentions). Competitors are extracted from the real answers, and only entities tagged “competitor” count — partners and directories (e.g. Upwork in the Payoneer case) stay out of the denominator; the scorecard states who is excluded and why.',
       sentiment: 'Average stance when mentioned: positive 1 · neutral 0.5 · negative 0.',
       citation: '% of answers citing the brand’s own domain (the AEO signal; mostly from Perplexity and Google AIO).',
     },
@@ -203,7 +221,7 @@ const T: Record<Lang, any> = {
     authorityBody:
       'Every scan persists all citation links found in AI answers (geo_citations), aggregated across scans into a ranking of the domains AI actually cites in this market. This is proprietary data: 📣 Distribute targets exactly these domains — build presence where AI already trusts, instead of spraying.',
     trendBody:
-      'The first Monitor run becomes the Day-0 baseline; the right-rail trend tracks AIGVR / presence / gaps per scan — this is how the contract’s “≥50% growth vs baseline” is verified. Note: adding Google AIO changed the engine mix, so points before/after that change aren’t strictly comparable; read trends within a consistent window.',
+      'The first Monitor run becomes the Day-0 baseline; the right-rail trend tracks AIGVR / presence / gaps per scan — this is how the contract’s “≥50% growth vs baseline” is verified. Below the trend line sits Monthly trend · MoM: the last scan of each calendar month is that month’s snapshot, each row showing the score and its month-over-month delta (absolute + %) — it unlocks automatically once scans span two months. Note: changes to the engine mix or the competitor definition (e.g. adding Google AIO, re-tagging a competitor as partner) break strict comparability; read trends within a consistent window — definition changes are annotated.',
     resultsRows: [
       ['Sandbox refine (creative deliverables)', 'Each creative output is an editable working copy: edit inline, use quick chips or free-form dialogue to revise (revisions build on the current draft), step back through versions, copy out.'],
       ['Advisor Q&A (measurement results)', 'Ask questions right under the result (“which gap first?”); answers are grounded in the current data and end with a one-click next-agent action.'],
@@ -216,6 +234,20 @@ const T: Record<Lang, any> = {
       ['Provisioning', 'Channel admin clicks “+ New client” → HQ approval queue → org activates with a subscription attached automatically.'],
       ['Invites', '“Invite” on the org card → email + role (viewer / editor / admin) → email auto-sends (or copy the link). The invitee must sign in with the invited email.'],
       ['Plans & quota', 'Basic 2 / Standard 8 / Premium 30 scans per month (full_scan and monitor are metered; HQ and channel partners are never metered). Over-quota returns a clear message; resets monthly.'],
+      ['Automatic weekly digest', 'With recipients configured, a GEO digest email goes out every Tuesday morning: a concise numbers block (index / per-engine / deliverables shipped) plus deliberately detailed effect-attribution and strategy sections. The interpretation switches with the project lifecycle stage (build phase never over-reads score movement). Full data always lives in the workspace PDF. A score drop ≥5 or an engine collapsing to zero triggers an immediate alert — no waiting for the cycle.'],
+    ],
+    setsRows: [
+      ['Where', 'The “Sets” button in the workspace header, for project admins. Edits live in project config — the Discovery asset and scan history are never touched, everything is reversible.'],
+      ['Competitor set', 'Tag each entity: competitor / partner / directory / self — only “competitor” enters share of voice, the benchmark and gaps. Tags survive the monthly set refresh: an entity marked partner is never re-discovered as a competitor. Rename, delete and manual add are supported.'],
+      ['Prompt library', 'Click any prompt to exclude / restore it (struck through when excluded); add custom prompts one per line. Edits apply from the next scan / answer generation; key prompts respect exclusions too.'],
+      ['Why manual editing exists', 'AI extracts competitors from real answers, but “who counts as a competitor” is a business judgment — the machine discovers, a human qualifies (real case: AI listed Payoneer’s partners Upwork/Fiverr as competitors).'],
+    ],
+    complianceRows: [
+      ['Universal rule: facts, never experiences', 'Agents generate verifiable factual information only. Any first-person user-experience voice (detected across EN/VI/TH/ID/MS/FIL) is treated as a fabricated testimonial and dropped — experiences belong to real customers.'],
+      ['Community channels = engagement briefs', 'Forums and groups (Reddit, Quora, Facebook Groups, and local forums like Pantip, Voz, Tinhte, Kaskus) never get ghostwritten posts. They get an engagement brief: where to engage, what people ask, which verified facts to contribute — always from a disclosed official account.'],
+      ['Unverified claims are flagged', '“Trusted by millions” / “industry-leading” style claims with no source are deterministically flagged ⚠ per item; replace with a fact from the brand profile or delete before sending.'],
+      ['Encyclopedia compliance', 'Wiki content is produced only by the Encyclopedia agent, and every output carries the compliant path: paid-relationship disclosure ({{paid}}) → AfC draft review or Talk-page edit request → independent editors merge. Never direct posting.'],
+      ['Genuine reviews only', 'Review content is never ghostwritten. The Report agent may recommend a genuine review-solicitation program — invitation links sent to the client’s real customers, who write the reviews themselves.'],
     ],
     faqRows: [
       ['A run failed', 'The stage shows the reason; hit ↻. Execution is checkpointed — completed phases never re-run or double-meter.'],
@@ -241,17 +273,19 @@ const T: Record<Lang, any> = {
       quickstart: 'Bắt đầu nhanh',
       layout: 'Bố cục không gian làm việc',
       agents: 'Danh mục 10 agent',
+      sets: 'Quản lý bộ đối thủ & thư viện prompt',
       aigvr: 'Thuật toán AIGVR 5 chiều',
       topofmind: 'Tỷ lệ đề xuất đầu tiên & prompt trọng điểm',
       surfaces: 'Bề mặt thật vs API proxy',
       authority: 'Chỉ mục trích dẫn Source-Authority',
-      trend: 'Đường cơ sở Day-0 & xu hướng',
+      trend: 'Đường cơ sở Day-0, xu hướng & so sánh theo tháng',
       results: 'Thao tác kết quả: sandbox / cố vấn / dịch / xuất',
-      channel: 'Tổ chức, lời mời & hạn mức',
+      compliance: 'Mô hình tuân thủ: sự kiện vs trải nghiệm',
+      channel: 'Tổ chức, lời mời, hạn mức & bản tin tuần',
       faq: 'Xử lý sự cố',
     },
     quickstart: [
-      ['1 · Tạo dự án', 'Dashboard → “+ New project”. Một dự án = một thương hiệu × một thị trường (VD: Focus Media × Việt Nam).'],
+      ['1 · Tạo dự án', 'Dashboard → “+ New project”. Một dự án = một thương hiệu × một thị trường (VD: Focus Media × Việt Nam). Thương hiệu nhiều dòng sản phẩm: điền ô “Product line” (tùy chọn) và tạo một dự án cho mỗi dòng — mỗi dòng có bộ đối thủ và điểm số riêng, so sánh song song thay vì che lấp nhau.'],
       ['2 · Hồ sơ thương hiệu', 'Chạy 🪪 Profile trước: hệ thống đọc website chính thức và tạo một bộ dữ kiện chuẩn (định nghĩa / dịch vụ / khác biệt / NAP). Mọi agent nội dung đều bám vào đó — nhất quán, không bịa.'],
       ['3 · Full Scan', '⚡ Full Scan chạy Khám phá → Giám sát → Báo cáo, khoảng 4–6 phút. Lần quét đầu tiên tự động là đường cơ sở Day-0.'],
       ['4 · Đọc kết quả', 'Khu trung tâm: bảng điểm AIGVR và báo cáo. Cột phải: xu hướng, thị phần giọng nói, khoảng trống, nguồn được trích dẫn.'],
@@ -272,8 +306,8 @@ const T: Record<Lang, any> = {
       report: ['Báo cáo: chuyển bảng điểm mới nhất thành phát hiện + khuyến nghị ưu tiên cho lãnh đạo', '~90s'],
       optimize: ['Tối ưu nội dung: biến khoảng trống lớn nhất thành trang sẵn xuất bản + FAQ + JSON-LD FAQPage', '~60s'],
       site: ['Website: đọc trang chủ thật của bạn, trả về JSON-LD schema.org dán-là-chạy + danh sách chỉnh sửa cụ thể', '~60s'],
-      distribute: ['Phân phối: bản thảo đăng tải (danh bạ / PR / đánh giá) cho từng domain uy tín từ chỉ mục trích dẫn, chia 3 bậc ưu tiên', '~60s'],
-      encyclopedia: ['Bách khoa: đánh giá trung thực khả năng lên Wikipedia; bản nháp hoặc lộ trình xây độ phủ trước', '~60s'],
+      distribute: ['Phân phối: bản thảo đăng tải (danh bạ / PR / đánh giá) cho từng domain uy tín, chia 3 bậc ưu tiên; kênh cộng đồng (diễn đàn / nhóm Facebook) chỉ nhận “bản tóm tắt tương tác”, không viết hộ bài đăng; tuyên bố thiếu nguồn bị gắn cờ từng mục', '~60s'],
+      encyclopedia: ['Bách khoa: đánh giá trung thực khả năng lên Wikipedia; bản nháp hoặc lộ trình xây độ phủ trước; mỗi đầu ra kèm lộ trình nộp tuân thủ (công khai quan hệ trả phí + yêu cầu chỉnh sửa — không bao giờ đăng trực tiếp)', '~60s'],
       full_scan: ['Full Scan: Khám phá → Giám sát → Báo cáo một chạm, có checkpoint (chạy tiếp, không chạy trùng)', '~4–6 phút'],
     },
     aigvrIntro:
@@ -285,7 +319,7 @@ const T: Record<Lang, any> = {
     dimDef: {
       presence: '% truy vấn có câu trả lời nhắc tới thương hiệu.',
       prominence: 'Điểm vị trí trung bình khi được nhắc: 0 vắng · 1 thoáng qua · 2 một-trong-nhiều · 3 đề xuất hàng đầu; chuẩn hóa ÷3 ×100.',
-      competitiveShare: 'Lượt nhắc thương hiệu ÷ (thương hiệu + toàn bộ đối thủ). Đối thủ được trích từ câu trả lời thật, không đoán trước.',
+      competitiveShare: 'Lượt nhắc thương hiệu ÷ (thương hiệu + đối thủ). Đối thủ trích từ câu trả lời thật, và chỉ thực thể gắn nhãn “đối thủ” mới được tính — đối tác/danh bạ (VD Upwork trong trường hợp Payoneer) không vào mẫu số; bảng điểm ghi rõ ai bị loại và vì sao.',
       sentiment: 'Thái độ trung bình khi được nhắc: tích cực 1 · trung lập 0.5 · tiêu cực 0.',
       citation: '% câu trả lời dẫn link domain của thương hiệu (tín hiệu AEO; chủ yếu từ Perplexity và Google AIO).',
     },
@@ -300,7 +334,7 @@ const T: Record<Lang, any> = {
     authorityBody:
       'Mỗi lần quét lưu toàn bộ link trích dẫn trong câu trả lời AI (geo_citations), tổng hợp xuyên các lần quét thành bảng xếp hạng domain mà AI thật sự trích dẫn ở thị trường này. Đây là tài sản dữ liệu độc quyền: 📣 Phân phối nhắm đúng các domain đó — xây hiện diện nơi AI đã tin tưởng.',
     trendBody:
-      'Lần giám sát đầu tiên là đường cơ sở Day-0; cột phải theo dõi AIGVR / hiện diện / khoảng trống qua từng lần quét — căn cứ nghiệm thu “tăng ≥50% so với cơ sở” của hợp đồng. Lưu ý: từ khi thêm Google AIO, hỗn hợp công cụ thay đổi nên điểm trước/sau không so sánh tuyệt đối; đọc xu hướng trong cùng một cấu hình.',
+      'Lần giám sát đầu tiên là đường cơ sở Day-0; cột phải theo dõi AIGVR / hiện diện / khoảng trống qua từng lần quét — căn cứ nghiệm thu “tăng ≥50% so với cơ sở”. Dưới đường xu hướng là “Xu hướng tháng · so với tháng trước”: lần quét cuối mỗi tháng là ảnh chụp của tháng đó, từng dòng hiển thị điểm và mức thay đổi (tuyệt đối + %) — tự mở khi dữ liệu trải qua hai tháng. Lưu ý: thay đổi tổ hợp công cụ hoặc định nghĩa đối thủ sẽ phá vỡ tính so sánh tuyệt đối; đọc xu hướng trong cùng một cấu hình, chỗ đổi định nghĩa có ghi chú.',
     resultsRows: [
       ['Sandbox chỉnh sửa (sản phẩm sáng tạo)', 'Mỗi đầu ra sáng tạo là bản làm việc chỉnh được: sửa trực tiếp, dùng nút nhanh hoặc hội thoại để AI sửa tiếp (dựa trên bản hiện tại), quay lui theo phiên bản, sao chép dùng ngay.'],
       ['Hỏi cố vấn (kết quả đo lường)', 'Đặt câu hỏi ngay dưới kết quả (“đánh khoảng trống nào trước?”); trả lời bám dữ liệu hiện tại và kèm nút hành động tiếp theo.'],
@@ -313,6 +347,20 @@ const T: Record<Lang, any> = {
       ['Mở khách hàng', 'Admin kênh bấm “+ New client” → hàng chờ duyệt của HQ → tổ chức kích hoạt kèm gói thuê bao tự động.'],
       ['Mời thành viên', '“Invite” trên thẻ tổ chức → email + vai trò (viewer / editor / admin) → email tự gửi (hoặc sao chép link). Người được mời phải đăng nhập đúng email đó.'],
       ['Gói & hạn mức', 'Basic 2 / Standard 8 / Premium 30 lần quét mỗi tháng (tính full_scan và monitor; HQ và đối tác kênh không bị tính). Vượt hạn mức có thông báo rõ; đặt lại hàng tháng.'],
+      ['Bản tin tuần tự động', 'Khi đã cấu hình người nhận, email tóm tắt GEO gửi mỗi sáng thứ Ba: khối số liệu gọn (chỉ số / theo công cụ / đã bàn giao) + phần phân tích hiệu quả và khuyến nghị chiến lược chi tiết; cách diễn giải tự đổi theo giai đoạn dự án. Dữ liệu đầy đủ luôn ở workspace (PDF). Điểm giảm ≥5 hoặc một công cụ về 0 sẽ cảnh báo ngay.'],
+    ],
+    setsRows: [
+      ['Ở đâu', 'Nút “Sets” trên đầu workspace, dành cho quản trị viên dự án. Mọi chỉnh sửa nằm trong cấu hình dự án — tài sản Discovery và lịch sử quét không bị đụng tới, có thể hoàn tác.'],
+      ['Bộ đối thủ', 'Gắn nhãn từng thực thể: đối thủ / đối tác / danh bạ / chính mình — chỉ “đối thủ” vào thị phần giọng nói, đối sánh và khoảng trống. Nhãn giữ nguyên qua kỳ làm mới hàng tháng: thực thể đã đánh dấu đối tác không bao giờ bị nhận nhầm lại thành đối thủ. Hỗ trợ đổi tên, xóa, thêm thủ công.'],
+      ['Thư viện prompt', 'Bấm vào prompt bất kỳ để loại trừ / khôi phục (gạch ngang khi loại); thêm prompt tùy chỉnh mỗi dòng một câu. Có hiệu lực từ lần quét / lần tạo câu trả lời kế tiếp.'],
+      ['Vì sao cần chỉnh tay', 'AI trích đối thủ từ câu trả lời thật, nhưng “ai là đối thủ” là phán đoán kinh doanh — máy phát hiện, người định tính (ca thực tế: AI xếp đối tác Upwork/Fiverr của Payoneer vào đối thủ).'],
+    ],
+    complianceRows: [
+      ['Quy tắc chung: sự kiện, không trải nghiệm', 'Agent chỉ tạo thông tin sự kiện kiểm chứng được. Mọi giọng văn trải nghiệm ngôi thứ nhất (phát hiện đa ngôn ngữ EN/VI/TH/ID/MS/FIL) bị coi là chứng thực bịa đặt và loại bỏ — trải nghiệm thuộc về khách hàng thật.'],
+      ['Kênh cộng đồng = bản tóm tắt tương tác', 'Diễn đàn và nhóm (Reddit, Quora, nhóm Facebook, Pantip, Voz, Tinhte, Kaskus…) không bao giờ nhận bài viết hộ. Thay vào đó là bản tóm tắt: tương tác ở đâu, người ta hỏi gì, đóng góp sự kiện đã kiểm chứng nào — luôn bằng tài khoản chính thức công khai danh tính.'],
+      ['Gắn cờ tuyên bố thiếu nguồn', 'Các tuyên bố kiểu “hàng triệu người tin dùng” / “dẫn đầu ngành” không nguồn bị quét xác định và gắn cờ ⚠ từng mục; thay bằng sự kiện trong hồ sơ thương hiệu hoặc xóa trước khi gửi.'],
+      ['Bách khoa tuân thủ', 'Nội dung wiki chỉ do agent Bách khoa tạo, mỗi đầu ra kèm lộ trình: công khai quan hệ trả phí ({{paid}}) → duyệt nháp AfC hoặc yêu cầu chỉnh sửa trên trang Thảo luận → biên tập viên độc lập hợp nhất. Không bao giờ đăng trực tiếp.'],
+      ['Đánh giá thật', 'Nội dung đánh giá không bao giờ được viết hộ. Agent Báo cáo chỉ khuyến nghị chương trình mời đánh giá chân thực — gửi link mời tới khách hàng thật, họ tự viết.'],
     ],
     faqRows: [
       ['Lần chạy thất bại', 'Sân khấu hiển thị lý do; bấm ↻. Có checkpoint — giai đoạn đã xong không chạy lại, không tính phí trùng.'],
@@ -443,6 +491,8 @@ export default function GuideContent() {
           <Shot src="/guide/answers.png" caption={t.shotAnswers} />
         </Section>
 
+        <Section id="sets" title={t.sections.sets}><Rows rows={t.setsRows} /></Section>
+
         <Section id="aigvr" title={t.sections.aigvr}>
           <p className="text-[13px] text-dim leading-relaxed">{t.aigvrIntro}</p>
           <div className="rounded-lg border border-edge bg-surface p-4">
@@ -490,6 +540,7 @@ export default function GuideContent() {
         </Section>
 
         <Section id="results" title={t.sections.results}><Shot src="/guide/sandbox.png" caption={t.shotSandbox} /><Rows rows={t.resultsRows} /></Section>
+        <Section id="compliance" title={t.sections.compliance}><Rows rows={t.complianceRows} /></Section>
         <Section id="channel" title={t.sections.channel}><Rows rows={t.channelRows} /></Section>
         <Section id="faq" title={t.sections.faq}><Rows rows={t.faqRows} /></Section>
 
