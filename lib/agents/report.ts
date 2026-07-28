@@ -181,7 +181,11 @@ export async function runReportAgent(
     'Rules: 3-5 keyFindings, 4-6 recommendations ordered by priority (P0 first), ' +
       'each recommendation tied to a real gap or weak stage from the data. Keep each ' +
       'rationale to 1-2 sentences and at most 4 actions. Write in clear professional ' +
-      'English. Be specific to this brand and market.',
+      'English. Be specific to this brand and market. ' +
+      'If review-site visibility is weak and the brand serves end customers, you may ' +
+      'recommend a GENUINE review-solicitation program (invitation links sent to real ' +
+      'customers after purchase/service, Birdeye-style) — review CONTENT must come from ' +
+      'real customers; never recommend writing, seeding or incentivizing review text.',
   ].join('\n');
 
   await emit({ event_type: 'tool_call', payload: { tool: 'engine.chat', args: { model: DEFAULT_MODEL, purpose: 'Compose GEO report' } } });

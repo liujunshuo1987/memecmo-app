@@ -11,7 +11,7 @@
 import { poeChat, parseJsonFromLLM, DEFAULT_MODEL } from '@/lib/llm/poe';
 import { brandProfileBlock } from './brand-facts';
 import { stateFrameBlock } from './state-frames';
-import { scanUnverifiedClaims } from './compliance';
+import { scanUnverifiedClaims, FAKE_USER_RE, COMMUNITY_RE } from './compliance';
 
 type EventEmitter = (event: {
   event_type: 'log' | 'tool_call' | 'tool_result' | 'progress' | 'output_chunk' | 'error' | 'milestone';
@@ -40,23 +40,24 @@ interface Target {
   tier: number; // 1 = national/mainstream (highest authority, hardest) · 2 = industry/trade · 3 = directory/listing (quick win)
   effort: string; // 'quick' | 'medium' | 'high'
   title: string;
-  draft: string;
+  draft: string; // submission copy — or, for community channels, the engagement brief
   why: string;
+  format?: 'submission' | 'engagement_brief';
   complianceFlags?: string[]; // deterministic post-check findings the operator must resolve before sending
 }
 
-// ── Compliance guardrails (Olivia's audit) ───────────────────────────────────
+// ── Compliance guardrails (Olivia's audit, v2) ───────────────────────────────
 // The LLM is instructed to stay compliant, but the GUARANTEE is deterministic:
-// every draft passes these checks after generation, every run, same result.
+// every asset passes these checks after generation, every run, same result.
 //   1. Encyclopedia surfaces are never distributed from here — the Encyclopedia
 //      agent owns them with a COI-disclosure + edit-request flow.
-//   2. Community platforms: a draft written in fake user voice (astroturfing)
-//      is DROPPED, not fixed — publishing it is non-compliant everywhere.
-//   3. Unverifiable superlatives are flagged for operator review; they are not
-//      silently trusted just because a model wrote them confidently.
+//   2. UNIVERSAL rule: agents generate FACTS, never EXPERIENCES. First-person
+//      user-experience voice anywhere = fabricated testimonial → DROPPED.
+//   3. Community channels never get post text — they get engagement BRIEFS
+//      (where to engage, what's asked, which verified facts to contribute).
+//      The format is forced here, not merely requested from the model.
+//   4. Unverifiable superlatives are flagged for operator review.
 const WIKI_RE = /wikipedia\.|wikidata\.|wikimedia\.|fandom\./i;
-const COMMUNITY_RE = /reddit\.|quora\.|discourse|forum|community|facebook\.com\/groups/i;
-const FAKE_USER_RE = /\b(i'?ve been using|i have been using|as a (real|regular|long-?time|happy|satisfied) (user|customer)|my (own )?experience (with|using)|i (recently )?(tried|switched to|discovered))\b/i;
 
 function applyComplianceGuardrails(raw: Target[]): { kept: Target[]; dropped: { domain: string; reason: string }[] } {
   const kept: Target[] = [];
@@ -68,18 +69,23 @@ function applyComplianceGuardrails(raw: Target[]): { kept: Target[]; dropped: { 
       dropped.push({ domain: t.domain, reason: 'Encyclopedia surfaces require the COI-disclosure + edit-request flow — use the Encyclopedia agent, never direct submission.' });
       continue;
     }
-    if (COMMUNITY_RE.test(domain) && FAKE_USER_RE.test(body)) {
-      dropped.push({ domain: t.domain, reason: 'Draft was written as a fabricated user testimonial for a community platform (astroturfing) — removed. Community placements must be transparent brand-voice with disclosed affiliation.' });
+    if (FAKE_USER_RE.test(body)) {
+      dropped.push({ domain: t.domain, reason: 'Asset was written as a fabricated user experience — removed. Agents provide facts; experiences belong to real customers only.' });
       continue;
     }
+    const isCommunity = COMMUNITY_RE.test(domain) || t.channelType === 'community';
     const flags: string[] = [];
-    if (COMMUNITY_RE.test(domain)) {
-      flags.push('Community platform: post only from a disclosed official brand account — never as a private user.');
+    if (isCommunity) {
+      flags.push('Engagement brief: official disclosed account · contribute verified facts only · never write or solicit experiences.');
     }
     for (const label of scanUnverifiedClaims(body)) {
       flags.push(`Unverified claim ("${label}") — replace with a fact from the verified brand profile, or delete before sending.`);
     }
-    kept.push(flags.length ? { ...t, complianceFlags: flags } : t);
+    kept.push({
+      ...t,
+      format: isCommunity ? 'engagement_brief' : 'submission',
+      ...(flags.length ? { complianceFlags: flags } : {}),
+    });
   }
   return { kept, dropped };
 }
@@ -110,13 +116,17 @@ export async function runDistributeAgent(
     'social, video). Your job: produce ready-to-send submission assets that ' +
     'get a brand featured/cited on the given target sources. Write native-quality copy ' +
     'in the target language, specific to the brand — no fluff. ' +
-    'COMPLIANCE RULES (hard): (1) NEVER write fake user experiences, testimonials or ' +
-    'reviews — on community platforms (Reddit, Quora, forums) only transparent ' +
-    'brand-voice posts with disclosed affiliation are acceptable. (2) Every factual ' +
-    'claim must come from the verified brand facts provided — no invented numbers, no ' +
-    '"trusted by millions"-style claims that are not in the facts. (3) Do NOT include ' +
-    'Wikipedia or other encyclopedia targets — they are handled by a dedicated ' +
-    'compliant workflow. Output strict JSON only.';
+    'COMPLIANCE RULES (hard): (1) Agents generate FACTS, never EXPERIENCES — no fake ' +
+    'user testimonials or reviews, anywhere. (2) For community platforms (Reddit, ' +
+    'Quora, forums): do NOT write post text. Output an ENGAGEMENT BRIEF instead — ' +
+    'where to engage (specific communities/thread types), what people ask there, and ' +
+    'which verified facts the brand can contribute; participation is always a disclosed ' +
+    'official account. Set "channelType":"community" and "format":"engagement_brief" ' +
+    'for these; all other channels use "format":"submission" with ready-to-send copy. ' +
+    '(3) Every factual claim must come from the verified brand facts provided — no ' +
+    'invented numbers, no "trusted by millions"-style claims not in the facts. ' +
+    '(4) Do NOT include Wikipedia or other encyclopedia targets — they are handled by ' +
+    'a dedicated compliant workflow. Output strict JSON only.';
 
   const sourceList = targets.length
     ? targets.map((t) => `- ${t.domain} (cited ${t.citations}× by AI engines)`).join('\n')
@@ -139,7 +149,7 @@ export async function runDistributeAgent(
       'platforms, tier 3 = directories/listings (quick wins). Return ONLY JSON of this shape:',
     '{',
     '  "targets": [',
-    '    { "domain": "the source", "channelType": "directory|industry_media|review_site|social|video|other",',
+    '    { "domain": "the source", "channelType": "directory|industry_media|review_site|social|video|community|other", "format": "submission|engagement_brief",',
     '      "tier": 1, "effort": "quick|medium|high",',
     '      "title": "listing title / PR angle", "draft": "the actual submission/listing/pitch body in ' + languageName + ', 120-180 words, ready to send", "why": "one line: why this source moves AI visibility" }',
     '  ]',
@@ -195,7 +205,7 @@ export async function runDistributeAgent(
   for (const t of list) {
     const tier = t.tier || 3;
     if (tier !== curTier) { md.push(`\n## ${tierLabel(tier)}\n`); curTier = tier; }
-    md.push(`### ${t.domain}  _(${t.channelType} · ${t.effort || 'medium'} effort)_`, `**${t.title}**`, '', t.draft, '', `> Why: ${t.why}`, '');
+    md.push(`### ${t.domain}  _(${t.channelType} · ${t.format === 'engagement_brief' ? 'engagement brief' : `${t.effort || 'medium'} effort`})_`, `**${t.title}**`, '', t.draft, '', `> Why: ${t.why}`, '');
     for (const f of t.complianceFlags ?? []) md.push(`> ⚠ COMPLIANCE: ${f}`, '');
   }
   const mdStr = md.join('\n');

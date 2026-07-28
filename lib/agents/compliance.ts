@@ -19,3 +19,11 @@ export function scanUnverifiedClaims(text: string): string[] {
   }
   return found;
 }
+
+// THE universal rule (Olivia): agents may generate FACTS, never EXPERIENCES.
+// First-person user-experience voice in any outbound asset means the model
+// fabricated a testimonial — such output is dropped, not repaired.
+export const FAKE_USER_RE = /\b(i'?ve been using|i have been using|as a (real|regular|long-?time|happy|satisfied) (user|customer)|my (own )?experience (with|using)|i (recently )?(tried|switched to|discovered))\b/i;
+
+/** Community platforms get engagement BRIEFS (facts to contribute), never post text. */
+export const COMMUNITY_RE = /reddit\.|quora\.|discourse|forum|community|facebook\.com\/groups/i;
