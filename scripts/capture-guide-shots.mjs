@@ -53,12 +53,17 @@ await sleep(2000);
 // Click a left-rail deliverable, then WAIT until the stage shows the rendered
 // result (not the transient loading state) — up to 20s.
 async function openDeliverable(patterns, readyPattern) {
+  // Nav rows are no longer plain <aside button>s — match the leaf element by
+  // text and click its nearest clickable ancestor (row-click = view).
   const ok = await page.evaluate((pats) => {
     const res = new RegExp(pats.join('|'), 'i');
-    const btns = Array.from(document.querySelectorAll('aside button'));
-    const hit = btns.find((b) => res.test(b.textContent || ''));
-    if (hit) { hit.click(); return (hit.textContent || '').trim().slice(0, 30); }
-    return null;
+    const leaf = Array.from(document.querySelectorAll('*')).find(
+      (el) => el.children.length === 0 && res.test((el.textContent || '').trim()),
+    );
+    if (!leaf) return null;
+    const target = leaf.closest('button,[role="button"],div[class*="cursor"]') || leaf;
+    target.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    return (leaf.textContent || '').trim().slice(0, 30);
   }, patterns);
   try {
     await page.waitForFunction(
