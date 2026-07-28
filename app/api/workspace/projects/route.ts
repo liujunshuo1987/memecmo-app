@@ -15,6 +15,7 @@ interface CreateProjectBody {
   targetCountry: string;    // 'Vietnam', 'Thailand', ...
   targetLanguage?: string;  // 'vi', 'th', ...
   industry?: string;
+  productLine?: string;     // optional third axis: brand × product line × market
   description?: string;
 }
 
@@ -85,6 +86,9 @@ export async function POST(req: NextRequest) {
       industry: body.industry ?? null,
       description: body.description ?? null,
       created_by: user.id,
+      // Kept out of `industry` so cards/UI show the clean value; agents get
+      // the composed scope at run time (inngest load-project).
+      ...(body.productLine ? { metadata: { productLine: body.productLine } } : {}),
     })
     .select('*')
     .single();

@@ -74,10 +74,21 @@ export const runAgent = inngest.createFunction(
     const project = await step.run('load-project', async () => {
       const { data, error } = await sb
         .from('projects')
-        .select('id, brand_name, brand_url, target_country, target_language, industry')
+        .select('id, brand_name, brand_url, target_country, target_language, industry, metadata')
         .eq('id', projectId)
         .single();
       if (error || !data) throw new Error(`Project ${projectId} not found: ${error?.message}`);
+      // Product-line axis: the scope is stored clean in metadata (UI shows it
+      // as a chip); here — the single choke point every agent run passes
+      // through — it is composed into the industry context so discovery,
+      // competitor extraction and judging all lock onto the one line.
+      const productLine = (data as any).metadata?.productLine;
+      if (productLine) {
+        (data as any).industry = [
+          data.industry,
+          `PRODUCT LINE SCOPE: ${productLine}. Scope ALL analysis (prompts, competitors, judging) to THIS product line only.`,
+        ].filter(Boolean).join(' — ');
+      }
       return data;
     });
 

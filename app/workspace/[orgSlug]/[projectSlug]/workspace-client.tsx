@@ -88,6 +88,7 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     Optimize: '内容', Site: '主页', Distribute: '分发', Encyclopedia: '百科', 'Copy kit': '复制全套', 'Copy brief': '复制简报',
     'Copy page': '复制页面', 'Copy schema': '复制 schema', 'Copy plan': '复制方案', 'Copy Markdown': '复制 Markdown',
     trend: '趋势', 'vs previous scan': '对比上次扫描', 'Run another scan to track change.': '再扫一次即可追踪变化。',
+    'Monthly trend': '月度趋势', 'MoM': '环比', 'Cross a month boundary to unlock month-over-month.': '跨月后自动生成环比对照。',
     'Top-of-mind rate': '首位推荐率', 'featured / first recommendation': '被作为首选/首位推荐',
     'Top-of-mind · key prompts': '首位推荐率 · 重点 Prompt', 'key prompts monitored': '条重点 Prompt 已监测',
     Answers: '标准答案', 'Standard answer library': '标准答案库', 'the answer we want AI to give': '我们希望 AI 给出的答案',
@@ -725,6 +726,45 @@ function TrendPanel({ history }: { history: ScanPoint[] }) {
         </div>
       ) : (
         <div className="text-[10px] text-faint pt-1">{t('Run another scan to track change.')}</div>
+      )}
+      <MonthlyTrend history={history} arrow={arrow} dColor={dColor} />
+    </div>
+  );
+}
+
+// Month-over-month (环比) block under the score trend: the LAST scan inside
+// each calendar month is that month's snapshot; each row shows the score and
+// its delta vs the previous month (absolute + percent).
+function MonthlyTrend({ history, arrow, dColor }: {
+  history: ScanPoint[];
+  arrow: (d: number | null) => string;
+  dColor: (d: number | null, goodUp?: boolean) => string;
+}) {
+  const byMonth = new Map<string, ScanPoint>();
+  for (const p of history) byMonth.set(p.ts.slice(0, 7), p); // chronological → last wins
+  const months = [...byMonth.entries()].slice(-6);
+  return (
+    <div className="pt-2 mt-1 border-t border-edge space-y-1">
+      <div className="text-[10px] uppercase tracking-widest text-faint">{t('Monthly trend')} · {t('MoM')}</div>
+      {months.length < 2 ? (
+        <div className="text-[10px] text-faint">{t('Cross a month boundary to unlock month-over-month.')}</div>
+      ) : (
+        months.map(([m, p], i) => {
+          const prevM = i > 0 ? months[i - 1][1] : null;
+          const d = prevM && p.aigvr != null && prevM.aigvr != null ? p.aigvr - prevM.aigvr : null;
+          const pct = d != null && prevM?.aigvr ? (d / prevM.aigvr) * 100 : null;
+          return (
+            <div key={m} className="flex items-center justify-between text-[11px]">
+              <span className="text-faint tabular-nums">{m}</span>
+              <span className="flex items-center gap-2">
+                <span className="text-ink tabular-nums">{p.aigvr ?? '—'}</span>
+                <span className={`tabular-nums ${dColor(d)}`}>
+                  {d == null ? '—' : `${arrow(d)} ${Math.abs(d)}${pct != null ? ` (${pct > 0 ? '+' : ''}${pct.toFixed(1)}%)` : ''}`}
+                </span>
+              </span>
+            </div>
+          );
+        })
       )}
     </div>
   );

@@ -237,6 +237,13 @@ export default function DashboardClient({ groups, userEmail, isRootAdmin, billin
                         <div className="text-[11px] text-faint">
                           {p.target_country} · {p.target_language || 'auto'}
                         </div>
+                        {(p as any).metadata?.productLine && (
+                          <div className="mt-1">
+                            <span className="inline-block max-w-full truncate text-[10px] px-1.5 py-0.5 rounded bg-brand-soft text-brand">
+                              {(p as any).metadata.productLine}
+                            </span>
+                          </div>
+                        )}
                         {p.industry && <div className="text-[11px] text-faint truncate mt-1">{p.industry}</div>}
                       </a>
                     ))}
@@ -514,6 +521,7 @@ function NewProjectModal({
   const [brandUrl, setBrandUrl] = useState('');
   const [country, setCountry] = useState(regions.sea ? 'Vietnam' : 'California, US');
   const [industry, setIndustry] = useState('');
+  const [productLine, setProductLine] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -528,12 +536,15 @@ function NewProjectModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           organizationSlug: org.slug,
-          slug: slugify(brandName) || `project-${Date.now()}`,
+          // Product line joins the slug so "Payoneer × SMB" and "Payoneer ×
+          // Enterprise" coexist in one org without a slug collision.
+          slug: slugify(productLine ? `${brandName} ${productLine}` : brandName) || `project-${Date.now()}`,
           brandName: brandName.trim(),
           brandUrl: brandUrl.trim() || undefined,
           targetCountry: country,
           targetLanguage: lang,
           industry: industry.trim() || undefined,
+          productLine: productLine.trim() || undefined,
         }),
       });
       const data = await res.json();
@@ -598,6 +609,14 @@ function NewProjectModal({
                 className="w-full bg-surface border border-edge rounded-md px-3 py-2 text-sm focus:outline-none focus:border-blue-400/50" />
             </Field>
           </div>
+          <Field label="Product line (optional) · 产品线">
+            <input value={productLine} onChange={(e) => setProductLine(e.target.value)}
+              placeholder="e.g. Enterprise B2B payments — scope every prompt, competitor and score to ONE product line"
+              className="w-full bg-surface border border-edge rounded-md px-3 py-2 text-sm focus:outline-none focus:border-blue-400/50" />
+            <p className="text-[10px] text-faint mt-1">
+              Leave empty to analyze the whole brand. Create one project per line to compare lines side by side.
+            </p>
+          </Field>
         </div>
 
         {error && <div className="text-xs text-garnet bg-garnet/10 border border-red-500/30 rounded px-3 py-2">{error}</div>}
