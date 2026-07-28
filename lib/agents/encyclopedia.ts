@@ -11,6 +11,7 @@
 import { poeChat, parseJsonFromLLM, DEFAULT_MODEL } from '@/lib/llm/poe';
 import { brandProfileBlock } from './brand-facts';
 import { stateFrameBlock } from './state-frames';
+import { scanUnverifiedClaims } from './compliance';
 
 type EventEmitter = (event: {
   event_type: 'log' | 'tool_call' | 'tool_result' | 'progress' | 'output_chunk' | 'error' | 'milestone';
@@ -69,7 +70,10 @@ export async function runEncyclopediaAgent(
     'You are a Wikipedia editor and AEO strategist. You uphold Wikipedia standards — ' +
     'notability (significant INDEPENDENT coverage), neutral point of view, verifiability, ' +
     'no promotion. You are HONEST: if a brand is not yet notable, you say so and give the ' +
-    'realistic path instead of a deletion-bait article. Output strict JSON only.';
+    'realistic path instead of a deletion-bait article. HARD RULE: every sentence of the ' +
+    'draft must be attributable to an independent source — no promotional or unverifiable ' +
+    'claims ("trusted by millions", "leading provider"); if a fact is not in the provided ' +
+    'brand facts or citation plan, do not write it. Output strict JSON only.';
 
   const sourceLines = independent.length
     ? independent.map((s) => `- ${s.domain} (cited ${s.citations}×)`).join('\n')
@@ -124,6 +128,32 @@ export async function runEncyclopediaAgent(
   await emit({ event_type: 'output_chunk', payload: { kind: 'notability', value: { verdict, approach: parsed.recommendedApproach } } });
 
   const da = parsed.draftArticle || { title: input.brandName, lead: '', sections: [] };
+
+  // Deterministic claim scan — a wiki draft carrying "trusted by millions"
+  // style claims is deletion-bait AND a policy violation. Flag, never trust.
+  const draftText = [da.lead, ...(da.sections || []).map((s) => s.content)].join('\n');
+  const claimFlags = scanUnverifiedClaims(draftText).map(
+    (label) => `Unverified claim ("${label}") in the draft — remove or attribute to an independent source before submission.`,
+  );
+
+  // Compliant submission path — built in code, present on EVERY output. The
+  // route is disclosure + edit request reviewed by independent editors; direct
+  // publication of paid content violates Wikimedia Terms of Use.
+  const editRoute = parsed.recommendedApproach === 'contribute_to_existing' ? 'talk_page_request_edit' : 'afc_draft_review';
+  const compliantSubmission = {
+    disclosureRequired: true,
+    route: editRoute,
+    steps: [
+      `Disclose the paid relationship BEFORE any edit: add {{paid|employer=${input.brandName}}} (or the ${targetWiki} equivalent) to the submitting account's user page — required by the Wikimedia Terms of Use.`,
+      editRoute === 'talk_page_request_edit'
+        ? 'Do NOT edit the article directly. Post the proposed text with sources on the article\'s Talk page inside a {{request edit}} template and let independent editors review and merge.'
+        : 'Do NOT publish the article directly. Submit the draft through Articles for Creation (AfC) so independent reviewers approve it into mainspace.',
+      'Every claim must carry an independent citation from the citation plan; drop anything a reviewer could not verify.',
+      'Accept the reviewers\' outcome — no re-submission pressure, no sockpuppet accounts, no undisclosed follow-up edits.',
+    ],
+    claimFlags,
+  };
+
   const md = [
     `# ${input.brandName} — Encyclopedia (${targetWiki})`,
     '',
@@ -142,6 +172,10 @@ export async function runEncyclopediaAgent(
     '',
     '## Get mentioned in existing articles (works before standalone notability)',
     ...(parsed.existingArticleTargets || []).flatMap((t) => [`### ${t.article}`, t.howToGetMentioned, '']),
+    '',
+    '## Compliant submission path (mandatory)',
+    ...compliantSubmission.steps.map((s, i) => `${i + 1}. ${s}`),
+    ...(claimFlags.length ? ['', ...claimFlags.map((f) => `> ⚠ COMPLIANCE: ${f}`)] : []),
   ].join('\n');
 
   await emit({ event_type: 'progress', payload: { pct: 100 } });
@@ -158,6 +192,7 @@ export async function runEncyclopediaAgent(
       draftArticle: da,
       citationPlan: parsed.citationPlan || [],
       existingArticleTargets: parsed.existingArticleTargets || [],
+      compliantSubmission,
       fullMarkdown: md,
       generatedBy: `${res.model}`,
     },

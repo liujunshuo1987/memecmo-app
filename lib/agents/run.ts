@@ -82,6 +82,34 @@ async function loadCompetitorSet(sb: ReturnType<typeof svc>, projectId: string):
   const { data } = await sb.from('projects').select('metadata').eq('id', projectId).maybeSingle();
   return (data?.metadata as any)?.competitorSet ?? null;
 }
+
+// Operator prompt edits (projects.metadata.promptEdits {excluded[], added[]}).
+// Applied at run assembly — the stored Discovery asset stays untouched, so
+// edits are reversible and never corrupt the source library.
+type PromptCat = { category: string; label: string; prompts: string[] };
+async function loadPromptEdits(sb: ReturnType<typeof svc>, projectId: string): Promise<{ excluded: string[]; added: string[] } | null> {
+  const { data } = await sb.from('projects').select('metadata').eq('id', projectId).maybeSingle();
+  return (data?.metadata as any)?.promptEdits ?? null;
+}
+function applyPromptEdits(
+  edits: { excluded?: string[]; added?: string[] } | null,
+  promptSet: PromptCat[],
+  keyPrompts: string[],
+): { promptSet: PromptCat[]; keyPrompts: string[] } {
+  if (!edits) return { promptSet, keyPrompts };
+  const norm = (s: string) => s.trim().toLowerCase();
+  const excluded = new Set((edits.excluded ?? []).map(norm));
+  const ps = promptSet
+    .map((c) => ({ ...c, prompts: (c.prompts || []).filter((p) => !excluded.has(norm(p))) }))
+    .filter((c) => c.prompts.length);
+  const kp = keyPrompts.filter((p) => !excluded.has(norm(p)));
+  const existing = new Set(ps.flatMap((c) => c.prompts).map(norm));
+  const fresh = (edits.added ?? [])
+    .map((s) => String(s).trim())
+    .filter((p) => p && !excluded.has(norm(p)) && !existing.has(norm(p)));
+  if (fresh.length) ps.push({ category: 'custom', label: 'Operator-added', prompts: fresh });
+  return { promptSet: ps, keyPrompts: kp };
+}
 async function persistCompetitorSet(sb: ReturnType<typeof svc>, projectId: string, set: unknown): Promise<void> {
   const { data } = await sb.from('projects').select('metadata').eq('id', projectId).maybeSingle();
   const metadata = { ...((data?.metadata as Record<string, unknown>) || {}), competitorSet: set };
@@ -278,8 +306,9 @@ export async function executeAgentRun(
 
       const mon = await runStep('phase-monitor', async () => {
         await persistAndEmit({ event_type: 'milestone', payload: { label: 'Phase 2/3 · Monitor', step: 2, totalSteps: 3 } });
-        const promptSet = ((disc.output as { promptSet?: unknown[] }).promptSet as { category: string; label: string; prompts: string[] }[]) || [];
-        const keyPrompts = ((disc.output as { keyPrompts?: unknown[] }).keyPrompts as string[]) || [];
+        const rawPromptSet = ((disc.output as { promptSet?: unknown[] }).promptSet as { category: string; label: string; prompts: string[] }[]) || [];
+        const rawKeyPrompts = ((disc.output as { keyPrompts?: unknown[] }).keyPrompts as string[]) || [];
+        const { promptSet, keyPrompts } = applyPromptEdits(await loadPromptEdits(sb, project.id), rawPromptSet, rawKeyPrompts);
         // No nested stepper: this whole phase is already one step.
         const m = await runMonitorAgent(
           { ...base, promptSet, keyPrompts, competitorSet: await loadCompetitorSet(sb, project.id) },
@@ -349,6 +378,7 @@ export async function executeAgentRun(
       } catch {
         throw new Error('Discovery prompt set asset is corrupted — re-run Discovery.');
       }
+      ({ keyPrompts } = applyPromptEdits(await loadPromptEdits(sb, project.id), [], keyPrompts));
       result = await runStandardAnswersAgent(
         {
           brandName: project.brand_name,
@@ -386,6 +416,7 @@ export async function executeAgentRun(
       if (!promptSet.length) {
         throw new Error('Discovery prompt set is empty — re-run Discovery.');
       }
+      ({ promptSet, keyPrompts } = applyPromptEdits(await loadPromptEdits(sb, project.id), promptSet, keyPrompts));
       result = await runMonitorAgent(
         {
           brandName: project.brand_name,

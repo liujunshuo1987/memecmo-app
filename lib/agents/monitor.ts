@@ -46,7 +46,12 @@ interface MonitorInput {
   competitorSet?: CompetitorSet | null;
 }
 
-export interface CompetitorGroup { canonical: string; aliases: string[] }
+// relationship (Javvo entity-resolution spec): only 'competitor' enters SoV /
+// benchmark / gap math. Partners, directories and self STAY in the set — their
+// aliases keep folding and a set refresh carries the tag forward, so a marked
+// partner is never re-discovered as a competitor.
+export type CompetitorRelationship = 'competitor' | 'partner' | 'directory' | 'self';
+export interface CompetitorGroup { canonical: string; aliases: string[]; relationship?: CompetitorRelationship }
 export interface CompetitorSet { groups: CompetitorGroup[]; refreshedAt: string }
 
 const COMPETITOR_SET_TTL_MS = 30 * 24 * 3600 * 1000;
@@ -532,7 +537,29 @@ export async function runMonitorAgent(
       payload: { text: competitorGroups.length ? `Competitors named by the engines: ${competitorGroups.map((g) => g.canonical).join(', ')}` : 'No competitor brands surfaced.' },
     });
   }
-  const competitors = competitorGroups.map((g) => g.canonical);
+  // Carry relationship tags forward across set refreshes: a name (or alias)
+  // marked partner/directory/self in the previous set keeps that tag even when
+  // the fresh extraction re-surfaces it — otherwise every refresh would
+  // re-pollute SoV with partners (Olivia's Upwork/Fiverr report).
+  const priorRel = new Map<string, CompetitorRelationship>();
+  for (const g of frozen?.groups ?? []) {
+    const rel = g.relationship ?? 'competitor';
+    if (rel === 'competitor') continue;
+    priorRel.set(normKey(g.canonical), rel);
+    for (const a of g.aliases) priorRel.set(normKey(a), rel);
+  }
+  for (const g of competitorGroups) {
+    const rel = priorRel.get(normKey(g.canonical)) ?? g.aliases.map((a) => priorRel.get(normKey(a))).find(Boolean);
+    if (rel && !g.relationship) g.relationship = rel;
+  }
+
+  const relOf = (g: CompetitorGroup): CompetitorRelationship => g.relationship ?? 'competitor';
+  const scoringGroups = competitorGroups.filter((g) => relOf(g) === 'competitor');
+  const competitors = scoringGroups.map((g) => g.canonical);
+  const scoringCanonicals = new Set(competitors);
+  const partners = competitorGroups
+    .filter((g) => relOf(g) !== 'competitor' && relOf(g) !== 'self')
+    .map((g) => ({ name: g.canonical, relationship: relOf(g) }));
   // Any variant → its canonical name (judge output + string fallback).
   const aliasToCanonical = new Map<string, string>();
   for (const g of competitorGroups) {
@@ -543,8 +570,8 @@ export async function runMonitorAgent(
     aliasToCanonical.get(normKey(name)) ??
     competitors.find((c) => mentions(name, c) || mentions(c, name)) ??
     null;
-  // Judge sees canonical names with their aliases so it tags consistently.
-  const judgeTrackList = competitorGroups.map((g) =>
+  // Judge sees only the SCORING set — partner mentions are simply not tracked.
+  const judgeTrackList = scoringGroups.map((g) =>
     g.aliases.length ? `${g.canonical} (also known as: ${g.aliases.join(', ')})` : g.canonical,
   );
 
@@ -570,8 +597,9 @@ export async function runMonitorAgent(
       // Map every judged/matched variant to its canonical competitor so one
       // company never counts twice under two spellings.
       const competitorsPresent = v && v.competitors.length
-        ? Array.from(new Set(v.competitors.map(canonicalOf).filter((c): c is string => !!c)))
+        ? Array.from(new Set(v.competitors.map(canonicalOf).filter((c): c is string => !!c && scoringCanonicals.has(c))))
         : competitorGroups
+            .filter((g) => scoringCanonicals.has(g.canonical))
             .filter((g) => [g.canonical, ...g.aliases].some((n) => mentions(a.text, n)))
             .map((g) => g.canonical);
       samples.push({
@@ -672,6 +700,9 @@ export async function runMonitorAgent(
     sampled: { total: totalPrompts, used: sampled.length, queries: samples.length, keyUsed, keyTotal: keyPrompts.length },
     metrics: { overall, perEngine, perStage, perIntent, keySet },
     competitorBenchmark: bench,
+    // Entities tracked but excluded from SoV by relationship tag (partner /
+    // directory) — surfaced so the UI can show WHY they aren't in the column.
+    partners,
     brandRank,
     citations: { brandCited: brandCitedCount > 0, brandCitedCount, sampleSources: allSources },
     gaps,

@@ -48,6 +48,9 @@ function buildBatchPrompt(input: StandardAnswersInput, localLang: string, profil
     'Never invent facts, figures, or claims not present in the facts block. Answers read ' +
     'like a helpful AI assistant, not ad copy. Output strict JSON only.';
 
+  // English-market projects get ONE answer — asking for "local" AND "en" when
+  // both are English produced every answer twice (Olivia's Payoneer bug).
+  const englishMarket = localLang === 'English';
   const user = [
     `Brand: ${input.brandName}`,
     input.brandUrl ? `Website: ${input.brandUrl}` : null,
@@ -55,9 +58,11 @@ function buildBatchPrompt(input: StandardAnswersInput, localLang: string, profil
     input.industry ? `Industry: ${input.industry}` : null,
     profileBlock || null,
     '',
-    `For each question below, write the standard answer in TWO languages:`,
-    `- "local": in ${localLang}`,
-    `- "en": in English`,
+    englishMarket
+      ? 'For each question below, write the standard answer in English (fill only the "en" field; leave "local" as an empty string):'
+      : `For each question below, write the standard answer in TWO languages:`,
+    englishMarket ? null : `- "local": in ${localLang}`,
+    englishMarket ? null : `- "en": in English`,
     'Each answer: 2-4 sentences, factual and helpful, positioning the brand naturally and ' +
       'correctly where relevant (include a concrete differentiator or fact from the facts block ' +
       'when it fits). If the question is non-branded/category, give a genuinely useful answer in ' +
@@ -121,11 +126,16 @@ export async function runStandardAnswersAgent(
             // Map by index back to the batch prompts — the model may omit/alter the
             // verbatim prompt field. Keep any item with a non-empty answer.
             out = list
-              .map((a: any, k: number) => ({
-                prompt: (typeof a?.prompt === 'string' && a.prompt.trim()) ? a.prompt : (batch[k] || ''),
-                local: String(a?.local ?? a?.vi ?? ''),
-                en: String(a?.en ?? a?.english ?? ''),
-              }))
+              .map((a: any, k: number) => {
+                const en = String(a?.en ?? a?.english ?? '');
+                let local = String(a?.local ?? a?.vi ?? '');
+                if (localLang === 'English' || local === en) local = ''; // single-language market → no duplicate
+                return {
+                  prompt: (typeof a?.prompt === 'string' && a.prompt.trim()) ? a.prompt : (batch[k] || ''),
+                  local,
+                  en,
+                };
+              })
               .filter((a) => a.prompt && (a.local || a.en));
           } catch {
             /* retry once; if still empty, this batch is skipped (others still produce a usable library) */

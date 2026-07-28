@@ -93,6 +93,10 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Top-of-mind · key prompts': '首位推荐率 · 重点 Prompt', 'key prompts monitored': '条重点 Prompt 已监测',
     Answers: '标准答案', 'Standard answer library': '标准答案库', 'the answer we want AI to give': '我们希望 AI 给出的答案',
     'Export PDF': '导出 PDF', Guide: '使用说明', 'Not run yet for this project.': '本项目尚未运行该智能体。', 'Run now': '立即运行',
+    Sets: '竞对与提示词', 'Competitor set': '竞对集', 'Prompt library': '提示词库', 'Relationship': '关系',
+    'Not counted in SoV': '不计入声量份额', 'Add competitor': '添加竞对', 'Add prompts (one per line)': '新增提示词(每行一条)',
+    'Click a prompt to exclude / restore it. Changes apply from the next run.': '点击提示词可排除/恢复;修改自下次运行起生效。',
+    'Save': '保存', 'Saved': '已保存', 'excluded': '已排除', 'competitor': '竞对', 'partner': '合作伙伴', 'directory': '目录平台', 'self': '自身',
     'Position when present': '出现时位置', 'Sentiment when present': '出现时情感', 'Citation strength': '引用强度',
     'Top-of-mind': '首位推荐', key: '重点', Rank: '排名', answers: '条回答', 'queries competitors win': '竞品占优的问题',
     'By intent': '按意图',
@@ -171,6 +175,7 @@ function creditFullScan(m: Record<string, LatestRun>): Record<string, LatestRun>
 
 export default function WorkspaceClient({ project, organization, initialRuns, scanHistory, isOperator = false }: Props) {
   const [history, setHistory] = useState<ScanPoint[]>(scanHistory);
+  const [setsOpen, setSetsOpen] = useState(false);
   const [runsByAgent, setRunsByAgent] = useState<Record<string, LatestRun>>(() => {
     const m: Record<string, LatestRun> = {};
     for (const r of initialRuns) {
@@ -401,6 +406,12 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setSetsOpen(true)}
+            className="text-[11px] px-2 py-1 rounded-md border border-edge text-dim hover:text-ink transition whitespace-nowrap"
+          >
+            {t('Sets')}
+          </button>
           <a href="/guide" className="text-[11px] px-2 py-1 rounded-md border border-edge text-dim hover:text-ink transition whitespace-nowrap">
             {t('Guide')}
           </a>
@@ -435,6 +446,8 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
           </span>
         </div>
       </header>
+
+      {setsOpen && <SetsEditorModal projectId={project.id} onClose={() => setSetsOpen(false)} />}
 
       {/* Three-zone shell: nav rail | stage | context */}
       <div className="wz-shell flex-1 grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)_300px] min-h-0">
@@ -1591,15 +1604,24 @@ function DiscoveryResult({ o }: { o: Record<string, any> }) {
 function StandardAnswersResult({ o }: { o: Record<string, any> }) {
   const answers: any[] = o.answers || [];
   const localName = o.localLangName || 'Local';
+  // English-market (or legacy duplicated) outputs collapse to one block —
+  // local===en used to render every answer twice.
+  const blocksOf = (a: any) => {
+    const out: { lab: string; val: string }[] = [];
+    if (a.local && a.local !== a.en) out.push({ lab: localName, val: a.local });
+    if (a.en) out.push({ lab: 'English', val: a.en });
+    return out;
+  };
+  const bilingual = answers.some((a) => blocksOf(a).length > 1);
   const copy = (text: string) => navigator.clipboard?.writeText(text).catch(() => {});
   const copyAll = () =>
-    copy(answers.map((a, i) => `${i + 1}. ${a.prompt}\n[${localName}] ${a.local}\n[English] ${a.en}`).join('\n\n'));
+    copy(answers.map((a, i) => `${i + 1}. ${a.prompt}\n` + blocksOf(a).map((b) => `[${b.lab}] ${b.val}`).join('\n')).join('\n\n'));
   return (
     <div className="rounded-xl border border-edge bg-surface p-5 space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-ink tracking-wide">{t('Standard answer library')}</h3>
-          <p className="text-[11px] text-faint mt-0.5">{localName} + English · {t('the answer we want AI to give')}</p>
+          <p className="text-[11px] text-faint mt-0.5">{bilingual ? `${localName} + English` : 'English'} · {t('the answer we want AI to give')}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <div className="text-right">
@@ -1619,7 +1641,7 @@ function StandardAnswersResult({ o }: { o: Record<string, any> }) {
               <span className="text-[12px] font-medium text-brand/90 flex-1 min-w-0 truncate">{a.prompt}</span>
             </summary>
             <div className="px-3 pb-3 pt-1.5 space-y-2.5 border-t border-edge">
-              {[{ lab: localName, val: a.local }, { lab: 'English', val: a.en }].map((blk, k) => (
+              {blocksOf(a).map((blk, k) => (
                 <div key={k}>
                   <div className="flex items-center justify-between mb-0.5">
                     <span className="text-[10px] uppercase tracking-wider text-faint">{blk.lab}</span>
@@ -1946,6 +1968,11 @@ function MonitorResult({ o }: { o: Record<string, any> }) {
               </div>
             ))}
           </div>
+          {Array.isArray(o.partners) && o.partners.length > 0 && (
+            <p className="text-[10px] text-faint mt-1.5">
+              {t('Not counted in SoV')}: {o.partners.map((p: any) => `${p.name} (${t(p.relationship)})`).join(' · ')}
+            </p>
+          )}
         </div>
       )}
 
@@ -2117,6 +2144,171 @@ function ReportResult({ o }: { o: Record<string, any> }) {
           </ul>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Sets editor — competitor set & prompt library (Javvo spec: manual
+// correction first). Edits live on projects.metadata; the Discovery asset and
+// scan history are never touched, and the competitor-set freeze date is kept.
+function SetsEditorModal({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+  const [tab, setTab] = useState<'competitors' | 'prompts'>('competitors');
+  const [groups, setGroups] = useState<{ canonical: string; aliases: string[]; relationship?: string }[]>([]);
+  const [library, setLibrary] = useState<{ label: string; prompts: string[] }[]>([]);
+  const [excluded, setExcluded] = useState<Set<string>>(new Set());
+  const [added, setAdded] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const norm = (s: string) => s.trim().toLowerCase();
+
+  useEffect(() => {
+    fetch(`/api/workspace/project-sets?projectId=${projectId}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setGroups(d.competitorSet?.groups ?? []);
+        setLibrary((d.promptLibrary ?? []).map((c: any) => ({ label: c.label || c.category || 'general', prompts: c.prompts || [] })));
+        setExcluded(new Set((d.promptEdits?.excluded ?? []).map((s: string) => s.trim().toLowerCase())));
+        setAdded((d.promptEdits?.added ?? []).join('\n'));
+      })
+      .catch(() => setMsg('Load failed'))
+      .finally(() => setLoading(false));
+  }, [projectId]);
+
+  const togglePrompt = (p: string) =>
+    setExcluded((prev) => {
+      const n = new Set(prev);
+      if (n.has(norm(p))) n.delete(norm(p)); else n.add(norm(p));
+      return n;
+    });
+
+  const save = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await fetch('/api/workspace/project-sets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          competitorGroups: groups.filter((g) => g.canonical.trim()),
+          promptEdits: { excluded: [...excluded], added: added.split('\n').map((s) => s.trim()).filter(Boolean) },
+        }),
+      });
+      const d = await res.json();
+      setMsg(res.ok ? t('Saved') : d.error || 'Error');
+    } catch {
+      setMsg('Network error');
+    }
+    setBusy(false);
+  };
+
+  const REL_OPTS = ['competitor', 'partner', 'directory', 'self'] as const;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-canvas border border-edge rounded-xl w-full max-w-2xl max-h-[82vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-edge">
+          <div className="flex items-center gap-2">
+            {(['competitors', 'prompts'] as const).map((tb) => (
+              <button
+                key={tb}
+                onClick={() => setTab(tb)}
+                className={`text-xs px-3 py-1.5 rounded-md transition ${tab === tb ? 'bg-brand text-on-brand' : 'text-dim hover:text-ink border border-edge'}`}
+              >
+                {t(tb === 'competitors' ? 'Competitor set' : 'Prompt library')}
+              </button>
+            ))}
+          </div>
+          <button onClick={onClose} className="text-faint hover:text-ink text-lg leading-none px-1">×</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          {loading ? (
+            <div className="text-xs text-faint py-8 text-center">…</div>
+          ) : tab === 'competitors' ? (
+            <div className="space-y-2">
+              <p className="text-[11px] text-faint">
+                {t('Not counted in SoV')}: {REL_OPTS.filter((r) => r !== 'competitor').map((r) => t(r)).join(' / ')}
+              </p>
+              {groups.map((g, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input
+                    value={g.canonical}
+                    onChange={(e) => setGroups((gs) => gs.map((x, k) => (k === i ? { ...x, canonical: e.target.value } : x)))}
+                    className="flex-1 bg-surface border border-edge rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-brand/50"
+                  />
+                  <select
+                    value={g.relationship ?? 'competitor'}
+                    onChange={(e) => setGroups((gs) => gs.map((x, k) => (k === i ? { ...x, relationship: e.target.value } : x)))}
+                    className={`bg-surface border rounded-md px-2 py-1.5 text-xs focus:outline-none ${(g.relationship ?? 'competitor') === 'competitor' ? 'border-edge text-dim' : 'border-gold/50 text-gold'}`}
+                  >
+                    {REL_OPTS.map((r) => (
+                      <option key={r} value={r} className="bg-surface">{t(r)}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => setGroups((gs) => gs.filter((_, k) => k !== i))}
+                    className="text-faint hover:text-garnet text-sm px-1"
+                    aria-label="remove"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={() => setGroups((gs) => [...gs, { canonical: '', aliases: [], relationship: 'competitor' }])}
+                className="text-[11px] px-2.5 py-1.5 rounded-md border border-edge text-dim hover:text-brand hover:border-brand/50 transition"
+              >
+                + {t('Add competitor')}
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-[11px] text-faint">{t('Click a prompt to exclude / restore it. Changes apply from the next run.')}</p>
+              {library.map((c) => (
+                <div key={c.label}>
+                  <div className="text-[10px] uppercase tracking-widest text-faint mb-1">{c.label}</div>
+                  <div className="space-y-0.5">
+                    {c.prompts.map((p) => {
+                      const off = excluded.has(norm(p));
+                      return (
+                        <button
+                          key={p}
+                          onClick={() => togglePrompt(p)}
+                          className={`block w-full text-left text-[11px] px-2 py-1 rounded transition ${off ? 'line-through text-garnet/70 bg-garnet/5' : 'text-dim hover:bg-raised'}`}
+                        >
+                          {p}{off ? ` · ${t('excluded')}` : ''}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-faint mb-1">{t('Add prompts (one per line)')}</div>
+                <textarea
+                  value={added}
+                  onChange={(e) => setAdded(e.target.value)}
+                  rows={4}
+                  className="w-full bg-surface border border-edge rounded-md px-2.5 py-2 text-xs focus:outline-none focus:border-brand/50"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between px-5 py-3 border-t border-edge">
+          <span className="text-[11px] text-faint">{msg ?? ''}</span>
+          <button
+            onClick={save}
+            disabled={busy || loading}
+            className="text-xs px-4 py-2 rounded-md bg-brand text-on-brand hover:brightness-110 disabled:bg-raised disabled:text-faint transition"
+          >
+            {busy ? '…' : t('Save')}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
