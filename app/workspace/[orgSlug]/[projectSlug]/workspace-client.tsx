@@ -191,16 +191,38 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
   UI_LANG = uiLang; // module-level so nested renderers can call t()
   SCORE_LABEL = ((organization.metadata as any)?.scoreLabel as string) || 'AI Mindset Index';
   const [theme, setTheme] = useState<'night' | 'day'>('night');
-  // Credit balance — shown at the point of spend. Root (operator) org has no
-  // credit concept; everyone else sees the wallet next to the run controls.
-  const [credits, setCredits] = useState<number | null>(null);
+  // Credit wallet — shown AND spendable at the point of spend. Root
+  // (operator) org has no credit concept; everyone else gets balance + top-up.
+  const [credits, setCredits] = useState<{ granted: number; purchased: number; total: number } | null>(null);
+  const [creditPacks, setCreditPacks] = useState<Record<string, { credits: number; usd: number; label: string }>>({});
+  const [walletOpen, setWalletOpen] = useState(false);
+  const [walletBusy, setWalletBusy] = useState<string | null>(null);
+  const [walletError, setWalletError] = useState<string | null>(null);
   useEffect(() => {
     if ((organization as any).type === 'root') return;
     fetch(`/api/workspace/credits?orgId=${organization.id}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (d?.balance) setCredits(d.balance.total); })
+      .then((d) => { if (d?.balance) { setCredits(d.balance); setCreditPacks(d.packs || {}); } })
       .catch(() => {});
   }, [organization]);
+  const buyPack = async (pack: string) => {
+    setWalletBusy(pack); setWalletError(null);
+    try {
+      const res = await fetch('/api/workspace/credits', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orgId: organization.id, pack }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setWalletError(res.status === 403
+          ? (uiLang === 'zh' ? '充值需管理员权限 — 请联系贵司管理员或 MemeCMO 顾问代为开通。' : uiLang === 'vi' ? 'Chỉ quản trị viên mới có thể mua — vui lòng liên hệ quản trị viên hoặc tư vấn MemeCMO.' : 'Purchasing requires an org admin — ask your admin or your MemeCMO advisor.')
+          : (data.message || data.error || 'Purchase failed'));
+        setWalletBusy(null);
+        return;
+      }
+      window.location.href = data.url;
+    } catch (e) { setWalletError(e instanceof Error ? e.message : String(e)); setWalletBusy(null); }
+  };
   useEffect(() => {
     try { setTheme(localStorage.getItem('memecmo-theme') === 'day' ? 'day' : 'night'); } catch { /* ignore */ }
     try { const l = localStorage.getItem('memecmo-uilang'); if (l === 'zh' || l === 'vi' || l === 'en') setUiLang(l); } catch { /* ignore */ }
@@ -389,7 +411,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
         setSending(false);
         return;
       }
-      if (data.credits && typeof data.credits.total === 'number') setCredits(data.credits.total);
+      if (data.credits && typeof data.credits.total === 'number') setCredits(data.credits);
       setActiveRunId(data.run.id);
     } catch (err) {
       setRunStatus({ status: 'failed', progress_pct: 0, summary: err instanceof Error ? err.message : String(err), agentId, output: null });
@@ -418,12 +440,13 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
         </div>
         <div className="flex items-center gap-3">
           {credits != null && (
-            <span
-              title={uiLang === 'zh' ? '主动全扫描 25 分/次、内容加跑 10 分;定时扫描与报告按约交付、不扣分' : uiLang === 'vi' ? 'Quét chủ động 25 · nội dung 10; quét định kỳ theo hợp đồng không trừ điểm' : 'On-demand full scan 25 · content run 10; scheduled scans & reports are contracted and free'}
-              className="text-[11px] px-2 py-1 rounded-md border border-gold/40 text-gold whitespace-nowrap cursor-help tabular-nums"
+            <button
+              onClick={() => setWalletOpen(true)}
+              title={uiLang === 'zh' ? '查看余额与充值' : uiLang === 'vi' ? 'Xem số dư & nạp thêm' : 'Balance & top-up'}
+              className="text-[11px] px-2 py-1 rounded-md border border-gold/40 text-gold whitespace-nowrap tabular-nums hover:bg-gold/10 transition"
             >
-              ◈ {credits} credits
-            </span>
+              ◈ {credits.total} credits
+            </button>
           )}
           <button
             onClick={() => setSetsOpen(true)}
@@ -466,6 +489,37 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
         </div>
       </header>
 
+      {walletOpen && credits && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" onClick={() => setWalletOpen(false)}>
+          <div className="w-full max-w-md rounded-xl border border-edge bg-surface p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div>
+              <h3 className="text-sm font-semibold text-ink">{uiLang === 'zh' ? 'Credits 余额与充值' : uiLang === 'vi' ? 'Số dư Credits & nạp thêm' : 'Credits · balance & top-up'}</h3>
+              <p className="text-xs text-faint">{organization.name}</p>
+            </div>
+            <div className="rounded-lg border border-edge bg-canvas p-4 flex items-baseline justify-between">
+              <span className="text-3xl font-bold text-ink tabular-nums">{credits.total}</span>
+              <span className="text-[11px] text-faint">{uiLang === 'zh' ? `赠送 ${credits.granted} · 购买 ${credits.purchased}` : uiLang === 'vi' ? `Tặng ${credits.granted} · Mua ${credits.purchased}` : `granted ${credits.granted} · purchased ${credits.purchased}`}</span>
+            </div>
+            <p className="text-[11px] text-faint leading-relaxed">
+              {uiLang === 'zh' ? '主动全扫描 25 分/次、内容加跑 10 分;定时扫描与报告按合同交付、永不扣分。' : uiLang === 'vi' ? 'Quét chủ động 25 điểm/lần, chạy nội dung 10 điểm; quét định kỳ theo hợp đồng không trừ điểm.' : 'On-demand full scan costs 25, content runs 10; scheduled scans & reports are contracted and never charged.'}
+            </p>
+            <div className="space-y-2">
+              {Object.entries(creditPacks).map(([key, p]) => (
+                <button key={key} disabled={walletBusy !== null} onClick={() => buyPack(key)}
+                  className="w-full flex items-center justify-between text-xs px-4 py-2.5 rounded-lg border border-edge text-ink hover:border-brand/50 hover:bg-brand-soft/30 disabled:opacity-50 transition">
+                  <span>{p.credits.toLocaleString()} credits</span>
+                  <span className="font-semibold">{walletBusy === key ? '…' : `${p.usd.toLocaleString()}`}</span>
+                </button>
+              ))}
+            </div>
+            {walletError && <div className="text-[11px] text-garnet bg-garnet/10 border border-garnet/40 rounded px-3 py-2">{walletError}</div>}
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-faint">{uiLang === 'zh' ? '支持国际信用卡;对公转账请联系顾问' : uiLang === 'vi' ? 'Hỗ trợ thẻ quốc tế; chuyển khoản liên hệ tư vấn' : 'Cards accepted · bank transfer via your advisor'}</span>
+              <button onClick={() => setWalletOpen(false)} className="text-xs px-3 py-1.5 rounded-md border border-edge text-dim hover:text-ink transition">{uiLang === 'zh' ? '关闭' : uiLang === 'vi' ? 'Đóng' : 'Close'}</button>
+            </div>
+          </div>
+        </div>
+      )}
       {setsOpen && <SetsEditorModal projectId={project.id} onClose={() => setSetsOpen(false)} />}
 
       {/* Three-zone shell: nav rail | stage | context */}
