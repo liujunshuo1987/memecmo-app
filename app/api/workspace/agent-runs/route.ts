@@ -11,7 +11,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { V05_AGENT_IDS } from '@/lib/agents/registry';
 import { inngest } from '@/lib/inngest/client';
-import { getQuotaStatusForProject, isMeteredKind, recordUsage, orgIdForProject } from '@/lib/commerce';
+import { getQuotaStatusForProject, isMeteredKind, recordUsage, orgIdForProject, serviceClient } from '@/lib/commerce';
+import { CREDIT_COSTS, spendCredits, getCreditBalance } from '@/lib/credits';
+
+/** Is the caller a member of the root (operator) org? Operator delivery runs
+ *  are part of the contracted service — never credit-charged. */
+async function isOperator(supabase: ReturnType<typeof createClient>, userId: string): Promise<boolean> {
+  const { data: root } = await supabase.from('organizations').select('id').eq('type', 'root').maybeSingle();
+  if (!root) return false;
+  const { data: mem } = await supabase
+    .from('organization_members')
+    .select('role')
+    .eq('organization_id', root.id)
+    .eq('user_id', userId)
+    .maybeSingle();
+  return !!mem;
+}
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -70,6 +85,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'quota_exceeded', message, quota }, { status: 402 });
   }
 
+  // ④ Credit policy (shareholder-approved): scheduled scans are the contracted
+  // service and run via cron; a CLIENT-initiated run is the flexibility product
+  // and costs credits. Operator (root-org member) runs are delivery work — free.
+  const creditCost = CREDIT_COSTS[body.agentId] ?? 0;
+  let creditCharge: { orgId: string; cost: number } | null = null;
+  if (creditCost > 0 && !(await isOperator(supabase, user.id))) {
+    const orgId = await orgIdForProject(body.projectId);
+    if (orgId) {
+      const svc = serviceClient();
+      const bal = await getCreditBalance(svc, orgId);
+      if (bal.total < creditCost) {
+        return NextResponse.json(
+          {
+            error: 'insufficient_credits',
+            message: `This on-demand run costs ${creditCost} credits; your balance is ${bal.total}. Scheduled scans and reports continue as contracted — buy a credit pack in Billing for on-demand flexibility.`,
+            credits: bal,
+            cost: creditCost,
+          },
+          { status: 402 },
+        );
+      }
+      creditCharge = { orgId, cost: creditCost };
+    }
+  }
+
   const { data: run, error: runError } = await supabase
     .from('agent_runs')
     .insert({
@@ -119,5 +159,12 @@ export async function POST(req: NextRequest) {
     if (orgId) await recordUsage({ orgId, projectId: body.projectId, agentRunId: run.id, kind: body.agentId });
   }
 
-  return NextResponse.json({ ok: true, run, quota });
+  // ④ Deduct credits after successful enqueue (granted pool first).
+  let credits = null;
+  if (creditCharge) {
+    const res = await spendCredits(serviceClient(), creditCharge.orgId, creditCharge.cost, body.agentId, run.id);
+    credits = res.balance;
+  }
+
+  return NextResponse.json({ ok: true, run, quota, credits });
 }

@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 import { serviceClient } from '@/lib/commerce';
 import { isBillingConfigured, getStripe, syncSubscription } from '@/lib/billing';
+import { addPurchasedCredits } from '@/lib/credits';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -45,6 +46,10 @@ export async function POST(req: NextRequest) {
             subscription.metadata = { ...subscription.metadata, ...session.metadata };
           }
           await syncSubscription(subscription);
+        } else if (session.mode === 'payment' && session.payment_status === 'paid' && session.metadata?.orgId && session.metadata?.credits) {
+          // Credit pack purchase — fulfil into the purchased pool (idempotent
+          // on the session id; Stripe retries webhooks).
+          await addPurchasedCredits(serviceClient(), session.metadata.orgId, Number(session.metadata.credits), `stripe:${session.id}`);
         }
         break;
       }

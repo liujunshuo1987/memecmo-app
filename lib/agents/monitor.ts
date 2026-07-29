@@ -44,6 +44,8 @@ interface MonitorInput {
   // Frozen competitor set (score stability): reused for 30 days, then
   // re-identified. Persisted on the project by run.ts.
   competitorSet?: CompetitorSet | null;
+  // Per-plan sampling cap (billing lever). Defaults to SAMPLE_CAP.
+  sampleCap?: number;
 }
 
 // relationship (Javvo entity-resolution spec): only 'competitor' enters SoV /
@@ -420,7 +422,7 @@ export async function runMonitorAgent(
   //    stage-balanced for breadth.
   const totalPrompts = input.promptSet.reduce((n, c) => n + (c.prompts?.length || 0), 0);
   const keyPrompts = input.keyPrompts || [];
-  const sampled = selectSample(input.promptSet, keyPrompts, SAMPLE_CAP);
+  const sampled = selectSample(input.promptSet, keyPrompts, Math.max(6, Math.min(input.sampleCap ?? SAMPLE_CAP, SAMPLE_CAP)));
   // Client-facing intent taxonomy (high-intent vs educational) — deterministic
   // so the frozen library never needs regeneration.
   const intentNames = [input.brandName, ...((input.competitorSet?.groups || []).map((g) => g.canonical))];

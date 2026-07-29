@@ -3,7 +3,7 @@
 // Workspace dashboard: orgs the user belongs to, their projects, and a
 // "New project" flow. Each project links into its agent workspace.
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -292,6 +292,27 @@ function BillingModal({ org, bill, plans, stripeReady, onClose }: {
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [credits, setCredits] = useState<{ balance: { granted: number; purchased: number; total: number }; packs: Record<string, { credits: number; usd: number; label: string }> } | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/workspace/credits?orgId=${org.id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setCredits(d))
+      .catch(() => {});
+  }, [org.id]);
+
+  const buyPack = async (pack: string) => {
+    setBusy(`pack:${pack}`); setError(null);
+    try {
+      const res = await fetch('/api/workspace/credits', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orgId: org.id, pack }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.message || data.error || 'Purchase failed'); setBusy(null); return; }
+      window.location.href = data.url;
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); setBusy(null); }
+  };
 
   const checkout = async (planId: string) => {
     setBusy(planId); setError(null);
@@ -362,6 +383,24 @@ function BillingModal({ org, bill, plans, stripeReady, onClose }: {
           })}
         </div>
 
+        {credits && (
+          <div className="rounded-lg border border-edge bg-canvas p-4 space-y-2">
+            <div className="flex items-baseline justify-between">
+              <span className="text-xs font-semibold text-ink">Credits · 主动扫描与加跑</span>
+              <span className="text-sm font-bold text-ink tabular-nums">{credits.balance.total}<span className="text-[10px] font-normal text-faint"> 分(赠 {credits.balance.granted} / 购 {credits.balance.purchased})</span></span>
+            </div>
+            <p className="text-[11px] text-faint">定时扫描与报告按约交付、不扣分;主动发起全扫 25 分、内容加跑 10 分。</p>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(credits.packs).map(([key, p]) => (
+                <button key={key} disabled={!stripeReady || busy !== null} onClick={() => buyPack(key)}
+                  className="text-[11px] px-3 py-1.5 rounded-md border border-edge text-dim hover:text-ink hover:border-brand/50 disabled:opacity-50 transition">
+                  {busy === `pack:${key}` ? '跳转中…' : `$${p.usd} → ${p.credits.toLocaleString()} 分`}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {error && <div className="text-xs text-garnet bg-garnet/10 border border-garnet/40 rounded px-3 py-2">{error}</div>}
 
         <div className="flex items-center justify-between pt-1">
@@ -427,7 +466,7 @@ function InviteModal({ org, onClose }: { org: Organization; onClose: () => void 
               <select value={role} onChange={(e) => setRole(e.target.value as 'admin' | 'editor' | 'viewer')}
                 className="w-full bg-raised border border-edge rounded-md px-3 py-2 text-sm focus:outline-none focus:border-brand/50">
                 <option value="viewer">Viewer — read reports</option>
-                <option value="editor">Editor — run agents</option>
+                <option value="editor">Member — day-to-day operations</option>
                 <option value="admin">Admin — manage org</option>
               </select>
             </label>

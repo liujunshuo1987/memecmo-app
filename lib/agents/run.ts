@@ -17,6 +17,7 @@ import { runSiteAgent } from './site';
 import { runEncyclopediaAgent } from './encyclopedia';
 import { runProfileAgent } from './profile';
 import { runStandardAnswersAgent } from './answers';
+import { planPolicyForProject } from '@/lib/commerce';
 
 // Load the latest canonical brand profile (if any) so execution agents share
 // consistent facts. Returns null when none exists yet.
@@ -251,6 +252,8 @@ export async function executeAgentRun(
 
     if (agentId === 'full_scan') {
       // One-click cascade: Discovery → Monitor → Report, all into this one run.
+      // Per-plan billing levers (null for operator/channel orgs → defaults).
+      const planPolicy = await planPolicyForProject(project.id).catch(() => null);
       const base = {
         brandName: project.brand_name,
         brandUrl: project.brand_url,
@@ -258,6 +261,8 @@ export async function executeAgentRun(
         targetLanguage: project.target_language,
         industry: project.industry,
         userPrompt,
+        libraryCap: planPolicy?.promptLibraryCap,
+        sampleCap: planPolicy?.sampledPerScan,
       };
 
       // Each phase is one Inngest step → its own short invocation, durable
@@ -355,6 +360,7 @@ export async function executeAgentRun(
           targetLanguage: project.target_language,
           industry: project.industry,
           userPrompt,
+          libraryCap: (await planPolicyForProject(project.id).catch(() => null))?.promptLibraryCap,
         },
         persistAndEmit,
       );
@@ -427,6 +433,7 @@ export async function executeAgentRun(
           promptSet,
           keyPrompts,
           competitorSet: await loadCompetitorSet(sb, project.id),
+          sampleCap: (await planPolicyForProject(project.id).catch(() => null))?.sampledPerScan,
         },
         persistAndEmit,
       );

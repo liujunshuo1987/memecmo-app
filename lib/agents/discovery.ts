@@ -26,6 +26,8 @@ interface DiscoveryInput {
   targetLanguage?: string | null;
   industry?: string | null;
   userPrompt?: string;
+  // Per-plan library size cap (billing lever). Trims proportionally per stage.
+  libraryCap?: number;
 }
 
 // Map ISO-ish language codes to names the model understands unambiguously.
@@ -241,6 +243,24 @@ export async function runDiscoveryAgent(
       for (const p of cat.prompts) {
         if (keyPrompts.length >= KEY_TARGET) break outer;
         if (!keyNorm.has(normPrompt(p))) { keyPrompts.push(p); keyNorm.add(normPrompt(p)); }
+      }
+    }
+  }
+
+  // Billing lever: trim the library to the plan's cap, proportionally per
+  // stage so funnel balance survives. Key prompts are kept (they're the
+  // contract-monitored panel and always ≤ KEY_TARGET).
+  if (input.libraryCap && input.libraryCap > 0) {
+    const total = promptSet.reduce((n, c) => n + c.prompts.length, 0);
+    if (total > input.libraryCap) {
+      const keep = new Set(keyPrompts.map(normPrompt));
+      const ratio = input.libraryCap / total;
+      for (const cat of promptSet) {
+        const target = Math.max(4, Math.round(cat.prompts.length * ratio));
+        if (cat.prompts.length <= target) continue;
+        const keyed = cat.prompts.filter((p) => keep.has(normPrompt(p)));
+        const rest = cat.prompts.filter((p) => !keep.has(normPrompt(p)));
+        cat.prompts = [...keyed, ...rest].slice(0, Math.max(target, keyed.length));
       }
     }
   }

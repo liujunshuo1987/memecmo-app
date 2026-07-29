@@ -170,3 +170,25 @@ export async function orgIdForProject(projectId: string): Promise<string | null>
     .maybeSingle();
   return (data?.organization_id as string) ?? null;
 }
+
+// ── Plan policy (shareholder-approved levers) ────────────────────────────────
+// Per-plan prompt/sampling caps for metered end-client orgs. Operator and
+// channel orgs return null → agents use their built-in defaults (current
+// behavior — the contracted FMVN cadence is unaffected).
+export interface PlanPolicy {
+  promptLibraryCap: number;
+  sampledPerScan: number;
+}
+
+export async function planPolicyForProject(projectId: string): Promise<PlanPolicy | null> {
+  const sb = serviceClient();
+  const { data: project } = await sb.from('projects').select('organization_id').eq('id', projectId).maybeSingle();
+  if (!project?.organization_id) return null;
+  const { data: org } = await sb.from('organizations').select('id, type').eq('id', project.organization_id).maybeSingle();
+  if (!org || org.type !== 'end_client') return null;
+  const { data: sub } = await sb.from('org_subscriptions').select('plan_id').eq('organization_id', org.id).maybeSingle();
+  if (!sub?.plan_id) return null;
+  const { data: plan } = await sb.from('plans').select('prompt_library_cap, sampled_per_scan').eq('id', sub.plan_id).maybeSingle();
+  if (!plan) return null;
+  return { promptLibraryCap: plan.prompt_library_cap, sampledPerScan: plan.sampled_per_scan };
+}

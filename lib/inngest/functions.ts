@@ -5,6 +5,7 @@ import { inngest } from './client';
 import { executeAgentRun } from '@/lib/agents/run';
 import { recordUsage, isMeteredKind } from '@/lib/commerce';
 import { sendProjectDigest, maybeSendScanAlert } from '@/lib/reports/digest';
+import { applyMonthlyGrant } from '@/lib/credits';
 
 function svc() {
   return createServiceClient(
@@ -153,7 +154,18 @@ export const scheduledMonthly = inngest.createFunction(
       const id = await step.run(`report-${p.id}`, () => enqueueScheduledRun(p.id, p.organization_id, 'report'));
       if (id) reports++;
     }
-    return { cadence: 'monthly', monitored: monthly.length, reports };
+    // Monthly credit allowances (e.g. FMVN flagship 200/mo capped at 600) —
+    // orgs with metadata.monthlyCreditGrant, granted pool, capped.
+    const granted = await step.run('monthly-credit-grants', async () => {
+      const sb = svc();
+      const { data: orgs } = await sb.from('organizations').select('id, metadata').eq('status', 'active');
+      let total = 0;
+      for (const o of orgs ?? []) {
+        if ((o.metadata as any)?.monthlyCreditGrant) total += await applyMonthlyGrant(sb, o as any);
+      }
+      return total;
+    });
+    return { cadence: 'monthly', monitored: monthly.length, reports, creditsGranted: granted };
   },
 );
 
