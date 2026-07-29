@@ -191,6 +191,16 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
   UI_LANG = uiLang; // module-level so nested renderers can call t()
   SCORE_LABEL = ((organization.metadata as any)?.scoreLabel as string) || 'AI Mindset Index';
   const [theme, setTheme] = useState<'night' | 'day'>('night');
+  // Credit balance — shown at the point of spend. Root (operator) org has no
+  // credit concept; everyone else sees the wallet next to the run controls.
+  const [credits, setCredits] = useState<number | null>(null);
+  useEffect(() => {
+    if ((organization as any).type === 'root') return;
+    fetch(`/api/workspace/credits?orgId=${organization.id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.balance) setCredits(d.balance.total); })
+      .catch(() => {});
+  }, [organization]);
   useEffect(() => {
     try { setTheme(localStorage.getItem('memecmo-theme') === 'day' ? 'day' : 'night'); } catch { /* ignore */ }
     try { const l = localStorage.getItem('memecmo-uilang'); if (l === 'zh' || l === 'vi' || l === 'en') setUiLang(l); } catch { /* ignore */ }
@@ -379,6 +389,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
         setSending(false);
         return;
       }
+      if (data.credits && typeof data.credits.total === 'number') setCredits(data.credits.total);
       setActiveRunId(data.run.id);
     } catch (err) {
       setRunStatus({ status: 'failed', progress_pct: 0, summary: err instanceof Error ? err.message : String(err), agentId, output: null });
@@ -406,6 +417,14 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {credits != null && (
+            <span
+              title={uiLang === 'zh' ? '主动全扫描 25 分/次、内容加跑 10 分;定时扫描与报告按约交付、不扣分' : uiLang === 'vi' ? 'Quét chủ động 25 · nội dung 10; quét định kỳ theo hợp đồng không trừ điểm' : 'On-demand full scan 25 · content run 10; scheduled scans & reports are contracted and free'}
+              className="text-[11px] px-2 py-1 rounded-md border border-gold/40 text-gold whitespace-nowrap cursor-help tabular-nums"
+            >
+              ◈ {credits} credits
+            </span>
+          )}
           <button
             onClick={() => setSetsOpen(true)}
             className="text-[11px] px-2 py-1 rounded-md border border-edge text-dim hover:text-ink transition whitespace-nowrap"

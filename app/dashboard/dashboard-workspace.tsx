@@ -189,7 +189,10 @@ export default function DashboardClient({ groups, userEmail, isRootAdmin, billin
                         {bill.planName} · {bill.used}/{bill.quota} scans{bill.status !== 'trialing' && bill.status !== 'active' ? ` · ${bill.status}` : ''}
                       </button>
                     )}
-                    {!bill && (role === 'admin' || isRootAdmin) && (
+                    {/* Balance is need-to-know for anyone who can spend it —
+                        every member sees the entry; purchases stay admin-gated
+                        at the API. */}
+                    {!bill && (
                       <button
                         onClick={() => setBillingOrg(org)}
                         title="套餐、credit 余额与充值"
