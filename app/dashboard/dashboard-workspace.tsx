@@ -189,6 +189,15 @@ export default function DashboardClient({ groups, userEmail, isRootAdmin, billin
                         {bill.planName} · {bill.used}/{bill.quota} scans{bill.status !== 'trialing' && bill.status !== 'active' ? ` · ${bill.status}` : ''}
                       </button>
                     )}
+                    {!bill && (role === 'admin' || isRootAdmin) && (
+                      <button
+                        onClick={() => setBillingOrg(org)}
+                        title="套餐、credit 余额与充值"
+                        className="text-[10px] px-2 py-0.5 rounded-full border border-edge text-dim uppercase tracking-wider cursor-pointer hover:text-ink hover:border-brand/50 transition"
+                      >
+                        套餐 · Credits
+                      </button>
+                    )}
                   </div>
                   <div className="flex gap-2">
                     {canInvite && (
