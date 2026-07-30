@@ -71,6 +71,76 @@ let UI_LANG: UiLang = 'en';
 // "AI Mindset Index"; orgs whose CONTRACT names the metric (FMVN → AIGVR)
 // override via organizations.metadata.scoreLabel.
 let SCORE_LABEL = 'AI Mindset Index';
+// Display mode (SVP feedback): 'enterprise' leads with standard metrics and
+// hides the composite gauge (no industry consensus on weighted composites);
+// 'simple' (default) keeps the headline index. organizations.metadata.scoreDisplay.
+let SCORE_DISPLAY: 'simple' | 'enterprise' = 'simple';
+
+// Trilingual glossary — every unfamiliar GEO term gets a hover explainer
+// (Semrush-style "?" affordance) linking to the Guide.
+const GLOSSARY: Record<string, { en: string; zh: string; vi: string }> = {
+  presence: {
+    en: 'How often AI engines mention your brand at all when answering the tracked buyer questions. 60% = mentioned in 6 of 10 answers.',
+    zh: 'AI 引擎在回答被跟踪的买家问题时,提到你品牌的比例。60% 表示 10 个回答里有 6 个提到。',
+    vi: 'Tần suất các AI engine nhắc đến thương hiệu của bạn khi trả lời các câu hỏi được theo dõi. 60% = 6/10 câu trả lời có nhắc.',
+  },
+  sov: {
+    en: 'Share of Voice — of all brand mentions across answers (you + competitors), the share that is yours. The competitive slice of the market conversation.',
+    zh: '声量份额——所有回答中提到的品牌总量里(你+竞品),属于你的比例。这是竞争视角的市场话语权。',
+    vi: 'Share of Voice — trong tổng số lần nhắc thương hiệu (bạn + đối thủ), phần thuộc về bạn.',
+  },
+  position: {
+    en: 'When your brand IS mentioned, how prominently: 3 = first brand named (top-of-mind), 0 = buried in a list. Top-of-mind rate = share of answers where you are the FIRST brand.',
+    zh: '被提到时的显著程度:3 = 第一个被点名(首位提及),0 = 淹没在列表里。首位提及率 = 你是第一个被提到的品牌的回答占比。',
+    vi: 'Khi được nhắc, mức độ nổi bật: 3 = thương hiệu đầu tiên, 0 = chìm trong danh sách.',
+  },
+  sentiment: {
+    en: 'The tone AI uses when describing your brand, scored only on answers where you appear. Low = neutral-to-negative framing worth fixing at the source.',
+    zh: 'AI 描述你品牌时的语气倾向,只统计出现你的回答。低分 = 中性偏负面的表述,需要从信源层面修复。',
+    vi: 'Giọng điệu AI khi mô tả thương hiệu, chỉ tính các câu trả lời có bạn xuất hiện.',
+  },
+  citation: {
+    en: 'Citation Rate — how often AI cites sources (links) that belong to or favor you when answering. The AEO signal: whose website earns the reference.',
+    zh: '引用率——AI 回答时引用属于你/有利于你的信源(链接)的频率。这是 AEO 信号:谁的网站赢得了引用。',
+    vi: 'Citation Rate — tần suất AI trích dẫn nguồn thuộc về bạn khi trả lời.',
+  },
+  gaps: {
+    en: 'High-intent buyer questions (who/best/price/compare) where competitors are recommended and you are absent — the exact queries losing you customers.',
+    zh: '高购买意图问题(谁家好/最佳/价格/对比)中,竞品被推荐而你缺席的题目——正在流失客户的那些提问。',
+    vi: 'Các câu hỏi ý định mua cao mà đối thủ được đề xuất còn bạn vắng mặt.',
+  },
+  index: {
+    en: 'A weighted summary of the five standard metrics (Presence 30% · Position 25% · Share of Voice 20% · Sentiment 15% · Citation 10%). A convenience dial — the five metrics above are the ground truth.',
+    zh: '五个标准指标的加权摘要(出现率30% · 位次25% · 声量20% · 情感15% · 引用10%)。它是速览仪表——上面五个标准指标才是事实本身。',
+    vi: 'Tóm tắt có trọng số của 5 chỉ số chuẩn. 5 chỉ số chuẩn mới là sự thật gốc.',
+  },
+  realsurface: {
+    en: 'Measured on the real Google AI Overview page (location-targeted), not an API proxy — what searchers actually see.',
+    zh: '在真实的 Google AI Overview 页面上实测(含地区定位),不是 API 代理——搜索者实际看到的界面。',
+    vi: 'Đo trên trang Google AI Overview thật (định vị khu vực), không phải API proxy.',
+  },
+  topofmind: {
+    en: 'The share of answers where your brand is the FIRST one AI names — the strongest recommendation position.',
+    zh: 'AI 第一个点名你品牌的回答占比——最强的推荐位。',
+    vi: 'Tỷ lệ câu trả lời mà thương hiệu của bạn được AI nêu tên ĐẦU TIÊN.',
+  },
+};
+
+function TermTip({ term, children }: { term: string; children?: any }) {
+  const g = GLOSSARY[term];
+  if (!g) return <>{children}</>;
+  const text = UI_LANG === 'zh' ? g.zh : UI_LANG === 'vi' ? g.vi : g.en;
+  return (
+    <span className="relative inline-flex items-center gap-1 group/tip">
+      {children}
+      <span className="inline-flex items-center justify-center w-3 h-3 rounded-full border border-faint/60 text-faint text-[8px] leading-none cursor-help select-none">?</span>
+      <span className="pointer-events-none invisible group-hover/tip:visible absolute z-30 bottom-full left-0 mb-1.5 w-60 rounded-lg border border-edge bg-raised p-2.5 text-left shadow-xl normal-case tracking-normal">
+        <span className="block text-[11px] leading-relaxed text-dim whitespace-normal">{text}</span>
+        <a href="/guide" className="pointer-events-auto inline-block mt-1 text-[10px] text-brand hover:underline">Guide →</a>
+      </span>
+    </span>
+  );
+}
 const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
   zh: {
     'Run full GEO scan': '运行完整 GEO 扫描', '…focus the agents': '…给智能体一个方向',
@@ -83,6 +153,7 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     Recommendations: '建议', 'Quick wins': '速赢', 'AEO checklist': 'AEO 清单', 'Homepage edits': '主页修改',
     'Citation plan': '引用计划', 'Evidence needed to qualify': '达标所需证据', 'Get mentioned in existing articles': '进入已有词条被提及',
     'Latest scan': '最近扫描', 'Presence': '出现率', 'Share of Voice': '声量份额', 'Brand rank': '品牌排名', 'High-intent gaps': '高意图缺口',
+    'All engines': '全部引擎', 'Benchmark and gaps remain whole-scan.': '竞对对标与缺口仍为全量扫描口径。',
     'Cited sources': '被引来源', Deliverables: '交付物', 'Structured view': '结构化视图', Refine: '改写', Ask: '问',
     'Full Scan': '完整扫描', Profile: '品牌档案', Discovery: '发现', Monitor: '监测', Report: '报告',
     Optimize: '内容', Site: '主页', Distribute: '分发', Encyclopedia: '百科', 'Copy kit': '复制全套', 'Copy brief': '复制简报',
@@ -115,7 +186,8 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
 
   },
   vi: {
-    'Run full GEO scan': 'Chạy quét GEO đầy đủ', '…focus the agents': '…định hướng cho agent',
+
+    'All engines': 'Tất cả engine', 'Benchmark and gaps remain whole-scan.': 'So sánh đối thủ và khoảng trống vẫn theo toàn bộ lần quét.',    'Run full GEO scan': 'Chạy quét GEO đầy đủ', '…focus the agents': '…định hướng cho agent',
     Setup: 'Chuẩn bị', Measure: 'Đo lường', 'Act — build AEO presence': 'Hành động · xây dựng AEO',
     ready: 'sẵn sàng', run: 'chạy', 'running…': 'đang chạy…', 'Re-run': 'Chạy lại', Copy: 'Sao chép', Edit: 'Sửa', Done: 'Xong',
     Result: 'Kết quả', 'Pick a deliverable on the left, or run a full GEO scan.': 'Chọn một mục bên trái, hoặc chạy quét GEO đầy đủ.',
@@ -190,6 +262,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
   const [uiLang, setUiLang] = useState<UiLang>('en');
   UI_LANG = uiLang; // module-level so nested renderers can call t()
   SCORE_LABEL = ((organization.metadata as any)?.scoreLabel as string) || 'AI Mindset Index';
+  SCORE_DISPLAY = ((organization.metadata as any)?.scoreDisplay === 'enterprise' ? 'enterprise' : 'simple');
   const [theme, setTheme] = useState<'night' | 'day'>('night');
   // Credit wallet — shown AND spendable at the point of spend. Root
   // (operator) org has no credit concept; everyone else gets balance + top-up.
@@ -756,11 +829,11 @@ function TranslatedView({ agentId, output, summary, to }: { agentId?: string; ou
   );
 }
 
-function ContextMetric({ label, value }: { label: string; value: string }) {
+function ContextMetric({ label, value, tip }: { label: string; value: string; tip?: string }) {
   return (
-    <div className="flex items-center justify-between text-[12px]">
-      <span className="text-faint">{t(label)}</span>
-      <span className="text-ink font-medium">{value}</span>
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-[11px] text-dim">{tip ? <TermTip term={tip}>{label}</TermTip> : label}</span>
+      <span className="text-[11px] font-semibold text-ink tabular-nums">{value}</span>
     </div>
   );
 }
@@ -873,21 +946,30 @@ function ContextPanel({ headlineAigvr, scoreRun, runsByAgent, totalAgents }: {
   const rank = sc?.brandRank;
   const benchN = (sc?.competitorBenchmark || []).length;
   const sources = (sc?.sourceAuthority?.ranking || []).length;
+  const sov = sc?.dimensions?.competitiveShare;
+  const cite = sc?.dimensions?.citation;
+  const senti = sc?.dimensions?.sentiment;
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-edge bg-surface p-4 text-center">
-        <div className="text-[10px] uppercase tracking-widest text-faint mb-1">{SCORE_LABEL}</div>
-        <div className={`text-3xl font-semibold leading-none ${headlineAigvr == null ? 'text-faint' : headlineAigvr >= 67 ? 'text-sage' : headlineAigvr >= 34 ? 'text-gold' : 'text-garnet'}`}>{headlineAigvr ?? '—'}</div>
-        <div className="text-[10px] text-faint mt-1">/ 100</div>
-      </div>
+      {/* Standard metrics lead (SVP feedback); composite is a summary dial. */}
       {sc && (
         <div className="rounded-lg border border-edge bg-surface p-3 space-y-2">
           <div className="text-[10px] uppercase tracking-widest text-faint">{t('Latest scan')}</div>
-          <ContextMetric label="Presence" value={presence != null ? `${presence}%` : '—'} />
-          {topOfMind != null && <ContextMetric label="Top-of-mind rate" value={`${topOfMind}%`} />}
+          <ContextMetric tip="presence" label="Presence" value={presence != null ? `${presence}%` : '—'} />
+          <ContextMetric tip="sov" label="Share of Voice" value={sov != null ? `${Math.round(sov)}%` : '—'} />
+          <ContextMetric tip="citation" label="Citation rate" value={cite != null ? `${Math.round(cite)}%` : '—'} />
+          <ContextMetric tip="sentiment" label="AI sentiment" value={senti != null ? String(Math.round(senti)) : '—'} />
+          {topOfMind != null && <ContextMetric tip="topofmind" label="Top-of-mind rate" value={`${topOfMind}%`} />}
           <ContextMetric label="Brand rank" value={rank ? `#${rank} of ${benchN}` : '—'} />
-          <ContextMetric label="High-intent gaps" value={String(gaps)} />
+          <ContextMetric tip="gaps" label="High-intent gaps" value={String(gaps)} />
           <ContextMetric label="Cited sources" value={String(sources)} />
+        </div>
+      )}
+      {SCORE_DISPLAY !== 'enterprise' && (
+        <div className="rounded-lg border border-edge bg-surface p-4 text-center">
+          <div className="text-[10px] uppercase tracking-widest text-faint mb-1"><TermTip term="index">{SCORE_LABEL}</TermTip></div>
+          <div className={`text-3xl font-semibold leading-none ${headlineAigvr == null ? 'text-faint' : headlineAigvr >= 67 ? 'text-sage' : headlineAigvr >= 34 ? 'text-gold' : 'text-garnet'}`}>{headlineAigvr ?? '—'}</div>
+          <div className="text-[10px] text-faint mt-1">/ 100</div>
         </div>
       )}
       <div className="rounded-lg border border-edge bg-surface p-3">
@@ -1879,10 +1961,10 @@ function VerificationBar({ projectId, kind }: { projectId: string; kind: string 
   );
 }
 
-function KpiTile({ label, value, sub, accent }: { label: string; value: string | number; sub?: string; accent?: boolean }) {
+function KpiTile({ label, value, sub, accent, tip }: { label: string; value: string | number; sub?: string; accent?: boolean; tip?: string }) {
   return (
     <div className={`rounded-lg border px-3 py-2 ${accent ? 'border-brand/40 bg-brand-soft/40' : 'border-edge bg-surface'}`}>
-      <div className="text-[10px] uppercase tracking-wider text-faint truncate">{label}</div>
+      <div className="text-[10px] uppercase tracking-wider text-faint">{tip ? <TermTip term={tip}>{label}</TermTip> : label}</div>
       <div className="text-lg font-semibold text-ink tabular-nums leading-tight">{value}</div>
       {sub && <div className="text-[10px] text-faint truncate">{sub}</div>}
     </div>
@@ -1890,7 +1972,12 @@ function KpiTile({ label, value, sub, accent }: { label: string; value: string |
 }
 
 function MonitorResult({ o }: { o: Record<string, any> }) {
-  const d = o.dimensions || {};
+  // Per-engine view (SVP feedback: each LLM matters differently) — slicing is
+  // display-level; benchmark and gaps stay whole-scan.
+  const [engineView, setEngineView] = useState<string | null>(null);
+  const allEngines: any[] = o.metrics?.perEngine || [];
+  const engSel = engineView ? allEngines.find((e) => e.engine === engineView) : null;
+  const d = engSel ?? (o.dimensions || {});
   const dims: { k: string; label: string }[] = [
     { k: 'presence', label: 'Presence' },
     { k: 'prominence', label: 'Prominence' },
@@ -1910,7 +1997,7 @@ function MonitorResult({ o }: { o: Record<string, any> }) {
   const bench: any[] = o.competitorBenchmark || [];
   const maxSov = Math.max(1, ...bench.map((b) => b.sovPct || 0));
   const gaps: any[] = o.gaps || [];
-  const score = o.aigvrScore ?? 0;
+  const score = engSel ? (engSel.aigvr ?? 0) : (o.aigvrScore ?? 0);
   const tom = o.topOfMind || {};
   const hasTom = tom.overallRate != null;
 
@@ -1923,23 +2010,44 @@ function MonitorResult({ o }: { o: Record<string, any> }) {
           <p className="text-[11px] text-faint mt-0.5">{(o.engines || []).join(' · ')} · {o.sampled?.queries ?? '—'} queries</p>
         </div>
         <div className="flex flex-col items-center shrink-0">
-          <ScoreGauge score={score} />
+          {SCORE_DISPLAY !== 'enterprise' && (
+            <TermTip term="index"><ScoreGauge score={score} /></TermTip>
+          )}
           <div className="text-[10px] text-faint mt-1">
             Rank <span className="text-ink font-semibold">#{o.brandRank ?? '—'}</span> of {bench.length || '—'}
           </div>
         </div>
       </div>
 
+      {/* Engine filter — every number below re-slices to the chosen engine */}
+      {allEngines.length > 1 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button onClick={() => setEngineView(null)}
+            className={`text-[11px] px-2.5 py-1 rounded-md border transition ${!engineView ? 'border-brand/60 bg-brand-soft text-brand font-semibold' : 'border-edge text-dim hover:text-ink'}`}>
+            {t('All engines')}
+          </button>
+          {allEngines.map((e, i) => (
+            <button key={i} onClick={() => setEngineView(e.engine === engineView ? null : e.engine)}
+              className={`text-[11px] px-2.5 py-1 rounded-md border transition ${engineView === e.engine ? 'border-brand/60 bg-brand-soft text-brand font-semibold' : 'border-edge text-dim hover:text-ink'}`}>
+              {e.engine}
+            </button>
+          ))}
+          {engineView && (
+            <span className="text-[10px] text-faint ml-1">{t('Benchmark and gaps remain whole-scan.')}</span>
+          )}
+        </div>
+      )}
+
       {/* Six non-overlapping headline KPIs (CMO review): occurrence, share of
           voice, position-when-present (top-of-mind folded in as its filtered
           view), sentiment-when-present, citation strength, high-intent gaps. */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        <KpiTile label={t('Presence')} value={`${Math.round(d.presence ?? 0)}%`} sub={`${o.metrics?.overall?.brandHits ?? '—'}/${o.sampled?.queries ?? '—'} ${t('answers')}`} />
-        <KpiTile label={t('Share of Voice')} value={`${Math.round(d.competitiveShare ?? 0)}%`} sub={`${t('Rank')} #${o.brandRank ?? '—'} / ${bench.length || '—'}`} />
-        <KpiTile label={t('Position when present')} value={Math.round(d.prominence ?? 0)} sub={hasTom ? `${t('Top-of-mind')} ${tom.overallRate}% · ${t('key')} ${tom.keyRate ?? '—'}%` : undefined} accent />
-        <KpiTile label={t('Sentiment when present')} value={Math.round(d.sentiment ?? 0)} />
-        <KpiTile label={t('Citation strength')} value={`${Math.round(d.citation ?? 0)}%`} />
-        <KpiTile label={t('High-intent gaps')} value={gaps.length} sub={t('queries competitors win')} accent={gaps.length > 0} />
+        <KpiTile tip="presence" label={t('Presence')} value={`${Math.round(d.presence ?? 0)}%`} sub={`${o.metrics?.overall?.brandHits ?? '—'}/${o.sampled?.queries ?? '—'} ${t('answers')}`} />
+        <KpiTile tip="sov" label={t('Share of Voice')} value={`${Math.round(d.competitiveShare ?? 0)}%`} sub={`${t('Rank')} #${o.brandRank ?? '—'} / ${bench.length || '—'}`} />
+        <KpiTile tip="position" label={t('Position when present')} value={Math.round(d.prominence ?? 0)} sub={hasTom ? `${t('Top-of-mind')} ${tom.overallRate}% · ${t('key')} ${tom.keyRate ?? '—'}%` : undefined} accent />
+        <KpiTile tip="sentiment" label={t('Sentiment when present')} value={Math.round(d.sentiment ?? 0)} />
+        <KpiTile tip="citation" label={t('Citation strength')} value={`${Math.round(d.citation ?? 0)}%`} />
+        <KpiTile tip="gaps" label={t('High-intent gaps')} value={gaps.length} sub={t('queries competitors win')} accent={gaps.length > 0} />
       </div>
 
       {/* Radar + per-dimension breakdown */}
@@ -1965,7 +2073,8 @@ function MonitorResult({ o }: { o: Record<string, any> }) {
           <SectionLabel>By engine</SectionLabel>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {engines.map((e, i) => (
-              <div key={i} className={`rounded-lg border bg-surface px-2.5 py-2 ${(e.kind === 'serp' || e.kind === 'surface') ? 'border-gold/40' : 'border-edge'}`}>
+              <div key={i} onClick={() => setEngineView(e.engine === engineView ? null : e.engine)}
+                className={`rounded-lg border bg-surface px-2.5 py-2 cursor-pointer transition ${engineView === e.engine ? 'border-brand ring-1 ring-brand/40' : (e.kind === 'serp' || e.kind === 'surface') ? 'border-gold/40 hover:border-gold' : 'border-edge hover:border-brand/40'}`}>
                 <div className="flex items-baseline justify-between gap-1">
                   <span className="text-[11px] text-dim truncate">{e.engine}</span>
                   <span className="text-[13px] font-bold tabular-nums" style={{ color: toneColor(e.aigvr || 0) }}>{e.aigvr ?? '—'}</span>
