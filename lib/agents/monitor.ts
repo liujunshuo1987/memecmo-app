@@ -46,6 +46,9 @@ interface MonitorInput {
   competitorSet?: CompetitorSet | null;
   // Per-plan sampling cap (billing lever). Defaults to SAMPLE_CAP.
   sampleCap?: number;
+  // Standard answers library (B2) — enables the answer-accuracy pass: is what
+  // AI actually says CORRECT vs the canonical answer? (support-cost signal)
+  standardAnswers?: { prompt: string; local?: string; en?: string }[];
 }
 
 // relationship (Javvo entity-resolution spec): only 'competitor' enters SoV /
@@ -582,6 +585,14 @@ export async function runMonitorAgent(
   await emit({ event_type: 'milestone', payload: { label: 'Scoring prominence & sentiment', step: 4, totalSteps: 5 } });
   const samples: Sample[] = [];
   let judgedEngines = 0;
+
+  // Answer-accuracy pool: brand-present answers to KEY prompts that have a
+  // canonical answer in the standard library. Judged after the engine loop.
+  const normP = (x: string) => x.toLowerCase().replace(/\s+/g, ' ').trim();
+  const stdMap = new Map<string, { en?: string; local?: string }>(
+    (input.standardAnswers || []).map((a) => [normP(a.prompt), { en: a.en, local: a.local }]),
+  );
+  const accuracyPool: { engine: string; prompt: string; text: string; canonical: string }[] = [];
   await Promise.all(engines.map(async (engine) => {
     const answers = rawByEngine.get(engine.label);
     if (!answers || !answers.length) return;
@@ -604,6 +615,15 @@ export async function runMonitorAgent(
             .filter((g) => scoringCanonicals.has(g.canonical))
             .filter((g) => [g.canonical, ...g.aliases].some((n) => mentions(a.text, n)))
             .map((g) => g.canonical);
+      const std = stdMap.get(normP(a.prompt));
+      if (brandPresent && std && accuracyPool.length < 48) {
+        accuracyPool.push({
+          engine: a.engine,
+          prompt: a.prompt,
+          text: a.text.slice(0, 900),
+          canonical: [std.local, std.en].filter(Boolean).join('\n---\n').slice(0, 900),
+        });
+      }
       samples.push({
         engine: a.engine,
         stage: a.stage,
@@ -620,6 +640,63 @@ export async function runMonitorAgent(
       });
     });
   }));
+
+  // 4b. Answer accuracy vs the standard library (never blocks the scan).
+  let accuracy: {
+    checked: number; accurate: number; partial: number; wrong: number; rate: number;
+    issues: { prompt: string; engine: string; verdict: string; issue: string }[];
+  } | null = null;
+  if (accuracyPool.length) {
+    try {
+      const verdicts: { verdict: string; issue: string }[] = new Array(accuracyPool.length).fill(null);
+      const BATCH = 6;
+      for (let i = 0; i < accuracyPool.length; i += BATCH) {
+        const batch = accuracyPool.slice(i, i + BATCH);
+        const user = [
+          `Brand: ${brandName}. For each item, compare the AI ANSWER against the CANONICAL answer (the verified correct one).`,
+          'Verdict: "accurate" (facts/links consistent), "partial" (right direction, missing or fuzzing key facts), "wrong" (contradicts canonical facts, wrong product info, wrong/outdated links).',
+          'For partial/wrong, "issue" states concretely what is incorrect or missing (one sentence). For accurate, issue is "".',
+          '',
+          ...batch.map((p, k) => `[${k}] QUESTION: ${p.prompt}\nCANONICAL: ${p.canonical}\nAI ANSWER (${p.engine}): ${p.text}`),
+          '',
+          'Return ONLY JSON: { "results": [ { "i": 0, "verdict": "accurate|partial|wrong", "issue": "string" } ] }',
+        ].join('\n');
+        const res = await poeChat({
+          model: 'Claude-Sonnet-4.5', // same judge model as the scoring pass
+          messages: [
+            { role: 'system', content: 'You are a strict fact-checking judge for brand information in AI answers. Output strict JSON only.' },
+            { role: 'user', content: user },
+          ],
+          maxTokens: 1800, temperature: 0.1, retries: 1,
+        });
+        const parsed = parseJsonFromLLM<any>(res.content);
+        for (const r of parsed?.results || []) {
+          const idx = i + Number(r.i);
+          if (idx >= 0 && idx < verdicts.length && ['accurate', 'partial', 'wrong'].includes(r.verdict)) {
+            verdicts[idx] = { verdict: r.verdict, issue: String(r.issue || '') };
+          }
+        }
+      }
+      const judged = verdicts.map((v, i) => ({ v, p: accuracyPool[i] })).filter((x) => x.v);
+      if (judged.length) {
+        const accurate = judged.filter((x) => x.v.verdict === 'accurate').length;
+        const partial = judged.filter((x) => x.v.verdict === 'partial').length;
+        const wrong = judged.filter((x) => x.v.verdict === 'wrong').length;
+        accuracy = {
+          checked: judged.length, accurate, partial, wrong,
+          rate: Math.round(((accurate + 0.5 * partial) / judged.length) * 100),
+          issues: judged
+            .filter((x) => x.v.verdict !== 'accurate')
+            .slice(0, 12)
+            .map((x) => ({ prompt: x.p.prompt, engine: x.p.engine, verdict: x.v.verdict, issue: x.v.issue })),
+        };
+        await emit({
+          event_type: 'log',
+          payload: { text: `Answer accuracy vs the standard library: ${accuracy.rate}% across ${accuracy.checked} brand-present key answers (${wrong} wrong, ${partial} partial) — wrong answers are support-cost leaks.` },
+        });
+      }
+    } catch { /* accuracy is additive — the scorecard ships without it */ }
+  }
 
   // 5. Aggregate scorecard
   await emit({ event_type: 'milestone', payload: { label: 'Computing AIGVR scorecard', step: 5, totalSteps: 5 } });
@@ -710,6 +787,7 @@ export async function runMonitorAgent(
     gaps,
     educationalTopics,
     rawSamples: samples,
+    accuracy,
     generatedBy: engines.map((e) => (e.kind === 'serp' ? 'Google AI Overview' : e.model)).join(' + '),
   };
 

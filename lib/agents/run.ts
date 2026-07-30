@@ -19,6 +19,25 @@ import { runProfileAgent } from './profile';
 import { runStandardAnswersAgent } from './answers';
 import { planPolicyForProject } from '@/lib/commerce';
 
+// Latest standard-answers library (B2) → the canonical answers the accuracy
+// pass judges real AI answers against. Null when the library hasn't been built.
+async function loadStandardAnswers(sb: any, projectId: string): Promise<{ prompt: string; local?: string; en?: string }[] | undefined> {
+  const { data } = await sb
+    .from('assets')
+    .select('content')
+    .eq('project_id', projectId)
+    .eq('type', 'standard_answers')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!data?.content) return undefined;
+  try {
+    const parsed = JSON.parse(data.content);
+    const answers = (parsed?.answers || []).filter((a: any) => a?.prompt);
+    return answers.length ? answers : undefined;
+  } catch { return undefined; }
+}
+
 // Load the latest canonical brand profile (if any) so execution agents share
 // consistent facts. Returns null when none exists yet.
 async function loadBrandProfile(sb: ReturnType<typeof svc>, projectId: string): Promise<any | null> {
@@ -316,7 +335,7 @@ export async function executeAgentRun(
         const { promptSet, keyPrompts } = applyPromptEdits(await loadPromptEdits(sb, project.id), rawPromptSet, rawKeyPrompts);
         // No nested stepper: this whole phase is already one step.
         const m = await runMonitorAgent(
-          { ...base, promptSet, keyPrompts, competitorSet: await loadCompetitorSet(sb, project.id) },
+          { ...base, promptSet, keyPrompts, competitorSet: await loadCompetitorSet(sb, project.id), standardAnswers: await loadStandardAnswers(sb, project.id) },
           bandedEmit(33, 33),
         );
         const sa = await recordCitationsAndIndex(sb, project.id, runId, domainOf(project.brand_url || ''), (m.output as { rawSamples?: any[] }).rawSamples || []);
@@ -434,6 +453,7 @@ export async function executeAgentRun(
           keyPrompts,
           competitorSet: await loadCompetitorSet(sb, project.id),
           sampleCap: (await planPolicyForProject(project.id).catch(() => null))?.sampledPerScan,
+          standardAnswers: await loadStandardAnswers(sb, project.id),
         },
         persistAndEmit,
       );

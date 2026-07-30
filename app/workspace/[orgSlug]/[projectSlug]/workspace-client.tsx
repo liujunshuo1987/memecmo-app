@@ -119,6 +119,11 @@ const GLOSSARY: Record<string, { en: string; zh: string; vi: string }> = {
     zh: '在真实的 Google AI Overview 页面上实测(含地区定位),不是 API 代理——搜索者实际看到的界面。',
     vi: 'Đo trên trang Google AI Overview thật (định vị khu vực), không phải API proxy.',
   },
+  accuracy: {
+    en: 'Answer Accuracy — of AI answers that mention you on key questions, the share consistent with your verified standard answers. Wrong answers are support-cost leaks: users acting on bad AI info call support.',
+    zh: '答案准确率——关键问题中提到你的 AI 回答里,与你核准的标准答案一致的比例。答错的回答是客服成本漏洞:用户按错误信息操作后会找售后。',
+    vi: 'Answer Accuracy — tỷ lệ câu trả lời AI nhất quán với câu trả lời chuẩn đã xác minh của bạn.',
+  },
   topofmind: {
     en: 'The share of answers where your brand is the FIRST one AI names — the strongest recommendation position.',
     zh: 'AI 第一个点名你品牌的回答占比——最强的推荐位。',
@@ -153,7 +158,7 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     Recommendations: '建议', 'Quick wins': '速赢', 'AEO checklist': 'AEO 清单', 'Homepage edits': '主页修改',
     'Citation plan': '引用计划', 'Evidence needed to qualify': '达标所需证据', 'Get mentioned in existing articles': '进入已有词条被提及',
     'Latest scan': '最近扫描', 'Presence': '出现率', 'Share of Voice': '声量份额', 'Brand rank': '品牌排名', 'High-intent gaps': '高意图缺口',
-    'All engines': '全部引擎', 'Benchmark and gaps remain whole-scan.': '竞对对标与缺口仍为全量扫描口径。',
+    'All engines': '全部引擎', 'Answer accuracy': '答案准确率', 'Since this report': '本报告之后', recommendations: '条建议', 'deliverables completed after it': '项执行交付已完成', 'No execution deliverables completed since this report yet — run them, and the next scan shows the movement here.': '本报告后尚无新的执行交付——完成执行后,下一次扫描的分数变化会显示在这里。', 'Answer accuracy issues': '答案错误清单', wrong: '答错', partial: '部分正确', 'Benchmark and gaps remain whole-scan.': '竞对对标与缺口仍为全量扫描口径。',
     'Cited sources': '被引来源', Deliverables: '交付物', 'Structured view': '结构化视图', Refine: '改写', Ask: '问',
     'Full Scan': '完整扫描', Profile: '品牌档案', Discovery: '发现', Monitor: '监测', Report: '报告',
     Optimize: '内容', Site: '主页', Distribute: '分发', Encyclopedia: '百科', 'Copy kit': '复制全套', 'Copy brief': '复制简报',
@@ -187,7 +192,7 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
   },
   vi: {
 
-    'All engines': 'Tất cả engine', 'Benchmark and gaps remain whole-scan.': 'So sánh đối thủ và khoảng trống vẫn theo toàn bộ lần quét.',    'Run full GEO scan': 'Chạy quét GEO đầy đủ', '…focus the agents': '…định hướng cho agent',
+    'All engines': 'Tất cả engine', 'Answer accuracy': 'Độ chính xác câu trả lời', 'Since this report': 'Sau báo cáo này', recommendations: 'khuyến nghị', 'deliverables completed after it': 'bàn giao đã hoàn thành sau đó', 'No execution deliverables completed since this report yet — run them, and the next scan shows the movement here.': 'Chưa có bàn giao thực thi nào sau báo cáo này — hoàn thành chúng và lần quét tiếp theo sẽ hiển thị thay đổi tại đây.', 'Answer accuracy issues': 'Danh sách câu trả lời sai', wrong: 'sai', partial: 'đúng một phần', 'Benchmark and gaps remain whole-scan.': 'So sánh đối thủ và khoảng trống vẫn theo toàn bộ lần quét.',    'Run full GEO scan': 'Chạy quét GEO đầy đủ', '…focus the agents': '…định hướng cho agent',
     Setup: 'Chuẩn bị', Measure: 'Đo lường', 'Act — build AEO presence': 'Hành động · xây dựng AEO',
     ready: 'sẵn sàng', run: 'chạy', 'running…': 'đang chạy…', 'Re-run': 'Chạy lại', Copy: 'Sao chép', Edit: 'Sửa', Done: 'Xong',
     Result: 'Kết quả', 'Pick a deliverable on the left, or run a full GEO scan.': 'Chọn một mục bên trái, hoặc chạy quét GEO đầy đủ.',
@@ -723,6 +728,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
                     versions={activeRunId ? sandboxVersions[activeRunId] : undefined}
                     onVersions={(v) => { if (activeRunId) setSandboxVersions((m) => ({ ...m, [activeRunId]: v })); }}
                     onDispatch={dispatchAgent}
+                    loop={{ runsByAgent, currentScore: headlineAigvr }}
                   />
                   <details className="print-hide rounded border border-edge bg-surface">
                     <summary className="cursor-pointer px-3 py-2 text-[11px] uppercase tracking-widest text-faint select-none hover:text-dim">Process log · {activity.length} steps</summary>
@@ -959,6 +965,7 @@ function ContextPanel({ headlineAigvr, scoreRun, runsByAgent, totalAgents }: {
           <ContextMetric tip="sov" label="Share of Voice" value={sov != null ? `${Math.round(sov)}%` : '—'} />
           <ContextMetric tip="citation" label="Citation rate" value={cite != null ? `${Math.round(cite)}%` : '—'} />
           <ContextMetric tip="sentiment" label="AI sentiment" value={senti != null ? String(Math.round(senti)) : '—'} />
+          {sc?.accuracy?.rate != null && <ContextMetric tip="accuracy" label="Answer accuracy" value={`${sc.accuracy.rate}%`} />}
           {topOfMind != null && <ContextMetric tip="topofmind" label="Top-of-mind rate" value={`${topOfMind}%`} />}
           <ContextMetric label="Brand rank" value={rank ? `#${rank} of ${benchN}` : '—'} />
           <ContextMetric tip="gaps" label="High-intent gaps" value={String(gaps)} />
@@ -1178,7 +1185,49 @@ function RadarChart({ data }: { data: { label: string; value: number }[] }) {
   );
 }
 
-function RunResult({ agentId, output, projectId, runId, versions, onVersions, onDispatch }: {
+// Recommendation → outcome closed loop (Oracle-SVP: "did the work move the
+// numbers?"). Execution deliverables completed AFTER this report, next to the
+// score then vs now — honest correlation, no causal overclaim.
+const LOOP_AGENTS: Record<string, string> = {
+  answers: 'Standard answers', optimize: 'Gap content', site: 'Site AEO & schema',
+  distribute: 'Distribution placements', encyclopedia: 'Encyclopedia entries', schema: 'Structured data',
+};
+function ClosedLoop({ o, loop, anchorAgent }: { o: Record<string, any>; loop: { runsByAgent: Record<string, LatestRun>; currentScore: number | null }; anchorAgent: string }) {
+  const reportAt = loop.runsByAgent[anchorAgent]?.createdAt;
+  if (!reportAt) return null;
+  const done = Object.entries(loop.runsByAgent)
+    .filter(([id, r]) => LOOP_AGENTS[id] && r.status === 'completed' && r.createdAt > reportAt)
+    .map(([id, r]) => ({ id, label: LOOP_AGENTS[id], at: r.createdAt.slice(0, 10) }));
+  const reportScore: number | null = o.aigvrScore ?? null;
+  const cur = loop.currentScore;
+  const delta = reportScore != null && cur != null ? Math.round((cur - reportScore) * 10) / 10 : null;
+  const recCount = (o.recommendations || []).length;
+  return (
+    <div className="rounded-xl border border-edge bg-surface p-4 space-y-2">
+      <div className="text-[10px] uppercase tracking-widest text-faint">{t('Since this report')}</div>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[12px]">
+        <span className="text-dim">{recCount} {t('recommendations')}</span>
+        <span className="text-dim">{done.length} {t('deliverables completed after it')}</span>
+        {delta != null && (
+          <span className={delta > 0 ? 'text-sage font-semibold' : delta < 0 ? 'text-garnet font-semibold' : 'text-faint'}>
+            {SCORE_LABEL} {reportScore} → {cur} ({delta > 0 ? '+' : ''}{delta})
+          </span>
+        )}
+      </div>
+      {done.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5">
+          {done.map((x) => (
+            <span key={x.id} className="text-[10px] px-2 py-0.5 rounded-full border border-sage/40 text-sage">✓ {x.label} · {x.at}</span>
+          ))}
+        </div>
+      ) : (
+        <p className="text-[11px] text-faint">{t('No execution deliverables completed since this report yet — run them, and the next scan shows the movement here.')}</p>
+      )}
+    </div>
+  );
+}
+
+function RunResult({ agentId, output, projectId, runId, versions, onVersions, onDispatch, loop }: {
   agentId?: string;
   output: Record<string, any>;
   projectId?: string;
@@ -1186,6 +1235,7 @@ function RunResult({ agentId, output, projectId, runId, versions, onVersions, on
   versions?: { label: string; content: string }[];
   onVersions?: (v: { label: string; content: string }[]) => void;
   onDispatch?: (agentId: string) => void;
+  loop?: { runsByAgent: Record<string, LatestRun>; currentScore: number | null };
 }) {
   const advisory = agentId === 'monitor' || agentId === 'report' || agentId === 'full_scan';
   // Deliverables the CLIENT should sign off on (agency workflow).
@@ -1198,11 +1248,15 @@ function RunResult({ agentId, output, projectId, runId, versions, onVersions, on
         <>
           {output.scorecard && <MonitorResult o={output.scorecard} />}
           {output.report && <ReportResult o={output.report} />}
+          {output.report && loop && <ClosedLoop o={output.report} loop={loop} anchorAgent="full_scan" />}
         </>
       ) : agentId === 'monitor' ? (
         <MonitorResult o={output} />
       ) : agentId === 'report' ? (
-        <ReportResult o={output} />
+        <>
+          <ReportResult o={output} />
+          {loop && <ClosedLoop o={output} loop={loop} anchorAgent="report" />}
+        </>
       ) : agentId === 'optimize' ? (
         <ArtifactSandbox o={output} projectId={projectId} runId={runId} versions={versions} onVersions={onVersions}
           title="Content sandbox" artifactType="content_draft"
@@ -2042,13 +2096,37 @@ function MonitorResult({ o }: { o: Record<string, any> }) {
           voice, position-when-present (top-of-mind folded in as its filtered
           view), sentiment-when-present, citation strength, high-intent gaps. */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        <KpiTile tip="presence" label={t('Presence')} value={`${Math.round(d.presence ?? 0)}%`} sub={`${o.metrics?.overall?.brandHits ?? '—'}/${o.sampled?.queries ?? '—'} ${t('answers')}`} />
-        <KpiTile tip="sov" label={t('Share of Voice')} value={`${Math.round(d.competitiveShare ?? 0)}%`} sub={`${t('Rank')} #${o.brandRank ?? '—'} / ${bench.length || '—'}`} />
-        <KpiTile tip="position" label={t('Position when present')} value={Math.round(d.prominence ?? 0)} sub={hasTom ? `${t('Top-of-mind')} ${tom.overallRate}% · ${t('key')} ${tom.keyRate ?? '—'}%` : undefined} accent />
+        {/* Counts follow the engine slice; whole-scan-only footnotes drop out
+            in engine view instead of showing mismatched numbers. */}
+        <KpiTile tip="presence" label={t('Presence')} value={`${Math.round(d.presence ?? 0)}%`} sub={`${(engSel ?? o.metrics?.overall)?.brandHits ?? '—'}/${(engSel ?? o.metrics?.overall)?.queries ?? o.sampled?.queries ?? '—'} ${t('answers')}`} />
+        <KpiTile tip="sov" label={t('Share of Voice')} value={`${Math.round(d.competitiveShare ?? 0)}%`} sub={engSel ? undefined : `${t('Rank')} #${o.brandRank ?? '—'} / ${bench.length || '—'}`} />
+        <KpiTile tip="position" label={t('Position when present')} value={Math.round(d.prominence ?? 0)} sub={engSel ? (engSel.topOfMindRate != null ? `${t('Top-of-mind')} ${engSel.topOfMindRate}%` : undefined) : hasTom ? `${t('Top-of-mind')} ${tom.overallRate}% · ${t('key')} ${tom.keyRate ?? '—'}%` : undefined} accent />
         <KpiTile tip="sentiment" label={t('Sentiment when present')} value={Math.round(d.sentiment ?? 0)} />
         <KpiTile tip="citation" label={t('Citation strength')} value={`${Math.round(d.citation ?? 0)}%`} />
         <KpiTile tip="gaps" label={t('High-intent gaps')} value={gaps.length} sub={t('queries competitors win')} accent={gaps.length > 0} />
+        {o.accuracy && !engSel && (
+          <KpiTile tip="accuracy" label={t('Answer accuracy')} value={`${o.accuracy.rate}%`} sub={`${o.accuracy.wrong} ${t('wrong')} · ${o.accuracy.partial} ${t('partial')} / ${o.accuracy.checked}`} accent={o.accuracy.wrong > 0} />
+        )}
       </div>
+
+      {/* Wrong/partial answers — each one is a support-cost leak with a fix path */}
+      {o.accuracy && o.accuracy.issues?.length > 0 && (
+        <div>
+          <SectionLabel>{t('Answer accuracy issues')}</SectionLabel>
+          <div className="space-y-1.5">
+            {o.accuracy.issues.map((iss: any, i: number) => (
+              <div key={i} className="rounded-lg border border-edge bg-canvas px-3 py-2">
+                <div className="flex items-center gap-2 text-[11px]">
+                  <span className={`px-1.5 py-0.5 rounded uppercase tracking-wider text-[9px] font-semibold ${iss.verdict === 'wrong' ? 'bg-garnet/15 text-garnet' : 'bg-gold/15 text-gold'}`}>{iss.verdict === 'wrong' ? t('wrong') : t('partial')}</span>
+                  <span className="text-faint">{iss.engine}</span>
+                  <span className="text-dim truncate">{iss.prompt}</span>
+                </div>
+                {iss.issue && <p className="mt-1 text-[11px] text-ink leading-relaxed">{iss.issue}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Radar + per-dimension breakdown */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">

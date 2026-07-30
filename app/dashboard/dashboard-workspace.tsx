@@ -203,6 +203,13 @@ export default function DashboardClient({ groups, userEmail, isRootAdmin, billin
                     )}
                   </div>
                   <div className="flex gap-2">
+                    <a
+                      href={`/workspace/${org.slug}/rollup`}
+                      title="全部项目最新扫描汇总一页 · portfolio rollup"
+                      className="text-xs px-3 py-1.5 rounded-md border border-edge text-dim hover:text-ink hover:border-edge-strong transition"
+                    >
+                      汇总 Rollup
+                    </a>
                     {canInvite && (
                       <button
                         onClick={() => setInviteOrg(org)}
