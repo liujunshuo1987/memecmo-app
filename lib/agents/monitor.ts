@@ -616,7 +616,7 @@ export async function runMonitorAgent(
             .filter((g) => [g.canonical, ...g.aliases].some((n) => mentions(a.text, n)))
             .map((g) => g.canonical);
       const std = stdMap.get(normP(a.prompt));
-      if (brandPresent && std && accuracyPool.length < 48) {
+      if (brandPresent && std && accuracyPool.length < 24) {
         accuracyPool.push({
           engine: a.engine,
           prompt: a.prompt,
@@ -650,7 +650,11 @@ export async function runMonitorAgent(
     try {
       const verdicts: { verdict: string; issue: string }[] = new Array(accuracyPool.length).fill(null);
       const BATCH = 6;
-      for (let i = 0; i < accuracyPool.length; i += BATCH) {
+      const batchStarts: number[] = [];
+      for (let i = 0; i < accuracyPool.length; i += BATCH) batchStarts.push(i);
+      // Concurrent batches — serial judging pushed the single-invocation
+      // monitor over the function-duration ceiling (run stalled at 33%).
+      await mapLimit(batchStarts, 3, async (i) => {
         const batch = accuracyPool.slice(i, i + BATCH);
         const user = [
           `Brand: ${brandName}. For each item, compare the AI ANSWER against the CANONICAL answer (the verified correct one).`,
@@ -676,7 +680,7 @@ export async function runMonitorAgent(
             verdicts[idx] = { verdict: r.verdict, issue: String(r.issue || '') };
           }
         }
-      }
+      });
       const judged = verdicts.map((v, i) => ({ v, p: accuracyPool[i] })).filter((x) => x.v);
       if (judged.length) {
         const accurate = judged.filter((x) => x.v.verdict === 'accurate').length;
