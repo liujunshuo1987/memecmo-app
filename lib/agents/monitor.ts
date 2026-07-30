@@ -592,6 +592,24 @@ export async function runMonitorAgent(
   const stdMap = new Map<string, { en?: string; local?: string }>(
     (input.standardAnswers || []).map((a) => [normP(a.prompt), { en: a.en, local: a.local }]),
   );
+  // Exact match first; Jaccard fallback covers library drift — the prompt
+  // library refreshes monthly and rewords questions, which would otherwise
+  // silently orphan the (older) standard-answers library.
+  const stdEntries = [...stdMap.entries()].map(([p, v]) => ({ p, v, words: new Set(p.split(' ').filter(Boolean)) }));
+  const stdFor = (prompt: string): { en?: string; local?: string } | undefined => {
+    const n = normP(prompt);
+    const exact = stdMap.get(n);
+    if (exact) return exact;
+    const w = new Set(n.split(' ').filter(Boolean));
+    let best: { v: { en?: string; local?: string }; j: number } | null = null;
+    for (const e of stdEntries) {
+      let inter = 0;
+      for (const x of w) if (e.words.has(x)) inter++;
+      const j = inter / (w.size + e.words.size - inter || 1);
+      if (j >= 0.55 && (!best || j > best.j)) best = { v: e.v, j };
+    }
+    return best?.v;
+  };
   const accuracyPool: { engine: string; prompt: string; text: string; canonical: string }[] = [];
   await Promise.all(engines.map(async (engine) => {
     const answers = rawByEngine.get(engine.label);
@@ -615,7 +633,7 @@ export async function runMonitorAgent(
             .filter((g) => scoringCanonicals.has(g.canonical))
             .filter((g) => [g.canonical, ...g.aliases].some((n) => mentions(a.text, n)))
             .map((g) => g.canonical);
-      const std = stdMap.get(normP(a.prompt));
+      const std = stdFor(a.prompt);
       if (brandPresent && std && accuracyPool.length < 24) {
         accuracyPool.push({
           engine: a.engine,
@@ -646,6 +664,12 @@ export async function runMonitorAgent(
     checked: number; accurate: number; partial: number; wrong: number; rate: number;
     issues: { prompt: string; engine: string; verdict: string; issue: string }[];
   } | null = null;
+  if (stdMap.size && !accuracyPool.length) {
+    await emit({
+      event_type: 'log',
+      payload: { text: `Standard-answers library no longer matches the current key prompts (0 of ${stdMap.size} usable) — re-run the Answers agent to restore accuracy monitoring.` },
+    });
+  }
   if (accuracyPool.length) {
     try {
       const verdicts: { verdict: string; issue: string }[] = new Array(accuracyPool.length).fill(null);
