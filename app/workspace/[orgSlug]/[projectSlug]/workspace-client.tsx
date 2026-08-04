@@ -160,6 +160,8 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Latest scan': '最近扫描', 'Presence': '出现率', 'Share of Voice': '声量份额', 'Brand rank': '品牌排名', 'High-intent gaps': '高意图缺口',
     'All engines': '全部引擎', 'Answer accuracy': '答案准确率', 'Since this report': '本报告之后', recommendations: '条建议', 'deliverables completed after it': '项执行交付已完成', 'No execution deliverables completed since this report yet — run them, and the next scan shows the movement here.': '本报告后尚无新的执行交付——完成执行后,下一次扫描的分数变化会显示在这里。', 'Answer accuracy issues': '答案错误清单', wrong: '答错', partial: '部分正确', 'Benchmark and gaps remain whole-scan.': '竞对对标与缺口仍为全量扫描口径。',
     'Cited sources': '被引来源', Deliverables: '交付物', 'Structured view': '结构化视图', Refine: '改写', Ask: '问',
+    'Ask about this result…': '问这份结果…', 'Which gap should we attack first?': '哪个缺口最该先打?',
+    'Why is my visibility low on some engines?': '为什么某些引擎上我可见度低?', 'What should we do first?': '最该先做哪件事?',
     'Full Scan': '完整扫描', Profile: '品牌档案', Discovery: '发现', Monitor: '监测', Report: '报告',
     Optimize: '内容', Site: '主页', Distribute: '分发', Encyclopedia: '百科', 'Copy kit': '复制全套', 'Copy brief': '复制简报',
     'Copy page': '复制页面', 'Copy schema': '复制 schema', 'Copy plan': '复制方案', 'Copy Markdown': '复制 Markdown',
@@ -197,6 +199,10 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     ready: 'sẵn sàng', run: 'chạy', 'running…': 'đang chạy…', 'Re-run': 'Chạy lại', Copy: 'Sao chép', Edit: 'Sửa', Done: 'Xong',
     Result: 'Kết quả', 'Pick a deliverable on the left, or run a full GEO scan.': 'Chọn một mục bên trái, hoặc chạy quét GEO đầy đủ.',
     'Ask about this result': 'Hỏi về kết quả này', 'Refine with a message': 'Tinh chỉnh bằng một câu',
+    'Ask about this result…': 'Hỏi về kết quả này…', Ask: 'Hỏi',
+    'Which gap should we attack first?': 'Nên tấn công khoảng trống nào trước?',
+    'Why is my visibility low on some engines?': 'Vì sao độ hiển thị thấp trên một số engine?',
+    'What should we do first?': 'Nên làm việc gì trước tiên?',
     'By engine': 'Theo engine', 'Funnel-stage visibility': 'Hiển thị theo giai đoạn phễu', 'Share of voice': 'Thị phần tiếng nói',
     'Key findings': 'Phát hiện chính', Recommendations: 'Khuyến nghị', 'Quick wins': 'Việc cần làm', Deliverables: 'Sản phẩm',
     'Full Scan': 'Quét đầy đủ', Profile: 'Hồ sơ', Discovery: 'Khám phá', Monitor: 'Giám sát', Report: 'Báo cáo',
@@ -1340,7 +1346,7 @@ function AdvisoryChat({ projectId, agentId, output, onDispatch }: {
     }
     setBusy(false);
   };
-  const QUICK = ['哪个缺口最该先打?', '为什么某些引擎上我可见度低?', '最该先做哪件事?'];
+  const QUICK = [t('Which gap should we attack first?'), t('Why is my visibility low on some engines?'), t('What should we do first?')];
   return (
     <div className="print-hide rounded-xl border border-edge bg-surface p-4 space-y-2">
       <div className="text-[10px] uppercase tracking-widest text-faint">{t('Ask about this result')}</div>
@@ -1360,11 +1366,11 @@ function AdvisoryChat({ projectId, agentId, output, onDispatch }: {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && q.trim()) { e.preventDefault(); ask(q); } }}
-          placeholder="问这份结果…(可中文)"
+          placeholder={t('Ask about this result…')}
           disabled={busy}
           className="flex-1 bg-surface border border-edge rounded-md px-3 py-2 text-[13px] focus:outline-none focus:border-blue-400/50"
         />
-        <button onClick={() => ask(q)} disabled={busy || !q.trim()} className="px-3 py-2 text-[13px] rounded-md bg-brand text-on-brand hover:brightness-110 disabled:bg-raised disabled:text-faint transition">{busy ? '…' : '问'}</button>
+        <button onClick={() => ask(q)} disabled={busy || !q.trim()} className="px-3 py-2 text-[13px] rounded-md bg-brand text-on-brand hover:brightness-110 disabled:bg-raised disabled:text-faint transition">{busy ? '…' : t('Ask')}</button>
       </div>
       {thread.length === 0 && (
         <div className="flex flex-wrap gap-1.5">
