@@ -56,6 +56,7 @@ const T: Record<Lang, any> = {
       results: '结果操作:沙箱 / 顾问 / 翻译 / 导出',
       compliance: '合规模型:事实与体验的边界',
       channel: '组织、邀请、配额与周报',
+      plans: '注册、会员与计费机制',
       faq: '常见问题排查',
     },
     quickstart: [
@@ -123,6 +124,15 @@ const T: Record<Lang, any> = {
       ['套餐配额', 'Basic 2 次 / Standard 8 次 / Premium 30 次扫描每月(计量 full_scan 与 monitor;总部与渠道商不计量)。超额返回明确提示,次月重置。'],
       ['自动周报邮件', '配置收件人后,每周二上午自动发送 GEO 摘要邮件:精简数字区(指数/分引擎/本期交付)+ 详细的效果归因与策略建议;解读口径随项目阶段自动切换(建设期不解读分数波动)。完整数据始终在工作台下载 PDF。掉分 ≥5 或某引擎归零会即时告警,不等周期。'],
     ],
+    plansRows: [
+      ['注册方式', '平台不开放公开注册,入口只有两个:官网 waitlist(运营方审核后发邀请)与组织邀请(渠道商可为终端客户开组织并邀请成员)。这是成本设计而非姿态——每次扫描消耗真实的引擎调用费用,开放注册+免费扫描会把获客变成不可控的滥用面。'],
+      ['席位与角色', 'admin(组织/邀请/账单)· editor(可触发执行)· viewer(只读:全部交付物、导出 PDF、就结果提问)。席位免费且不限量——查看者越多,报告在客户组织内传播越广,这是有意的分发设计。'],
+      ['订阅买的是什么', '不是"若干次扫描",而是完整交付服务:冻结面板上可比的定期扫描节奏(月/双周/周)、自动周报与告警、内容智能体、看板与席位。SEA 区:$299(2 扫/月·1 项目·4 引擎)/ $799(8 扫·3 项目·5 引擎含真实 Google AI Overview)/ $1,999(30 扫·10 项目·全功能)。US 区因州级定位与真实界面成本上浮约 50%。'],
+      ['信用点买的是什么', '"立即触发权"。合同节奏内的定期扫描永远不耗点;客户自己点 ▶ 的即时加跑才计点(全量扫描/监测 25 点,内容与报告类 10 点)。Standard/Premium 每月内含 50/150 点;点包:250 点 $250 · 1,150 点 $1,000(约 13% 加赠)· 3,900 点 $3,000(约 30% 加赠)。'],
+      ['为什么这样拆', '第一性原理:语料未变时的短期分数波动是噪音,反复加扫既烧成本又诱导对噪音过度解读。定期节奏保证可比性(同面板同口径),信用点单独为"等不及"定价——两类需求分开计费,双方激励都对齐。'],
+      ['双池记账', '信用点分两池:granted(赠送/月度内含,优先扣减,不开票)与 purchased(购买点包,可开票)。渠道伙伴的售前演示扫描按渠道协议由运营方发放 granted 点覆盖——售前成本不挤占客户的付费池。'],
+      ['欠费与退出', '订阅进入 past_due/canceled 后:扫描暂停,但看板、全部历史与 PDF 导出保留——数据归客户(协议 §9),平台不做数据劫持。恢复订阅即恢复扫描。'],
+    ],
     setsRows: [
       ['入口', '工作区页头「竞对与提示词」按钮,项目管理员可用。所有修改存于项目配置,Discovery 原始资产与历史扫描永不改动,可随时恢复。'],
       ['竞对集编辑', '给每个实体标关系:竞对 / 合作伙伴 / 目录平台 / 自身——只有「竞对」进声量份额、基准与缺口计算。标记会跨月度刷新自动继承:标过 partner 的实体永远不会被重新识别成竞对。也可改名、删除、手动添加。'],
@@ -169,6 +179,7 @@ const T: Record<Lang, any> = {
       results: 'Working with results: sandbox / advisor / translate / export',
       compliance: 'The compliance model: facts vs experiences',
       channel: 'Organizations, invites, quotas & weekly digests',
+      plans: 'Registration, membership & billing model',
       faq: 'Troubleshooting',
     },
     quickstart: [
@@ -236,6 +247,15 @@ const T: Record<Lang, any> = {
       ['Plans & quota', 'Basic 2 / Standard 8 / Premium 30 scans per month (full_scan and monitor are metered; HQ and channel partners are never metered). Over-quota returns a clear message; resets monthly.'],
       ['Automatic weekly digest', 'With recipients configured, a GEO digest email goes out every Tuesday morning: a concise numbers block (index / per-engine / deliverables shipped) plus deliberately detailed effect-attribution and strategy sections. The interpretation switches with the project lifecycle stage (build phase never over-reads score movement). Full data always lives in the workspace PDF. A score drop ≥5 or an engine collapsing to zero triggers an immediate alert — no waiting for the cycle.'],
     ],
+    plansRows: [
+      ['How registration works', 'No open self-serve signup. The two doors are the homepage waitlist (operator-reviewed invite) and organization invites (channel partners provision end-client orgs and invite members). This is cost design, not gatekeeping — every scan spends real engine-call money; open signup plus free scanning would turn acquisition into an uncontrolled abuse surface.'],
+      ['Seats & roles', 'admin (org / invites / billing) · editor (can trigger runs) · viewer (read-only: all deliverables, PDF export, ask-about-this-result). Seats are free and unlimited — more viewers means wider internal distribution of the reports, which is deliberate.'],
+      ['What a subscription buys', 'Not "N scans" but the full delivery service: a comparable scan cadence on frozen panels (monthly / biweekly / weekly), automatic digests and alerts, content agents, dashboard and seats. SEA: $299 (2 scans/mo · 1 project · 4 engines) / $799 (8 · 3 · 5 engines incl. the real Google AI Overview surface) / $1,999 (30 · 10 · everything). The US region runs ~50% higher for state-level targeting and real-surface costs.'],
+      ['What credits buy', 'The right to trigger now. Contracted scheduled scans never cost credits; client-initiated on-demand runs do (full scan / monitor 25 · content & report agents 10). Standard/Premium include 50/150 credits monthly; packs: 250 for $250 · 1,150 for $1,000 (~13% bonus) · 3,900 for $3,000 (~30% bonus).'],
+      ['Why this split', 'First principles: short-term score movement without corpus change is noise; repeated re-scanning burns cost and invites over-reading. The scheduled cadence guarantees comparability (same panel, same method); credits price impatience separately. Both sides’ incentives point the right way.'],
+      ['Two credit pools', 'granted (gifts / monthly allowance — spent first, never invoiced) vs purchased (Stripe packs, invoiceable). Channel-partner demo scans are covered by operator-granted credits under the channel agreement — pre-sales cost never eats the client’s paid pool.'],
+      ['Past-due & exit', 'When a subscription goes past_due / canceled: scanning pauses, but the dashboard, all history and PDF export remain available — the data belongs to the client (contract §9); no data hostage-taking. Resume billing and scanning resumes.'],
+    ],
     setsRows: [
       ['Where', 'The “Sets” button in the workspace header, for project admins. Edits live in project config — the Discovery asset and scan history are never touched, everything is reversible.'],
       ['Competitor set', 'Tag each entity: competitor / partner / directory / self — only “competitor” enters share of voice, the benchmark and gaps. Tags survive the monthly set refresh: an entity marked partner is never re-discovered as a competitor. Rename, delete and manual add are supported.'],
@@ -282,6 +302,7 @@ const T: Record<Lang, any> = {
       results: 'Thao tác kết quả: sandbox / cố vấn / dịch / xuất',
       compliance: 'Mô hình tuân thủ: sự kiện vs trải nghiệm',
       channel: 'Tổ chức, lời mời, hạn mức & bản tin tuần',
+      plans: 'Đăng ký, hội viên & cơ chế tính phí',
       faq: 'Xử lý sự cố',
     },
     quickstart: [
@@ -348,6 +369,15 @@ const T: Record<Lang, any> = {
       ['Mời thành viên', '“Invite” trên thẻ tổ chức → email + vai trò (viewer / editor / admin) → email tự gửi (hoặc sao chép link). Người được mời phải đăng nhập đúng email đó.'],
       ['Gói & hạn mức', 'Basic 2 / Standard 8 / Premium 30 lần quét mỗi tháng (tính full_scan và monitor; HQ và đối tác kênh không bị tính). Vượt hạn mức có thông báo rõ; đặt lại hàng tháng.'],
       ['Bản tin tuần tự động', 'Khi đã cấu hình người nhận, email tóm tắt GEO gửi mỗi sáng thứ Ba: khối số liệu gọn (chỉ số / theo công cụ / đã bàn giao) + phần phân tích hiệu quả và khuyến nghị chiến lược chi tiết; cách diễn giải tự đổi theo giai đoạn dự án. Dữ liệu đầy đủ luôn ở workspace (PDF). Điểm giảm ≥5 hoặc một công cụ về 0 sẽ cảnh báo ngay.'],
+    ],
+    plansRows: [
+      ['Đăng ký hoạt động thế nào', 'Không có đăng ký tự do. Hai cửa duy nhất: waitlist trên trang chủ (vận hành duyệt rồi mời) và lời mời từ tổ chức (đối tác kênh tạo tổ chức khách hàng và mời thành viên). Đây là thiết kế chi phí, không phải rào cản — mỗi lần quét tiêu chi phí gọi engine thật; đăng ký mở + quét miễn phí sẽ thành bề mặt lạm dụng không kiểm soát được.'],
+      ['Ghế & vai trò', 'admin (tổ chức / mời / thanh toán) · editor (được kích hoạt tác vụ) · viewer (chỉ xem: toàn bộ sản phẩm, xuất PDF, hỏi về kết quả). Ghế miễn phí, không giới hạn — càng nhiều người xem, báo cáo càng lan tỏa trong tổ chức khách hàng, đây là chủ đích.'],
+      ['Gói thuê bao mua gì', 'Không phải "N lần quét" mà là dịch vụ trọn gói: nhịp quét so sánh được trên bộ câu hỏi đóng băng (tháng / 2 tuần / tuần), bản tin và cảnh báo tự động, các agent nội dung, bảng điều khiển và ghế. Khu vực SEA: $299 (2 quét/tháng · 1 dự án · 4 engine) / $799 (8 · 3 · 5 engine gồm Google AI Overview thật) / $1,999 (30 · 10 · đầy đủ). Khu vực US cao hơn ~50% do nhắm mục tiêu cấp bang.'],
+      ['Credit mua gì', 'Quyền kích hoạt ngay. Quét định kỳ theo hợp đồng không bao giờ tốn credit; lần chạy do khách tự bấm mới tốn (quét đầy đủ / giám sát 25 · agent nội dung & báo cáo 10). Gói Standard/Premium tặng 50/150 credit mỗi tháng; gói mua: 250 = $250 · 1.150 = $1.000 (~13% tặng) · 3.900 = $3.000 (~30% tặng).'],
+      ['Vì sao tách như vậy', 'Nguyên lý gốc: điểm dao động ngắn hạn khi ngữ liệu chưa đổi là nhiễu; quét lại liên tục vừa đốt chi phí vừa dẫn tới diễn giải quá đà. Nhịp định kỳ bảo đảm tính so sánh (cùng bộ câu hỏi, cùng phương pháp); credit định giá riêng cho sự không-chờ-được. Động lực hai bên đều đúng hướng.'],
+      ['Hai quỹ credit', 'granted (tặng / hạn mức tháng — trừ trước, không xuất hóa đơn) và purchased (mua qua Stripe, xuất hóa đơn được). Quét demo bán hàng của đối tác kênh dùng credit granted do vận hành cấp theo thỏa thuận kênh — chi phí tiền-bán-hàng không ăn vào quỹ trả phí của khách.'],
+      ['Quá hạn & rời đi', 'Khi thuê bao past_due / canceled: tạm dừng quét, nhưng bảng điều khiển, toàn bộ lịch sử và xuất PDF vẫn còn — dữ liệu thuộc về khách hàng (hợp đồng §9); không giữ dữ liệu làm con tin. Nối lại thanh toán là quét tiếp.'],
     ],
     setsRows: [
       ['Ở đâu', 'Nút “Sets” trên đầu workspace, dành cho quản trị viên dự án. Mọi chỉnh sửa nằm trong cấu hình dự án — tài sản Discovery và lịch sử quét không bị đụng tới, có thể hoàn tác.'],
@@ -542,6 +572,7 @@ export default function GuideContent() {
         <Section id="results" title={t.sections.results}><Shot src="/guide/sandbox.png" caption={t.shotSandbox} /><Rows rows={t.resultsRows} /></Section>
         <Section id="compliance" title={t.sections.compliance}><Rows rows={t.complianceRows} /></Section>
         <Section id="channel" title={t.sections.channel}><Rows rows={t.channelRows} /></Section>
+        <Section id="plans" title={t.sections.plans}><Rows rows={t.plansRows} /></Section>
         <Section id="faq" title={t.sections.faq}><Rows rows={t.faqRows} /></Section>
 
         <footer className="pt-4 border-t border-edge text-[11px] text-faint">
