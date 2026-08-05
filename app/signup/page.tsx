@@ -12,6 +12,9 @@ import MemeCMOLogo from '@/components/memecmo-logo';
 import { useLanguage } from '@/contexts/language-context';
 import OAuthButtons from '@/components/oauth-buttons';
 
+// Flip to true once Google/Facebook providers are configured in Supabase Auth.
+const OAUTH_ENABLED = false;
+
 function SignupForm() {
   const searchParams = useSearchParams();
   // Honor both param names (invite flow / server pages send ?next= or ?redirect=)
@@ -140,18 +143,23 @@ function SignupForm() {
             </motion.div>
           )}
 
-          <OAuthButtons redirectTo={redirect} />
-
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-edge" />
+          {/* OAuth hidden until providers are configured in Supabase. */}
+          {OAUTH_ENABLED && (
+            <>
+            <OAuthButtons redirectTo={redirect} />
+  
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-edge" />
+              </div>
+              <div className="relative flex justify-center text-xs">
+                <span className="px-3 bg-surface text-faint">
+                  {t('auth.orContinueWith')}
+                </span>
+              </div>
             </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="px-3 bg-surface text-faint">
-                {t('auth.orContinueWith')}
-              </span>
-            </div>
-          </div>
+            </>
+          )}
 
           <form onSubmit={handleSignup} className="space-y-4">
             <div>

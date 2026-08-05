@@ -112,6 +112,22 @@ export async function applyMonthlyGrant(
   return amount;
 }
 
+/** Plan-included monthly allowance (plans.included_credits_monthly) for orgs
+ *  with a live subscription. Same cap discipline as applyMonthlyGrant: this
+ *  path tops the granted pool up to one month's allowance — no accumulation,
+ *  and a double-fire in the same month grants nothing extra. */
+export async function applyPlanAllowance(
+  sb: SupabaseClient,
+  orgId: string,
+  included: number,
+): Promise<number> {
+  if (!included) return 0;
+  const bal = await getCreditBalance(sb, orgId);
+  const room = Math.max(0, included - bal.granted);
+  if (room > 0) await grantCredits(sb, orgId, room, 'plan_allowance');
+  return room;
+}
+
 /** Credit packs (approved): list price $1/cr with volume bonuses. */
 export const CREDIT_PACKS: Record<string, { credits: number; usd: number; label: string }> = {
   starter: { credits: 250, usd: 250, label: 'Starter · 250 credits' },

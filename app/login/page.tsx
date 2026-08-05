@@ -12,6 +12,9 @@ import MemeCMOLogo from '@/components/memecmo-logo';
 import { useLanguage } from '@/contexts/language-context';
 import OAuthButtons from '@/components/oauth-buttons';
 
+// Flip to true once Google/Facebook providers are configured in Supabase Auth.
+const OAUTH_ENABLED = false;
+
 function LoginPageContent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -88,18 +91,23 @@ function LoginPageContent() {
             </motion.div>
           )}
 
-          <OAuthButtons redirectTo={redirect} />
-
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-edge" />
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="px-3 bg-surface text-faint">
-                {t('auth.orContinueWith')}
-              </span>
-            </div>
-          </div>
+          {/* OAuth hidden until Google/Facebook providers are configured in
+              Supabase — the buttons otherwise fail on click. */}
+          {OAUTH_ENABLED && (
+            <>
+              <OAuthButtons redirectTo={redirect} />
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-edge" />
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="px-3 bg-surface text-faint">
+                    {t('auth.orContinueWith')}
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
 
           <form onSubmit={handleEmailLogin} className="space-y-4">
             <div>

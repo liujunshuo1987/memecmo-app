@@ -5,7 +5,7 @@ import { inngest } from './client';
 import { executeAgentRun } from '@/lib/agents/run';
 import { recordUsage, isMeteredKind } from '@/lib/commerce';
 import { sendProjectDigest, maybeSendScanAlert } from '@/lib/reports/digest';
-import { applyMonthlyGrant } from '@/lib/credits';
+import { applyMonthlyGrant, applyPlanAllowance } from '@/lib/credits';
 
 function svc() {
   return createServiceClient(
@@ -162,6 +162,15 @@ export const scheduledMonthly = inngest.createFunction(
       let total = 0;
       for (const o of orgs ?? []) {
         if ((o.metadata as any)?.monthlyCreditGrant) total += await applyMonthlyGrant(sb, o as any);
+      }
+      // Plan-included allowances (plans.included_credits_monthly) for orgs
+      // with a live subscription — the other half of the credits promise.
+      const { data: subs } = await sb
+        .from('org_subscriptions')
+        .select('organization_id, status, plans!inner(included_credits_monthly)')
+        .in('status', ['trialing', 'active']);
+      for (const s of subs ?? []) {
+        total += await applyPlanAllowance(sb, s.organization_id, (s.plans as any)?.included_credits_monthly ?? 0);
       }
       return total;
     });
