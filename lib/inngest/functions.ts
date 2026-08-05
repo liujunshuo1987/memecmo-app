@@ -183,7 +183,7 @@ export const scheduledMonthly = inngest.createFunction(
 // attribution/strategy interpretation; full report stays in the workspace PDF.
 // Doubly gated like the scans: global kill-switch + per-project recipients.
 export const scheduledDigest = inngest.createFunction(
-  { id: 'scheduled-digest', name: 'Weekly client digest email', triggers: [{ cron: '0 2 * * 2' }] },
+  { id: 'scheduled-digest', name: 'Weekly client digest email', triggers: [{ cron: '0 2 * * 2' }, { event: 'digest/manual.requested' }] },
   async ({ step }) => {
     if (!schedulingEnabled()) return { skipped: 'SCHEDULED_SCANS_ENABLED!=1' };
     const sb = svc();

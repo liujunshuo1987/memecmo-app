@@ -24,6 +24,12 @@ export type AgentRunRequested = {
   };
 };
 
+export type DigestManualRequested = {
+  name: 'digest/manual.requested';
+  data: Record<string, never>;
+};
+
 export type Events = {
   'agent/run.requested': AgentRunRequested;
+  'digest/manual.requested': DigestManualRequested;
 };
