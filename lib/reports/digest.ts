@@ -65,6 +65,8 @@ const UI = {
     engines: '分引擎表现',
     highIntent: '高意图问题得分',
     topOfMind: '首位提及率',
+    citationSection: '引用源明细', ownDomain: '品牌自域', thirdParty: '第三方来源',
+    newCites: '本期新增来源', lostCites: '本期流失来源', citedByEngine: '各引擎实际引用',
     noActions: '本期无新增交付(扫描与监测持续运行)。',
     fullReport: '完整扫描数据与 PDF 报告可在工作台查看下载:',
     footer: 'MemeCMO Tech Limited · Hong Kong CR No. 80218619 · GEO 生成式引擎优化平台',
@@ -83,6 +85,8 @@ const UI = {
     engines: 'Per-engine performance',
     highIntent: 'High-intent score',
     topOfMind: 'Top-of-mind rate',
+    citationSection: 'Citation sources', ownDomain: 'Brand-owned', thirdParty: 'Third-party',
+    newCites: 'New this period', lostCites: 'Lost this period', citedByEngine: 'Cited by engine',
     noActions: 'No new deliverables this period (scanning and monitoring continue).',
     fullReport: 'Full scan data and the PDF report are available in the workspace:',
     footer: 'MemeCMO Tech Limited · Hong Kong CR No. 80218619 · Generative Engine Optimization',
@@ -101,6 +105,8 @@ const UI = {
     engines: 'Hiệu suất theo từng engine',
     highIntent: 'Điểm câu hỏi ý định cao',
     topOfMind: 'Tỷ lệ nhắc đến đầu tiên',
+    citationSection: 'Nguồn trích dẫn', ownDomain: 'Tên miền thương hiệu', thirdParty: 'Nguồn bên thứ ba',
+    newCites: 'Nguồn mới kỳ này', lostCites: 'Nguồn mất kỳ này', citedByEngine: 'Trích dẫn theo engine',
     noActions: 'Không có bàn giao mới trong kỳ (quét và giám sát vẫn tiếp tục).',
     fullReport: 'Dữ liệu quét đầy đủ và báo cáo PDF có tại workspace:',
     footer: 'MemeCMO Tech Limited · Hong Kong CR No. 80218619 · Generative Engine Optimization',
@@ -338,6 +344,56 @@ function digestHtml(g: GatherResult, interp: Interpretation | null): string {
     );
   }
 
+  // Citations block — deterministic, from the scorecard. Added per client
+  // feedback (2026-08-06): split own vs third-party, name the URLs each
+  // engine actually cited, and show source domains gained/lost vs last scan.
+  let citationsBlock = '';
+  if (cur) {
+    const rank: any[] = cur.sourceAuthority?.ranking ?? [];
+    if (rank.length) {
+      const own = rank.filter((r) => r.isBrand).reduce((a, r) => a + (r.citations || 0), 0);
+      const third = rank.filter((r) => !r.isBrand).reduce((a, r) => a + (r.citations || 0), 0);
+      const topThird = rank
+        .filter((r) => !r.isBrand)
+        .slice(0, 5)
+        .map((r) => `<tr><td style="padding:4px 0;font-size:12.5px;color:#2A2024;">${esc(r.domain)}</td><td style="padding:4px 0;font-size:12.5px;color:#6E625F;text-align:right;font-variant-numeric:tabular-nums;">${r.citations}</td></tr>`)
+        .join('');
+      const perEng = new Map<string, Map<string, number>>();
+      for (const smp of cur.rawSamples ?? []) {
+        for (const u of smp.citations ?? []) {
+          if (!perEng.has(smp.engine)) perEng.set(smp.engine, new Map());
+          const m = perEng.get(smp.engine)!;
+          m.set(u, (m.get(u) || 0) + 1);
+        }
+      }
+      const engineRows = [...perEng.entries()]
+        .map(([eng, m]) => {
+          const top = [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2)
+            .map(([u]) => `<div style="font-size:11px;color:#9C8E8A;word-break:break-all;margin-top:2px;">${esc(u.slice(0, 96))}</div>`)
+            .join('');
+          return `<div style="margin-top:8px;"><span style="font-size:12.5px;color:#2A2024;font-weight:600;">${esc(eng)}</span><span style="font-size:12px;color:#6E625F;"> · ${m.size} URL</span>${top}</div>`;
+        })
+        .join('');
+      let diffLine = '';
+      const prevRank: any[] = prev?.sourceAuthority?.ranking ?? [];
+      if (prevRank.length) {
+        const curD = new Set(rank.map((r) => r.domain));
+        const prevD = new Set(prevRank.map((r) => r.domain));
+        const added = [...curD].filter((d) => !prevD.has(d)).slice(0, 6);
+        const lost = [...prevD].filter((d) => !curD.has(d)).slice(0, 6);
+        diffLine = `<div style="font-size:12px;color:#6E625F;margin-top:10px;line-height:1.6;"><strong>${esc(t.newCites)}</strong>: ${added.length ? esc(added.join(', ')) : '—'}<br/><strong>${esc(t.lostCites)}</strong>: ${lost.length ? esc(lost.join(', ')) : '—'}</div>`;
+      }
+      citationsBlock = sec(
+        t.citationSection,
+        `<div style="font-size:12.5px;color:#2A2024;">${esc(t.ownDomain)}: <strong>${own}</strong> · ${esc(t.thirdParty)}: <strong>${third}</strong></div>
+         <table style="width:100%;border-collapse:collapse;margin-top:8px;">${topThird}</table>
+         <div style="font-size:11px;letter-spacing:1px;color:#9C8E8A;text-transform:uppercase;margin-top:12px;">${esc(t.citedByEngine)}</div>
+         ${engineRows || '<div style="font-size:12px;color:#9C8E8A;margin-top:4px;">—</div>'}
+         ${diffLine}`,
+      );
+    }
+  }
+
   const actionsBlock = sec(
     t.actionsSection,
     g.actions.length
@@ -382,6 +438,7 @@ function digestHtml(g: GatherResult, interp: Interpretation | null): string {
       <h1 style="margin:0 0 2px;font-size:18px;color:#2A2024;">${esc(g.project.brand_name)} &middot; ${esc(g.project.target_country)}</h1>
       <div style="font-size:12px;color:#9C8E8A;">${new Date().toISOString().slice(0, 10)}</div>
       ${scoreBlock}
+      ${citationsBlock}
       ${actionsBlock}
       ${attributionBlock}
       ${strategyBlock}
