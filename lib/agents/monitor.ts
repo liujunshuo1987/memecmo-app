@@ -640,10 +640,15 @@ export async function runMonitorAgent(
             .map((g) => g.canonical);
       const std = stdFor(a.prompt);
       if (brandPresent && std && accuracyPool.length < 24) {
+        // 2400-char judge window (was 900 — long Vietnamese answers were fed to
+        // the judge cut mid-sentence, producing false "incomplete" verdicts:
+        // 8 of 12 issues on the 8-10 scan were truncation artifacts). Anything
+        // longer carries an explicit marker so the judge never penalizes
+        // content that may follow the cut.
         accuracyPool.push({
           engine: a.engine,
           prompt: a.prompt,
-          text: a.text.slice(0, 900),
+          text: a.text.length > 2400 ? a.text.slice(0, 2400) + '\n…[ANSWER CONTINUES — TRUNCATED FOR JUDGING]' : a.text,
           canonical: [std.local, std.en].filter(Boolean).join('\n---\n').slice(0, 900),
         });
       }
@@ -689,6 +694,7 @@ export async function runMonitorAgent(
           `Brand: ${brandName}. For each item, compare the AI ANSWER against the CANONICAL answer (the verified correct one).`,
           'Verdict: "accurate" (facts/links consistent), "partial" (right direction, missing or fuzzing key facts), "wrong" (contradicts canonical facts, wrong product info, wrong/outdated links).',
           'For partial/wrong, "issue" states concretely what is incorrect or missing (one sentence). For accurate, issue is "".',
+          'If an AI ANSWER ends with "[ANSWER CONTINUES — TRUNCATED FOR JUDGING]", judge ONLY the visible portion: never mark it partial/wrong for information that could plausibly appear after the truncation point, and never use "cut off/incomplete" as the issue.',
           '',
           ...batch.map((p, k) => `[${k}] QUESTION: ${p.prompt}\nCANONICAL: ${p.canonical}\nAI ANSWER (${p.engine}): ${p.text}`),
           '',
