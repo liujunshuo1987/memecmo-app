@@ -158,6 +158,7 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     Recommendations: '建议', 'Quick wins': '速赢', 'AEO checklist': 'AEO 清单', 'Homepage edits': '主页修改',
     'Citation plan': '引用计划', 'Evidence needed to qualify': '达标所需证据', 'Get mentioned in existing articles': '进入已有词条被提及',
     'Latest scan': '最近扫描', 'Presence': '出现率', 'Share of Voice': '声量份额', 'Brand rank': '品牌排名', 'High-intent gaps': '高意图缺口',
+    'index score': '指数得分', 'actual share': '实际占比',
     'All engines': '全部引擎', 'Answer accuracy': '答案准确率', 'Since this report': '本报告之后', recommendations: '条建议', 'deliverables completed after it': '项执行交付已完成', 'No execution deliverables completed since this report yet — run them, and the next scan shows the movement here.': '本报告后尚无新的执行交付——完成执行后,下一次扫描的分数变化会显示在这里。', 'Answer accuracy issues': '答案错误清单', wrong: '答错', partial: '部分正确', 'Benchmark and gaps remain whole-scan.': '竞对对标与缺口仍为全量扫描口径。',
     'Cited sources': '被引来源', Deliverables: '交付物', 'Structured view': '结构化视图', Refine: '改写', Ask: '问',
     'Ask about this result…': '问这份结果…', 'Which gap should we attack first?': '哪个缺口最该先打?',
@@ -204,6 +205,7 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Why is my visibility low on some engines?': 'Vì sao độ hiển thị thấp trên một số engine?',
     'What should we do first?': 'Nên làm việc gì trước tiên?',
     'By engine': 'Theo engine', 'Funnel-stage visibility': 'Hiển thị theo giai đoạn phễu', 'Share of voice': 'Thị phần tiếng nói',
+    'index score': 'điểm chỉ số', 'actual share': 'tỷ lệ thực',
     'Key findings': 'Phát hiện chính', Recommendations: 'Khuyến nghị', 'Quick wins': 'Việc cần làm', Deliverables: 'Sản phẩm',
     'Full Scan': 'Quét đầy đủ', Profile: 'Hồ sơ', Discovery: 'Khám phá', Monitor: 'Giám sát', Report: 'Báo cáo',
     Optimize: 'Nội dung', Site: 'Trang chủ', Distribute: 'Phân phối', Encyclopedia: 'Bách khoa',
@@ -968,7 +970,7 @@ function ContextPanel({ headlineAigvr, scoreRun, runsByAgent, totalAgents }: {
         <div className="rounded-lg border border-edge bg-surface p-3 space-y-2">
           <div className="text-[10px] uppercase tracking-widest text-faint">{t('Latest scan')}</div>
           <ContextMetric tip="presence" label="Presence" value={presence != null ? `${presence}%` : '—'} />
-          <ContextMetric tip="sov" label="Share of Voice" value={sov != null ? `${Math.round(sov)}%` : '—'} />
+          <ContextMetric tip="sov" label={`Share of Voice · ${t('index score')}`} value={sov != null ? String(Math.round(sov)) : '—'} />
           <ContextMetric tip="citation" label="Citation rate" value={cite != null ? `${Math.round(cite)}%` : '—'} />
           <ContextMetric tip="sentiment" label="AI sentiment" value={senti != null ? String(Math.round(senti)) : '—'} />
           {sc?.accuracy?.rate != null && <ContextMetric tip="accuracy" label="Answer accuracy" value={`${sc.accuracy.rate}%`} />}
@@ -2105,7 +2107,7 @@ function MonitorResult({ o }: { o: Record<string, any> }) {
         {/* Counts follow the engine slice; whole-scan-only footnotes drop out
             in engine view instead of showing mismatched numbers. */}
         <KpiTile tip="presence" label={t('Presence')} value={`${Math.round(d.presence ?? 0)}%`} sub={`${(engSel ?? o.metrics?.overall)?.brandHits ?? '—'}/${(engSel ?? o.metrics?.overall)?.queries ?? o.sampled?.queries ?? '—'} ${t('answers')}`} />
-        <KpiTile tip="sov" label={t('Share of Voice')} value={`${Math.round(d.competitiveShare ?? 0)}%`} sub={engSel ? undefined : `${t('Rank')} #${o.brandRank ?? '—'} / ${bench.length || '—'}`} />
+        <KpiTile tip="sov" label={`${t('Share of Voice')} · ${t('index score')}`} value={Math.round(d.competitiveShare ?? 0)} sub={engSel ? undefined : `${t('actual share')} ${bench.find((b: any) => b.isBrand)?.sovPct ?? '—'}% · ${t('Rank')} #${o.brandRank ?? '—'} / ${bench.length || '—'}`} />
         <KpiTile tip="position" label={t('Position when present')} value={Math.round(d.prominence ?? 0)} sub={engSel ? (engSel.topOfMindRate != null ? `${t('Top-of-mind')} ${engSel.topOfMindRate}%` : undefined) : hasTom ? `${t('Top-of-mind')} ${tom.overallRate}% · ${t('key')} ${tom.keyRate ?? '—'}%` : undefined} accent />
         <KpiTile tip="sentiment" label={t('Sentiment when present')} value={Math.round(d.sentiment ?? 0)} />
         <KpiTile tip="citation" label={t('Citation strength')} value={`${Math.round(d.citation ?? 0)}%`} />

@@ -521,7 +521,12 @@ export async function runMonitorAgent(
   //    same company are merged before the set is fixed.
   await emit({ event_type: 'milestone', payload: { label: 'Identifying competitors', step: 3, totalSteps: 5 } });
   const frozen = input.competitorSet;
-  const frozenFresh = !!frozen?.groups?.length && Date.now() - new Date(frozen.refreshedAt).getTime() < COMPETITOR_SET_TTL_MS;
+  // locked=true (meeting resolution 2026-08-06): the curated set never
+  // auto-rotates — refresh only by explicit operator/client review. The
+  // 8-10 auto-rotation polluted the set with digital-ad networks.
+  const frozenFresh =
+    !!frozen?.groups?.length &&
+    ((frozen as any).locked === true || Date.now() - new Date(frozen.refreshedAt).getTime() < COMPETITOR_SET_TTL_MS);
   let competitorGroups: CompetitorGroup[];
   let competitorSetRefreshedAt: string;
   let competitorSetRefreshed = false;

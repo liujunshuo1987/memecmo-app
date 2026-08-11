@@ -142,6 +142,8 @@ interface GatherResult {
   schedule: ReportSchedule;
   stage: DigestStage;
   current: any | null;   // latest scorecard
+  currentMeta: { id: string; at: string | null; trigger: string | null } | null;
+  previousMeta: { id: string; at: string | null; trigger: string | null } | null;
   previous: any | null;  // the one before
   actions: { label: string; summary: string; at: string }[];
   latestReport: any | null; // Report-agent output completed within 7 days, if any
@@ -160,7 +162,7 @@ async function gather(sb: SupabaseClient, projectId: string): Promise<GatherResu
 
   const { data: scans } = await sb
     .from('agent_runs')
-    .select('id, agent_id, output, completed_at')
+    .select('id, agent_id, output, completed_at, trigger_method')
     .eq('project_id', projectId)
     .in('agent_id', ['monitor', 'full_scan'])
     .eq('status', 'completed')
@@ -214,6 +216,8 @@ async function gather(sb: SupabaseClient, projectId: string): Promise<GatherResu
     stage: deriveStage(schedule, scorecards.length),
     current: scorecards[0]?.sc ?? null,
     previous: scorecards[1]?.sc ?? null,
+    currentMeta: scorecards[0] ? { id: scorecards[0].id, at: scorecards[0].completed_at, trigger: (scorecards[0] as any).trigger_method } : null,
+    previousMeta: scorecards[1] ? { id: scorecards[1].id, at: scorecards[1].completed_at, trigger: (scorecards[1] as any).trigger_method } : null,
     actions,
     latestReport,
   };
@@ -261,7 +265,13 @@ async function interpret(g: GatherResult): Promise<Interpretation | null> {
   const sys =
     'You are a senior GEO (Generative Engine Optimization) analyst writing the interpretation sections of a client digest email. ' +
     `Write in ${LANG_NAME[lang]}. Detailed, specific, evidence-based prose — no hype, no vague consulting filler. ` +
-    'Never mention internal tooling or vendors; refer to engines by their public names. Output strict JSON only.';
+    'Never mention internal tooling or vendors; refer to engines by their public names. ' +
+    'EVIDENCE DISCIPLINE (client-agreed reporting standard): tag every claim with one of ' +
+    '[Observed] (directly measured this scan), [Inferred] (reasoned from measured data), or [Hypothesis] (plausible, unverified). ' +
+    'Score movements within ±3 points on an unchanged corpus are sampling noise — never present them as improvement or decline. ' +
+    'NEVER attribute a metric change to a cause (PR, engine behavior change, competitor investment) unless the supporting evidence ' +
+    'is itself in the data provided (e.g. named new cited sources); otherwise state it as [Hypothesis] with what evidence would confirm it. ' +
+    'Output strict JSON only.';
 
   const user = [
     `Brand: ${g.project.brand_name} · Market: ${g.project.target_country} · Industry: ${g.project.industry || 'n/a'}`,
@@ -375,10 +385,19 @@ function digestHtml(g: GatherResult, interp: Interpretation | null): string {
         })
         .join('');
       let diffLine = '';
-      const prevRank: any[] = prev?.sourceAuthority?.ranking ?? [];
-      if (prevRank.length) {
-        const curD = new Set(rank.map((r) => r.domain));
-        const prevD = new Set(prevRank.map((r) => r.domain));
+      const domainsOf = (sc: any): Set<string> => {
+        const out = new Set<string>();
+        for (const smp of sc?.rawSamples ?? []) {
+          for (const u of smp.citations ?? []) {
+            try { out.add(new URL(u).hostname.replace(/^www\./, '').toLowerCase()); } catch { /* skip */ }
+          }
+        }
+        return out;
+      };
+      const prevDomains = domainsOf(prev);
+      if (prevDomains.size) {
+        const curD = domainsOf(cur);
+        const prevD = prevDomains;
         const added = [...curD].filter((d) => !prevD.has(d)).slice(0, 6);
         const lost = [...prevD].filter((d) => !curD.has(d)).slice(0, 6);
         diffLine = `<div style="font-size:12px;color:#6E625F;margin-top:10px;line-height:1.6;"><strong>${esc(t.newCites)}</strong>: ${added.length ? esc(added.join(', ')) : '—'}<br/><strong>${esc(t.lostCites)}</strong>: ${lost.length ? esc(lost.join(', ')) : '—'}</div>`;
@@ -437,6 +456,7 @@ function digestHtml(g: GatherResult, interp: Interpretation | null): string {
     <div style="background:#FFFFFF;border:1px solid rgba(58,30,34,0.12);border-radius:14px;padding:28px;">
       <h1 style="margin:0 0 2px;font-size:18px;color:#2A2024;">${esc(g.project.brand_name)} &middot; ${esc(g.project.target_country)}</h1>
       <div style="font-size:12px;color:#9C8E8A;">${new Date().toISOString().slice(0, 10)}</div>
+      ${g.currentMeta ? `<div style="font-size:10.5px;color:#9C8E8A;margin-top:2px;">Scan ${esc((g.currentMeta.at || '').slice(0, 10))} · #${esc(g.currentMeta.id.slice(0, 8))} · ${g.currentMeta.trigger === 'schedule' ? 'auto' : 'manual'} · n=${cur?.metrics?.overall?.queries ?? '–'} · panel ${cur?.sampled?.used ?? '–'}/${cur?.sampled?.total ?? '–'}${g.previousMeta ? ` · vs ${esc((g.previousMeta.at || '').slice(0, 10))} #${esc(g.previousMeta.id.slice(0, 8))} (${g.previousMeta.trigger === 'schedule' ? 'auto' : 'manual'})` : ''}</div>` : ''}
       ${scoreBlock}
       ${citationsBlock}
       ${actionsBlock}

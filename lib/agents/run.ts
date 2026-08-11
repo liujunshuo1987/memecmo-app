@@ -103,6 +103,31 @@ async function loadCompetitorSet(sb: ReturnType<typeof svc>, projectId: string):
   return (data?.metadata as any)?.competitorSet ?? null;
 }
 
+// Core Benchmark lock (meeting resolution 2026-08-06, FMVN): the 20 co-selected
+// key prompts in projects.metadata.coreKeyPrompts are permanently frozen. While
+// present they override the library's rotating key selection, and any of them
+// missing from the (monthly-rotated) library is re-appended so the KPI panel
+// never drifts. Changing the core list requires written sign-off from both sides.
+async function loadCoreKeyPrompts(sb: ReturnType<typeof svc>, projectId: string): Promise<string[] | null> {
+  const { data } = await sb.from('projects').select('metadata').eq('id', projectId).maybeSingle();
+  const core = (data?.metadata as any)?.coreKeyPrompts;
+  return Array.isArray(core) && core.length ? core : null;
+}
+
+function applyCoreLock(
+  core: string[] | null,
+  promptSet: PromptCat[],
+  keyPrompts: string[],
+): { promptSet: PromptCat[]; keyPrompts: string[] } {
+  if (!core?.length) return { promptSet, keyPrompts };
+  const inSet = new Set(promptSet.flatMap((c) => c.prompts));
+  const missing = core.filter((p) => !inSet.has(p));
+  const ps = missing.length
+    ? [...promptSet, { category: 'core', label: 'Core benchmark (frozen)', prompts: missing }]
+    : promptSet;
+  return { promptSet: ps, keyPrompts: core };
+}
+
 // Operator prompt edits (projects.metadata.promptEdits {excluded[], added[]}).
 // Applied at run assembly — the stored Discovery asset stays untouched, so
 // edits are reversible and never corrupt the source library.
@@ -332,7 +357,8 @@ export async function executeAgentRun(
         await persistAndEmit({ event_type: 'milestone', payload: { label: 'Phase 2/3 · Monitor', step: 2, totalSteps: 3 } });
         const rawPromptSet = ((disc.output as { promptSet?: unknown[] }).promptSet as { category: string; label: string; prompts: string[] }[]) || [];
         const rawKeyPrompts = ((disc.output as { keyPrompts?: unknown[] }).keyPrompts as string[]) || [];
-        const { promptSet, keyPrompts } = applyPromptEdits(await loadPromptEdits(sb, project.id), rawPromptSet, rawKeyPrompts);
+        const edited = applyPromptEdits(await loadPromptEdits(sb, project.id), rawPromptSet, rawKeyPrompts);
+        const { promptSet, keyPrompts } = applyCoreLock(await loadCoreKeyPrompts(sb, project.id), edited.promptSet, edited.keyPrompts);
         // No nested stepper: this whole phase is already one step.
         const m = await runMonitorAgent(
           { ...base, promptSet, keyPrompts, competitorSet: await loadCompetitorSet(sb, project.id), standardAnswers: await loadStandardAnswers(sb, project.id) },
@@ -442,6 +468,7 @@ export async function executeAgentRun(
         throw new Error('Discovery prompt set is empty — re-run Discovery.');
       }
       ({ promptSet, keyPrompts } = applyPromptEdits(await loadPromptEdits(sb, project.id), promptSet, keyPrompts));
+      ({ promptSet, keyPrompts } = applyCoreLock(await loadCoreKeyPrompts(sb, project.id), promptSet, keyPrompts));
       result = await runMonitorAgent(
         {
           brandName: project.brand_name,
