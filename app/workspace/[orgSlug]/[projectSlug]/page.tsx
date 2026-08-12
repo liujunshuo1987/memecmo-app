@@ -52,6 +52,31 @@ export default async function WorkspacePage({ params }: PageProps) {
     isOperator = !!mem;
   }
 
+  // Mirrors RLS can_dispatch_runs(): operators, org admins/editors and parent
+  // channel-partner admins/editors may trigger runs; viewers browse only. The
+  // UI hides every Run control when this is false — a blank panel with a Run
+  // button was nudging read-only users into credit-priced manual scans.
+  let canDispatch = isOperator;
+  if (!canDispatch) {
+    const { data: pm } = await supabase
+      .from('organization_members')
+      .select('role')
+      .eq('organization_id', projectAndOrg.organization.id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    canDispatch = pm?.role === 'admin' || pm?.role === 'editor';
+  }
+  const parentOrgId = (projectAndOrg.organization as any).parent_org_id;
+  if (!canDispatch && parentOrgId) {
+    const { data: ppm } = await supabase
+      .from('organization_members')
+      .select('role')
+      .eq('organization_id', parentOrgId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    canDispatch = ppm?.role === 'admin' || ppm?.role === 'editor';
+  }
+
   return (
     <WorkspaceClient
       project={projectAndOrg.project}
@@ -59,6 +84,7 @@ export default async function WorkspacePage({ params }: PageProps) {
       initialRuns={recentRuns}
       scanHistory={scanHistory}
       isOperator={isOperator}
+      canDispatch={canDispatch}
     />
   );
 }

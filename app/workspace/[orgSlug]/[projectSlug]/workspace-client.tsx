@@ -20,6 +20,7 @@ interface Props {
   initialRuns: AgentRun[];
   scanHistory: ScanPoint[];
   isOperator?: boolean;
+  canDispatch?: boolean;
 }
 
 // Extract a trend point from a monitor / full_scan run's output (mirrors getScanHistory).
@@ -172,6 +173,8 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Top-of-mind · key prompts': '首位推荐率 · 重点 Prompt', 'key prompts monitored': '条重点 Prompt 已监测',
     Answers: '标准答案', 'Standard answer library': '标准答案库', 'the answer we want AI to give': '我们希望 AI 给出的答案',
     'Export PDF': '导出 PDF', Guide: '使用说明', 'Not run yet for this project.': '本项目尚未运行该智能体。', 'Run now': '立即运行',
+    'Results are generated automatically by the scheduled scans.': '结果由定期扫描自动生成——无需手动运行。',
+    'Scheduled scans keep this project fresh (Mon scan · Tue digest).': '定期扫描自动更新本项目(周一扫描 · 周二周报)。',
     Sets: '竞对与提示词', 'Competitor set': '竞对集', 'Prompt library': '提示词库', 'Relationship': '关系',
     'Not counted in SoV': '不计入声量份额', 'Add competitor': '添加竞对', 'Add prompts (one per line)': '新增提示词(每行一条)',
     'Click a prompt to exclude / restore it. Changes apply from the next run.': '点击提示词可排除/恢复;修改自下次运行起生效。',
@@ -213,6 +216,8 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Top-of-mind · key prompts': 'Đề xuất đầu tiên · prompt trọng điểm', 'key prompts monitored': 'prompt trọng điểm được theo dõi',
     Answers: 'Câu trả lời chuẩn', 'Standard answer library': 'Thư viện câu trả lời chuẩn', 'the answer we want AI to give': 'câu trả lời ta muốn AI đưa ra',
     'Export PDF': 'Xuất PDF', Guide: 'Hướng dẫn', 'Not run yet for this project.': 'Chưa chạy cho dự án này.', 'Run now': 'Chạy ngay',
+    'Results are generated automatically by the scheduled scans.': 'Kết quả được tạo tự động theo lịch quét định kỳ — không cần chạy thủ công.',
+    'Scheduled scans keep this project fresh (Mon scan · Tue digest).': 'Quét định kỳ tự cập nhật dự án (quét thứ Hai · bản tin thứ Ba).',
     'Position when present': 'Vị trí khi xuất hiện', 'Sentiment when present': 'Cảm xúc khi xuất hiện', 'Citation strength': 'Sức mạnh trích dẫn',
     'Top-of-mind': 'Đề xuất đầu tiên', key: 'trọng điểm', Rank: 'Hạng', answers: 'câu trả lời', 'queries competitors win': 'câu hỏi đối thủ thắng',
     'By intent': 'Theo ý định',
@@ -258,7 +263,7 @@ function creditFullScan(m: Record<string, LatestRun>): Record<string, LatestRun>
   return m;
 }
 
-export default function WorkspaceClient({ project, organization, initialRuns, scanHistory, isOperator = false }: Props) {
+export default function WorkspaceClient({ project, organization, initialRuns, scanHistory, isOperator = false, canDispatch = true }: Props) {
   const [history, setHistory] = useState<ScanPoint[]>(scanHistory);
   const [setsOpen, setSetsOpen] = useState(false);
   const [runsByAgent, setRunsByAgent] = useState<Record<string, LatestRun>>(() => {
@@ -453,6 +458,23 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
   // its events + output and stops (terminal).
   const [emptyAgent, setEmptyAgent] = useState<string | null>(null);
 
+  // Open on data, never on emptiness: auto-view the newest completed scorecard
+  // (scan preferred, else any completed deliverable). A blank panel whose only
+  // affordance is a Run button nudges people into credit-priced manual scans.
+  const autoOpened = useRef(false);
+  useEffect(() => {
+    if (autoOpened.current || activeRunId || runStatus) return;
+    const prefer = ['full_scan', 'monitor', 'report'];
+    const preferred = prefer.map((a) => ({ a, r: runsByAgent[a] })).find((x) => x.r?.status === 'completed');
+    const fallback = Object.entries(runsByAgent)
+      .map(([a, r]) => ({ a, r }))
+      .filter((x) => x.r?.status === 'completed')
+      .sort((x, y) => (y.r!.createdAt || '').localeCompare(x.r!.createdAt || ''))[0];
+    const pick = preferred ?? fallback;
+    if (pick?.r) { autoOpened.current = true; viewRun(pick.r.runId, pick.a); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runsByAgent]);
+
   const viewRun = (runId: string, agentId?: string) => {
     setEmptyAgent(null);
     // Synthesized (full-scan-credited) deliverables render from local output —
@@ -612,23 +634,29 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
       <div className="wz-shell flex-1 grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)_300px] min-h-0">
         {/* LEFT — deliverables nav */}
         <aside className="lg:border-r border-edge lg:overflow-y-auto px-4 py-4 space-y-4 lg:min-h-0">
-          <div className="space-y-2">
-            <button
-              onClick={() => dispatchAgent('full_scan')}
-              disabled={sending}
-              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-brand text-on-brand hover:brightness-110 disabled:bg-raised disabled:text-faint text-sm font-medium transition"
-            >
-              <Icon name="full_scan" size={16} /> {t('Run full GEO scan')}
-            </button>
-            <input
-              value={intent}
-              onChange={(e) => setIntent(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && intent.trim()) { e.preventDefault(); dispatchAgent('full_scan', intent.trim()); setIntent(''); } }}
-              placeholder={t('…focus the agents')}
-              disabled={sending}
-              className="w-full bg-surface border border-edge rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-blue-400/50"
-            />
-          </div>
+          {canDispatch ? (
+            <div className="space-y-2">
+              <button
+                onClick={() => dispatchAgent('full_scan')}
+                disabled={sending}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-brand text-on-brand hover:brightness-110 disabled:bg-raised disabled:text-faint text-sm font-medium transition"
+              >
+                <Icon name="full_scan" size={16} /> {t('Run full GEO scan')}
+              </button>
+              <input
+                value={intent}
+                onChange={(e) => setIntent(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && intent.trim()) { e.preventDefault(); dispatchAgent('full_scan', intent.trim()); setIntent(''); } }}
+                placeholder={t('…focus the agents')}
+                disabled={sending}
+                className="w-full bg-surface border border-edge rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-blue-400/50"
+              />
+            </div>
+          ) : (
+            <div className="text-[11px] text-faint leading-relaxed rounded-lg border border-edge bg-surface px-3 py-2.5">
+              {t('Scheduled scans keep this project fresh (Mon scan · Tue digest).')}
+            </div>
+          )}
           {DELIVERABLE_GROUPS.map((group) => (
             <div key={group.label}>
               <div className="text-[10px] uppercase tracking-widest text-faint mb-1.5">{t(group.label)}</div>
@@ -638,6 +666,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
                     key={aid}
                     agentId={aid}
                     run={runsByAgent[aid]}
+                    canRun={canDispatch}
                     running={sending && runStatus?.agentId === aid && !isTerminal}
                     isViewing={runStatus?.agentId === aid || emptyAgent === aid}
                     onView={viewRun}
@@ -659,13 +688,17 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
               <div className="text-sm font-medium text-ink">{AGENTS[emptyAgent]?.displayName?.replace('AIGVR', SCORE_LABEL)}</div>
               <div className="text-xs text-faint max-w-sm">{AGENTS[emptyAgent]?.description}</div>
               <div className="text-xs text-dim">{t('Not run yet for this project.')}</div>
-              <button
-                onClick={() => dispatchAgent(emptyAgent)}
-                disabled={sending}
-                className="mt-2 px-4 py-2 rounded-lg bg-brand text-on-brand text-sm font-medium hover:brightness-110 disabled:opacity-50 transition"
-              >
-                ▶ {t('Run now')}
-              </button>
+              {canDispatch ? (
+                <button
+                  onClick={() => dispatchAgent(emptyAgent)}
+                  disabled={sending}
+                  className="mt-2 px-4 py-2 rounded-lg bg-brand text-on-brand text-sm font-medium hover:brightness-110 disabled:opacity-50 transition"
+                >
+                  ▶ {t('Run now')}
+                </button>
+              ) : (
+                <div className="text-xs text-faint">{t('Results are generated automatically by the scheduled scans.')}</div>
+              )}
             </div>
           ) : !runStatus ? (
             <div className="h-full flex flex-col items-center justify-center text-center text-faint gap-2 py-16">
@@ -771,7 +804,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
 }
 
 function NavItem({
-  agentId, run, running, isViewing, onView, onRun, onEmpty, disabled,
+  agentId, run, running, isViewing, onView, onRun, onEmpty, disabled, canRun = true,
 }: {
   agentId: string;
   run?: LatestRun;
@@ -781,6 +814,7 @@ function NavItem({
   onRun: (agentId: string) => void;
   onEmpty: (agentId: string) => void;
   disabled: boolean;
+  canRun?: boolean;
 }) {
   const a = AGENTS[agentId];
   const ready = !!run && run.status === 'completed';
@@ -802,14 +836,14 @@ function NavItem({
         <span className="text-[10px] text-brand shrink-0">…</span>
       ) : ready ? (
         <span className="w-1.5 h-1.5 rounded-full bg-sage inline-block shrink-0" title="ready" />
-      ) : (
+      ) : canRun ? (
         <span
           onClick={(e) => { e.stopPropagation(); if (!disabled) onRun(agentId); }}
           className={`text-[10px] shrink-0 px-1.5 py-0.5 rounded border border-edge text-faint hover:text-brand hover:border-brand/50 transition ${disabled ? 'opacity-50' : ''}`}
         >
           ▶ {t('run')}
         </span>
-      )}
+      ) : null}
     </div>
   );
 }
