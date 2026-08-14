@@ -174,7 +174,7 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     Answers: '标准答案', 'Standard answer library': '标准答案库', 'the answer we want AI to give': '我们希望 AI 给出的答案',
     'Export PDF': '导出 PDF', Guide: '使用说明', 'Not run yet for this project.': '本项目尚未运行该智能体。', 'Run now': '立即运行',
     'Results are generated automatically by the scheduled scans.': '结果由定期扫描自动生成——无需手动运行。',
-    'Scheduled scans keep this project fresh (Mon scan · Tue digest).': '定期扫描自动更新本项目(周一扫描 · 周二周报)。',
+    'Scheduled scans keep this project fresh automatically.': '定期扫描按排定日自动更新本项目。',
     Sets: '竞对与提示词', 'Competitor set': '竞对集', 'Prompt library': '提示词库', 'Relationship': '关系',
     'Not counted in SoV': '不计入声量份额', 'Add competitor': '添加竞对', 'Add prompts (one per line)': '新增提示词(每行一条)',
     'Click a prompt to exclude / restore it. Changes apply from the next run.': '点击提示词可排除/恢复;修改自下次运行起生效。',
@@ -217,7 +217,7 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     Answers: 'Câu trả lời chuẩn', 'Standard answer library': 'Thư viện câu trả lời chuẩn', 'the answer we want AI to give': 'câu trả lời ta muốn AI đưa ra',
     'Export PDF': 'Xuất PDF', Guide: 'Hướng dẫn', 'Not run yet for this project.': 'Chưa chạy cho dự án này.', 'Run now': 'Chạy ngay',
     'Results are generated automatically by the scheduled scans.': 'Kết quả được tạo tự động theo lịch quét định kỳ — không cần chạy thủ công.',
-    'Scheduled scans keep this project fresh (Mon scan · Tue digest).': 'Quét định kỳ tự cập nhật dự án (quét thứ Hai · bản tin thứ Ba).',
+    'Scheduled scans keep this project fresh automatically.': 'Quét định kỳ tự cập nhật dự án theo lịch đã định.',
     'Position when present': 'Vị trí khi xuất hiện', 'Sentiment when present': 'Cảm xúc khi xuất hiện', 'Citation strength': 'Sức mạnh trích dẫn',
     'Top-of-mind': 'Đề xuất đầu tiên', key: 'trọng điểm', Rank: 'Hạng', answers: 'câu trả lời', 'queries competitors win': 'câu hỏi đối thủ thắng',
     'By intent': 'Theo ý định',
@@ -654,7 +654,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
             </div>
           ) : (
             <div className="text-[11px] text-faint leading-relaxed rounded-lg border border-edge bg-surface px-3 py-2.5">
-              {t('Scheduled scans keep this project fresh (Mon scan · Tue digest).')}
+              {t('Scheduled scans keep this project fresh automatically.')}
             </div>
           )}
           {DELIVERABLE_GROUPS.map((group) => (

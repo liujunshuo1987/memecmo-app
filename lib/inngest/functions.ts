@@ -27,7 +27,7 @@ function schedulingEnabled(): boolean {
 }
 
 // Active projects (with active org) opted into one of the given cadences.
-async function listScheduledProjects(cadences: string[]): Promise<{ id: string; organization_id: string }[]> {
+async function listScheduledProjects(cadences: string[]): Promise<{ id: string; organization_id: string; schedule: any }[]> {
   const sb = svc();
   const { data } = await sb
     .from('projects')
@@ -36,7 +36,7 @@ async function listScheduledProjects(cadences: string[]): Promise<{ id: string; 
     .in('metadata->>reporting', cadences);
   return (data ?? [])
     .filter((p: any) => p.organizations?.status === 'active')
-    .map((p: any) => ({ id: p.id, organization_id: p.organization_id }));
+    .map((p: any) => ({ id: p.id, organization_id: p.organization_id, schedule: p.metadata?.reportSchedule ?? {} }));
 }
 
 // Insert a queued run + hand off to Inngest, exactly like the HTTP endpoint but
@@ -124,10 +124,16 @@ export const runAgent = inngest.createFunction(
 // Weekly re-measure (Mondays 02:00 UTC) — fresh scorecard + trend + competitor
 // patrol for projects opted into weekly reporting. This is the "周报" data pull.
 export const scheduledWeekly = inngest.createFunction(
-  { id: 'scheduled-weekly', name: 'Weekly GEO re-measure', triggers: [{ cron: '0 2 * * 1' }] },
+  // Fires daily; each project scans on ITS configured day (UTC dow, default
+  // Monday). Clients align the cadence to their management rhythm — FMVN:
+  // Friday scan → Saturday digest → Monday leadership meeting (client request
+  // 2026-08). metadata.reportSchedule.scanDay: 0=Sun … 6=Sat.
+  { id: 'scheduled-weekly', name: 'Weekly GEO re-measure', triggers: [{ cron: '0 2 * * *' }] },
   async ({ step }) => {
     if (!schedulingEnabled()) return { skipped: 'SCHEDULED_SCANS_ENABLED!=1' };
-    const projects = await step.run('list-weekly', () => listScheduledProjects(['weekly']));
+    const dow = new Date().getUTCDay();
+    const projects = (await step.run('list-weekly', () => listScheduledProjects(['weekly'])))
+      .filter((p) => ((p.schedule?.scanDay ?? 1) === dow));
     let enqueued = 0;
     for (const p of projects) {
       const id = await step.run(`monitor-${p.id}`, () => enqueueScheduledRun(p.id, p.organization_id, 'monitor'));
@@ -183,9 +189,13 @@ export const scheduledMonthly = inngest.createFunction(
 // attribution/strategy interpretation; full report stays in the workspace PDF.
 // Doubly gated like the scans: global kill-switch + per-project recipients.
 export const scheduledDigest = inngest.createFunction(
-  { id: 'scheduled-digest', name: 'Weekly client digest email', triggers: [{ cron: '0 2 * * 2' }, { event: 'digest/manual.requested' }] },
-  async ({ step }) => {
+  // Daily cron + per-project digestDay (default Tuesday); manual trigger
+  // event unchanged. FMVN: digestDay=6 (Saturday).
+  { id: 'scheduled-digest', name: 'Weekly client digest email', triggers: [{ cron: '0 2 * * *' }, { event: 'digest/manual.requested' }] },
+  async ({ step, event }) => {
     if (!schedulingEnabled()) return { skipped: 'SCHEDULED_SCANS_ENABLED!=1' };
+    const manual = event?.name === 'digest/manual.requested';
+    const dow = new Date().getUTCDay();
     const sb = svc();
     const projects = await step.run('list-digest', async () => {
       const { data } = await sb
@@ -195,6 +205,7 @@ export const scheduledDigest = inngest.createFunction(
       return (data ?? [])
         .filter((p: any) => p.organizations?.status === 'active')
         .filter((p: any) => (p.metadata?.reportSchedule?.recipients ?? []).length > 0)
+        .filter((p: any) => manual || (p.metadata?.reportSchedule?.digestDay ?? 2) === dow)
         .map((p: any) => ({ id: p.id }));
     });
     let sent = 0;
