@@ -120,8 +120,13 @@ function applyCoreLock(
   keyPrompts: string[],
 ): { promptSet: PromptCat[]; keyPrompts: string[] } {
   if (!core?.length) return { promptSet, keyPrompts };
-  const inSet = new Set(promptSet.flatMap((c) => c.prompts));
-  const missing = core.filter((p) => !inSet.has(p));
+  // Diacritic/space/punctuation-insensitive matching — exact-string matching
+  // treated trivially different Vietnamese phrasings as "missing" and inflated
+  // the panel 110→130 (client round-3 finding "panel 24/130").
+  const normP = (s: string) =>
+    s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[?？.!,\s]+/g, ' ').trim();
+  const inSet = new Set(promptSet.flatMap((c) => c.prompts).map(normP));
+  const missing = core.filter((p) => !inSet.has(normP(p)));
   const ps = missing.length
     ? [...promptSet, { category: 'core', label: 'Core benchmark (frozen)', prompts: missing }]
     : promptSet;

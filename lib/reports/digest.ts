@@ -66,6 +66,8 @@ const UI = {
     highIntent: '高意图问题得分',
     topOfMind: '首位提及率',
     citationSection: '引用源明细', ownDomain: '品牌自域', thirdParty: '第三方来源',
+    interpUnavailable: '本期深度解读(效果归因/策略建议/协作请求)生成失败,以上数据区完整无误;完整分析将尽快补发。',
+    thisScan: '本期实测(当期扫描 · 仅检索型引擎的真实引用)', cumulativeIdx: '累计源库(跨全部扫描,含历史)',
     newCites: '本期新增来源', lostCites: '本期流失来源', citedByEngine: '各引擎实际引用',
     noActions: '本期无新增交付(扫描与监测持续运行)。',
     fullReport: '完整扫描数据与 PDF 报告可在工作台查看下载:',
@@ -86,6 +88,8 @@ const UI = {
     highIntent: 'High-intent score',
     topOfMind: 'Top-of-mind rate',
     citationSection: 'Citation sources', ownDomain: 'Brand-owned', thirdParty: 'Third-party',
+    interpUnavailable: 'The interpretation sections (attribution / strategy / cooperation) failed to generate this issue; the data sections above are complete. A full analysis follow-up will be sent.',
+    thisScan: 'This scan (retrieval engines only — verified citations)', cumulativeIdx: 'Cumulative source index (all scans)',
     newCites: 'New this period', lostCites: 'Lost this period', citedByEngine: 'Cited by engine',
     noActions: 'No new deliverables this period (scanning and monitoring continue).',
     fullReport: 'Full scan data and the PDF report are available in the workspace:',
@@ -106,6 +110,8 @@ const UI = {
     highIntent: 'Điểm câu hỏi ý định cao',
     topOfMind: 'Tỷ lệ nhắc đến đầu tiên',
     citationSection: 'Nguồn trích dẫn', ownDomain: 'Tên miền thương hiệu', thirdParty: 'Nguồn bên thứ ba',
+    interpUnavailable: 'Phần diễn giải (phân tích hiệu quả / khuyến nghị / phối hợp) của kỳ này không tạo được; các mục dữ liệu phía trên vẫn đầy đủ. Bản phân tích đầy đủ sẽ được gửi bổ sung.',
+    thisScan: 'Kỳ này (chỉ engine truy xuất — trích dẫn đã xác thực)', cumulativeIdx: 'Kho nguồn tích lũy (mọi lần quét)',
     newCites: 'Nguồn mới kỳ này', lostCites: 'Nguồn mất kỳ này', citedByEngine: 'Trích dẫn theo engine',
     noActions: 'Không có bàn giao mới trong kỳ (quét và giám sát vẫn tiếp tục).',
     fullReport: 'Dữ liệu quét đầy đủ và báo cáo PDF có tại workspace:',
@@ -287,31 +293,38 @@ async function interpret(g: GatherResult): Promise<Interpretation | null> {
     'attribution: 2-4 paragraphs. strategy: 2-4 items. cooperation: 0-5 items (build stage: always ≥3).',
   ].filter(Boolean).join('\n');
 
-  try {
-    const res = await poeChat({
-      model: DEFAULT_MODEL,
-      messages: [{ role: 'system', content: sys }, { role: 'user', content: user }],
-      // CJK JSON is token-hungry — 2200 truncated mid-object in testing.
-      maxTokens: 4200,
-      temperature: 0.3,
-      retries: 1,
-    });
-    const parsed = parseJsonFromLLM<any>(res.content);
-    if (!parsed) {
-      console.error('[digest] interpretation parse miss:', res.content.slice(0, 300));
-      return null;
+  // Two attempts: evidence-discipline tags lengthened output past the old
+  // 4200 cap on 8-15 — the JSON truncated mid-array and the client received a
+  // digest with one stray strategy line (round-3 §1). Attempt 2 asks for a
+  // tighter shape.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const brevity = attempt === 0 ? '' :
+        '\nYour previous response was truncated. BE CONCISE: attribution max 2 paragraphs; strategy max 3 items, each detail ≤2 sentences; cooperation max 4 items.';
+      const res = await poeChat({
+        model: DEFAULT_MODEL,
+        messages: [{ role: 'system', content: sys }, { role: 'user', content: user + brevity }],
+        // CJK JSON with evidence tags is token-hungry — 4200 truncated on 8-15.
+        maxTokens: 6000,
+        temperature: 0.3,
+        retries: 1,
+      });
+      const parsed = parseJsonFromLLM<any>(res.content);
+      if (!parsed) {
+        console.error('[digest] interpretation parse miss (attempt ' + attempt + '):', res.content.slice(0, 300));
+        continue;
+      }
+      return {
+        attribution: (parsed.attribution ?? []).filter((s: any) => typeof s === 'string'),
+        strategy: (parsed.strategy ?? []).filter((s: any) => s?.title && s?.detail),
+        cooperation: (parsed.cooperation ?? []).filter((s: any) => typeof s === 'string'),
+      };
+    } catch (e) {
+      // Log and fall through to the next attempt; the digest itself never blocks.
+      console.error(`[digest] interpretation failed (attempt ${attempt}):`, e instanceof Error ? e.message : e);
     }
-    return {
-      attribution: (parsed.attribution ?? []).filter((s: any) => typeof s === 'string'),
-      strategy: (parsed.strategy ?? []).filter((s: any) => s?.title && s?.detail),
-      cooperation: (parsed.cooperation ?? []).filter((s: any) => typeof s === 'string'),
-    };
-  } catch (e) {
-    // Digest degrades to data-only rather than blocking — but the miss must be
-    // visible in server logs, never silent.
-    console.error('[digest] interpretation failed:', e instanceof Error ? e.message : e);
-    return null;
   }
+  return null;
 }
 
 // ── HTML assembly (Atelier day palette, inline styles for email clients) ─────
@@ -361,54 +374,66 @@ function digestHtml(g: GatherResult, interp: Interpretation | null): string {
   if (cur) {
     const rank: any[] = cur.sourceAuthority?.ranking ?? [];
     if (rank.length) {
-      const own = rank.filter((r) => r.isBrand).reduce((a, r) => a + (r.citations || 0), 0);
-      const third = rank.filter((r) => !r.isBrand).reduce((a, r) => a + (r.citations || 0), 0);
-      const topThird = rank
-        .filter((r) => !r.isBrand)
-        .slice(0, 5)
-        .map((r) => `<tr><td style="padding:4px 0;font-size:12.5px;color:#2A2024;">${esc(r.domain)}</td><td style="padding:4px 0;font-size:12.5px;color:#6E625F;text-align:right;font-variant-numeric:tabular-nums;">${r.citations}</td></tr>`)
-        .join('');
+      // Round-3 corrections: (a) counts are PER-PERIOD from this scan's samples
+      // (the cumulative cross-scan index is shown separately — mixing the two
+      // denominators produced "57/597 unchanged yet 6 new/6 lost"); (b) only
+      // retrieval engines count — parametric engines' answer-text URLs are
+      // unverified generations (Claude "322 URLs" was that artifact).
+      const RETRIEVAL = new Set(['Perplexity', 'Google AI Overview']);
+      const brandDomains = new Set(rank.filter((r) => r.isBrand).map((r) => r.domain));
+      const domOf = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, '').toLowerCase(); } catch { return ''; } };
+      let own = 0, third = 0;
+      const thirdCount = new Map<string, number>();
       const perEng = new Map<string, Map<string, number>>();
       for (const smp of cur.rawSamples ?? []) {
+        if (!RETRIEVAL.has(smp.engine)) continue;
         for (const u of smp.citations ?? []) {
+          const d = domOf(u); if (!d) continue;
+          if (brandDomains.has(d)) own++;
+          else { third++; thirdCount.set(d, (thirdCount.get(d) || 0) + 1); }
           if (!perEng.has(smp.engine)) perEng.set(smp.engine, new Map());
           const m = perEng.get(smp.engine)!;
           m.set(u, (m.get(u) || 0) + 1);
         }
       }
+      const topThird = [...thirdCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5)
+        .map(([d, c]) => `<tr><td style="padding:4px 0;font-size:12.5px;color:#2A2024;">${esc(d)}</td><td style="padding:4px 0;font-size:12.5px;color:#6E625F;text-align:right;font-variant-numeric:tabular-nums;">${c}</td></tr>`)
+        .join('');
       const engineRows = [...perEng.entries()]
         .map(([eng, m]) => {
           const top = [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2)
             .map(([u]) => `<div style="font-size:11px;color:#9C8E8A;word-break:break-all;margin-top:2px;">${esc(u.slice(0, 96))}</div>`)
             .join('');
-          return `<div style="margin-top:8px;"><span style="font-size:12.5px;color:#2A2024;font-weight:600;">${esc(eng)}</span><span style="font-size:12px;color:#6E625F;"> · ${m.size} URL</span>${top}</div>`;
+          return `<div style="margin-top:8px;"><span style="font-size:12.5px;color:#2A2024;font-weight:600;">${esc(eng)}</span><span style="font-size:12px;color:#6E625F;"> · ${m.size} URL (unique)</span>${top}</div>`;
         })
         .join('');
       let diffLine = '';
       const domainsOf = (sc: any): Set<string> => {
         const out = new Set<string>();
         for (const smp of sc?.rawSamples ?? []) {
-          for (const u of smp.citations ?? []) {
-            try { out.add(new URL(u).hostname.replace(/^www\./, '').toLowerCase()); } catch { /* skip */ }
-          }
+          if (!RETRIEVAL.has(smp.engine)) continue;
+          for (const u of smp.citations ?? []) { const d = domOf(u); if (d) out.add(d); }
         }
         return out;
       };
       const prevDomains = domainsOf(prev);
       if (prevDomains.size) {
         const curD = domainsOf(cur);
-        const prevD = prevDomains;
-        const added = [...curD].filter((d) => !prevD.has(d)).slice(0, 6);
-        const lost = [...prevD].filter((d) => !curD.has(d)).slice(0, 6);
+        const added = [...curD].filter((d) => !prevDomains.has(d)).slice(0, 6);
+        const lost = [...prevDomains].filter((d) => !curD.has(d)).slice(0, 6);
         diffLine = `<div style="font-size:12px;color:#6E625F;margin-top:10px;line-height:1.6;"><strong>${esc(t.newCites)}</strong>: ${added.length ? esc(added.join(', ')) : '—'}<br/><strong>${esc(t.lostCites)}</strong>: ${lost.length ? esc(lost.join(', ')) : '—'}</div>`;
       }
+      const cumOwn = rank.filter((r) => r.isBrand).reduce((a, r) => a + (r.citations || 0), 0);
+      const cumThird = rank.filter((r) => !r.isBrand).reduce((a, r) => a + (r.citations || 0), 0);
       citationsBlock = sec(
         t.citationSection,
-        `<div style="font-size:12.5px;color:#2A2024;">${esc(t.ownDomain)}: <strong>${own}</strong> · ${esc(t.thirdParty)}: <strong>${third}</strong></div>
+        `<div style="font-size:11px;letter-spacing:1px;color:#9C8E8A;text-transform:uppercase;">${esc(t.thisScan)}</div>
+         <div style="font-size:12.5px;color:#2A2024;margin-top:4px;">${esc(t.ownDomain)}: <strong>${own}</strong> · ${esc(t.thirdParty)}: <strong>${third}</strong></div>
          <table style="width:100%;border-collapse:collapse;margin-top:8px;">${topThird}</table>
          <div style="font-size:11px;letter-spacing:1px;color:#9C8E8A;text-transform:uppercase;margin-top:12px;">${esc(t.citedByEngine)}</div>
          ${engineRows || '<div style="font-size:12px;color:#9C8E8A;margin-top:4px;">—</div>'}
-         ${diffLine}`,
+         ${diffLine}
+         <div style="font-size:11px;color:#9C8E8A;margin-top:10px;">${esc(t.cumulativeIdx)} — ${esc(t.ownDomain)} ${cumOwn} · ${esc(t.thirdParty)} ${cumThird}</div>`,
       );
     }
   }
@@ -423,6 +448,9 @@ function digestHtml(g: GatherResult, interp: Interpretation | null): string {
   );
 
   // The two deliberately DETAILED sections.
+  const interpNotice = !interp
+    ? `<div style="margin-top:22px;padding:10px 12px;background:#FBF3E4;border-radius:8px;font-size:12px;color:#8A6D3B;line-height:1.6;">${esc(t.interpUnavailable)}</div>`
+    : '';
   const attributionBlock =
     interp && interp.attribution.length && g.stage !== 'build'
       ? sec(t.attributionSection, interp.attribution.map((p) => `<p style="margin:0 0 12px;font-size:13.5px;color:#2A2024;line-height:1.7;">${esc(p)}</p>`).join(''))
@@ -460,6 +488,7 @@ function digestHtml(g: GatherResult, interp: Interpretation | null): string {
       ${scoreBlock}
       ${citationsBlock}
       ${actionsBlock}
+      ${interpNotice}
       ${attributionBlock}
       ${strategyBlock}
       ${cooperationBlock}
