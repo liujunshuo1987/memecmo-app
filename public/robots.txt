@@ -1,123 +1,45 @@
-# NeuronSpark Media-Tech - Generative Engine Optimization (GEO) Focused robots.txt
-# Optimized for maximum AI crawler accessibility and knowledge graph integration
+# MemeCMO — GEO platform (app.memecmo.ai)
+# Public, citable pages are open to every AI crawler. Authenticated product
+# surfaces are not useful to index and are disallowed.
 
 User-agent: *
 Allow: /
-Crawl-delay: 0
+Disallow: /api/
+Disallow: /auth/
+Disallow: /dashboard
+Disallow: /workspace/
+Disallow: /login
+Disallow: /signup
+Disallow: /waitlist
 
-# OpenAI GPT Crawlers (ChatGPT, GPT-4, etc.)
 User-agent: GPTBot
 Allow: /
-Crawl-delay: 0
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /workspace/
 
 User-agent: ChatGPT-User
 Allow: /
-Crawl-delay: 0
 
-# Anthropic Claude Crawlers
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
 User-agent: anthropic-ai
 Allow: /
-Crawl-delay: 0
 
-User-agent: Claude-Web
-Allow: /
-Crawl-delay: 0
-
-# Google AI Crawlers (Gemini, Bard, etc.)
-User-agent: Google-Extended
-Allow: /
-Crawl-delay: 0
-
-User-agent: GoogleOther
-Allow: /
-Crawl-delay: 0
-
-User-agent: Googlebot
-Allow: /
-Crawl-delay: 0
-
-User-agent: Googlebot-Image
-Allow: /
-
-User-agent: Googlebot-News
-Allow: /
-
-# Common Crawl (used by many LLM training datasets)
-User-agent: CCBot
-Allow: /
-Crawl-delay: 0
-
-# Cohere AI Crawlers
-User-agent: cohere-ai
-Allow: /
-Crawl-delay: 0
-
-# Meta AI Crawlers (LLaMA, etc.)
-User-agent: FacebookBot
-Allow: /
-Crawl-delay: 0
-
-User-agent: meta-externalagent
-Allow: /
-Crawl-delay: 0
-
-# Perplexity AI
 User-agent: PerplexityBot
 Allow: /
-Crawl-delay: 0
 
-# Bing and Microsoft AI
-User-agent: bingbot
+User-agent: Perplexity-User
 Allow: /
-Crawl-delay: 0
 
-User-agent: msnbot
+User-agent: Google-Extended
 Allow: /
-Crawl-delay: 0
 
-# Chinese Search Engines and AI Systems
-User-agent: Baiduspider
+User-agent: Bingbot
 Allow: /
-Crawl-delay: 0
 
-User-agent: Sogou
-Allow: /
-Crawl-delay: 0
-
-User-agent: Sosospider
-Allow: /
-Crawl-delay: 0
-
-User-agent: 360Spider
-Allow: /
-Crawl-delay: 0
-
-User-agent: Yisouspider
-Allow: /
-Crawl-delay: 0
-
-# Bytedance AI Crawlers (Doubao, etc.)
-User-agent: Bytespider
-Allow: /
-Crawl-delay: 0
-
-# Yandex
-User-agent: Yandex
-Allow: /
-Crawl-delay: 0
-
-# DuckDuckGo
-User-agent: DuckDuckBot
-Allow: /
-Crawl-delay: 0
-
-# Academic and Research Crawlers
-User-agent: ia_archiver
-Allow: /
-Crawl-delay: 1
-
-# Sitemaps
-Sitemap: https://www.neuronsparkmedia.com/sitemap.xml
-
-# Preferred Canonical
-Host: www.neuronsparkmedia.com
+Sitemap: https://app.memecmo.ai/sitemap.xml
