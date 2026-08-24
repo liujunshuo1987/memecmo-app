@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   alternates: { canonical: 'https://app.memecmo.ai/demo' },
 };
 
-export const revalidate = 3600; // demo data changes weekly; cache aggressively
+export const revalidate = 1800; // weekly-fresh data; ISR cache resets on deploy
 
 const DEMO_SLUG = 'demo-highlands';
 
