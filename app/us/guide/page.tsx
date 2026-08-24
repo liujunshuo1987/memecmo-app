@@ -7,7 +7,7 @@ import type { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'MemeCMO US — User Guide · State-Aware GEO',
   description: 'How the state-aware GEO workspace works: state markets, product lines, the AI Mindset Index, regulatory grounding, and the compliance model.',
-  robots: { index: false, follow: false },
+  alternates: { canonical: 'https://us.memecmo.ai/guide' },
 };
 
 const WEIGHTS = [

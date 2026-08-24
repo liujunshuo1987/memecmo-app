@@ -1,5 +1,5 @@
-// Hidden concept-test page for the us.memecmo.ai sub-system.
-// State-aware GEO for the US market — pure English, unlinked, noindex.
+// us.memecmo.ai — the US product line: state-aware GEO, live.
+// Pure English by design (US market). Indexable — linked from the homepage nav.
 //
 // First-principles thesis: the US is the one market where STATE LAW changes
 // the correct answer. Attorney advertising, insurance, telehealth licensure,
@@ -14,10 +14,16 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'MemeCMO US — State-Aware GEO · Private Preview',
+  title: 'MemeCMO US — State-Aware GEO, Live in CA · TX · FL · NY',
   description:
-    'Generative Engine Optimization measured and built state by state — prompts, compliant answers and citations grounded in each state\'s law and market.',
-  robots: { index: false, follow: false },
+    'Generative Engine Optimization measured and built state by state: standard metrics and answer accuracy per AI engine, compliant answers grounded in each state\'s regulatory frame, weekly digests. Tier-1 states live now.',
+  alternates: { canonical: 'https://us.memecmo.ai/' },
+  openGraph: {
+    type: 'website',
+    url: 'https://us.memecmo.ai/',
+    title: 'MemeCMO US — State-Aware GEO, Live in CA · TX · FL · NY',
+    description: 'State law changes the correct answer. We measure and build GEO state by state — live for California, Texas, Florida and New York.',
+  },
 };
 
 const TIER1 = ['CA', 'TX', 'FL', 'NY'];
@@ -47,12 +53,12 @@ const PRINCIPLES = [
 ];
 
 const AGENTS = [
-  { name: 'State Prompt Discovery', body: '100+ buyer questions per state — high-intent (who/best/price/compare + state) and educational — mined from how each state actually searches.' },
-  { name: 'Compliance-Grounded Answers', body: 'Canonical answers written against your verified facts AND the state\'s regulatory frame — the answer we want AI to give in that state, safely.' },
-  { name: 'Per-State AI Mindset Index', body: 'The five-dimension visibility score measured state by state across ChatGPT, Gemini, Perplexity, Claude and the real Google AI Overview surface, localized to state metros.' },
-  { name: 'State Citation Index', body: 'Which domains AI actually cites for your category in each state — the build-here list for directories, PR and reviews.' },
-  { name: 'LocalBusiness Schema per State', body: 'Paste-in JSON-LD with state-scoped areaServed, licenses and NAP — machine-readable proof you operate there.' },
-  { name: 'State Gap → Content Engine', body: 'Every state-level gap becomes a publish-ready page: state landing pages, incentive explainers, licensure FAQs.' },
+  { name: 'State Prompt Discovery', body: '100+ buyer questions per state — high-intent (who / best / price / compare + state) vs educational — with 20 key prompts monitored on every scan, frozen for scan-to-scan comparability.' },
+  { name: 'Compliance-Grounded Answers', body: 'Canonical answers written against your verified facts AND the state\'s regulatory frame — live today for California, Texas, Florida and New York across legal, insurance, healthcare, home services, cannabis and solar.' },
+  { name: 'Standard Metrics per State', body: 'Presence, share of voice, citation rate, AI sentiment and top-of-mind rate — per engine, across ChatGPT, Gemini, Perplexity, Claude and the real Google AI Overview surface localized to your state.' },
+  { name: 'Answer Accuracy', body: 'Does AI give your customers the correct facts, licenses and contact details? Every answer to a key question is checked against your verified standard answers — wrong answers are flagged per engine, because they become support calls.' },
+  { name: 'State Citation Index', body: 'Which domains AI actually cites for your category in each state — the build-here list for directories, PR and reviews, plus paste-in LocalBusiness JSON-LD with state-scoped areaServed and licenses.' },
+  { name: 'State Gap → Content Engine', body: 'Every state-level gap becomes a publish-ready deliverable: state landing pages, incentive explainers, licensure FAQs, third-party placements — verified by you before it ships.' },
 ];
 
 const VERTICALS = [
@@ -75,7 +81,7 @@ export default function UsPreviewPage() {
         </span>
         <div className="flex items-center gap-3">
           <a href="/us/guide" className="text-xs px-2.5 py-1.5 rounded-lg border border-edge text-dim hover:text-ink transition">Guide</a>
-          <span className="text-[10px] px-2 py-0.5 rounded-full border border-gold/40 text-gold uppercase tracking-widest">Private preview</span>
+          <span className="text-[10px] px-2 py-0.5 rounded-full border border-gold/40 text-gold uppercase tracking-widest">Early access</span>
           <a href="https://app.memecmo.ai/login?next=/dashboard" className="text-xs px-3 py-1.5 rounded-lg bg-brand text-on-brand font-medium hover:brightness-110 transition">Sign in →</a>
         </div>
       </header>
@@ -83,7 +89,7 @@ export default function UsPreviewPage() {
       <main className="max-w-4xl mx-auto px-6 py-14 space-y-16">
         {/* Hero */}
         <section className="space-y-5">
-          <p className="text-xs tracking-[0.25em] uppercase text-faint">us.memecmo.ai · concept test</p>
+          <p className="text-xs tracking-[0.25em] uppercase text-faint">us.memecmo.ai · state-aware GEO · live</p>
           <h1 className="text-3xl sm:text-5xl font-bold leading-tight">
             Be the answer<br />
             <span className="text-brand">in every state.</span>
@@ -177,20 +183,23 @@ export default function UsPreviewPage() {
         <section className="rounded-xl border border-brand/40 bg-brand-soft/40 p-5 space-y-2">
           <h2 className="text-sm font-semibold text-ink">Architecture note</h2>
           <p className="text-[13px] text-dim leading-relaxed">
-            One project = one brand × one state. English-native pipeline end to end. The measurement
-            surface localizes Google AI Overview to state metros; the five-dimension index, frozen
-            competitor sets and monthly prompt refresh carry over unchanged. State regulatory frames
-            enter at the grounding layer — the same place brand facts do — so every content agent
-            writes inside the state’s rules by construction.
+            One project = one brand × one state, on the same production engine that runs our
+            Southeast Asia platform. Google AI Overview is measured on the real, state-localized
+            surface; frozen prompt panels and competitor sets keep scores comparable scan to scan.
+            State regulatory frames are live at the grounding layer for Tier-1 states — every
+            content agent writes inside the state's rules by construction, with counsel review
+            before publication. Scans run weekly on schedule; a stage-aware digest lands in your
+            inbox every Tuesday; credits cover on-demand scans.
           </p>
         </section>
 
         {/* CTA */}
         <section className="space-y-3">
-          <h2 className="text-lg font-semibold">Private preview</h2>
+          <h2 className="text-lg font-semibold">Early access</h2>
           <p className="text-[13px] text-dim max-w-xl">
-            us.memecmo.ai is in concept testing. If you run a brand in a regulated vertical and want
-            to see your state-by-state AI visibility, request access:
+            The US line is in early access — Tier-1 states are live and measuring today. If you run
+            a brand in a regulated vertical and want your state-by-state baseline, request access
+            and we'll run the first scan with you:
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <a
@@ -211,7 +220,7 @@ export default function UsPreviewPage() {
 
       <footer className="border-t border-edge px-6 py-6 text-center">
         <p className="text-[11px] text-faint">
-          © 2026 MemeCMO Tech Limited · Hong Kong CR No. 80218619 · Private concept page — not indexed, not linked.
+          © 2026 MemeCMO Tech Limited · Hong Kong CR No. 80218619 · State-aware GEO for the United States.
         </p>
       </footer>
     </div>

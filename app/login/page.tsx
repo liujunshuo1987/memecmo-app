@@ -27,7 +27,7 @@ function LoginPageContent() {
   // older links send ?redirect=.
   const redirect = searchParams.get('redirect') || searchParams.get('next') || '/dashboard';
   const callbackError = searchParams.get('error');
-  const { t } = useLanguage();
+  const { t, language, setLanguage } = useLanguage();
   const supabase = createClient();
 
   const handleEmailLogin = async (e: React.FormEvent) => {
@@ -67,6 +67,14 @@ function LoginPageContent() {
         transition={{ duration: 0.5 }}
         className="relative w-full max-w-md"
       >
+        <div className="flex justify-center gap-1 mb-5">
+          {([['en', 'EN'], ['zh-CN', '简中'], ['zh-TW', '繁中']] as const).map(([v, label]) => (
+            <button key={v} type="button" onClick={() => setLanguage(v)}
+              className={`text-[11px] px-2.5 py-1 rounded-md border transition ${language === v ? 'border-brand/60 bg-brand-soft text-brand font-semibold' : 'border-edge text-faint hover:text-ink'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
         <div className="text-center mb-8">
           <Link href="https://memecmo.ai" className="inline-block mb-6">
             <span className="inline-flex justify-center"><MemeCMOLogo height={36} showWordmark /></span>
