@@ -39,6 +39,12 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="theme-day min-h-screen bg-canvas flex items-center justify-center px-4">
+      <a
+        href="https://memecmo.ai"
+        className="fixed top-5 left-6 z-20 inline-flex items-center gap-1.5 text-[13px] text-faint hover:text-ink transition"
+      >
+        ← memecmo.ai
+      </a>
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-1/3 left-1/3 w-96 h-96 bg-brand-soft rounded-full blur-3xl" />
       </div>
