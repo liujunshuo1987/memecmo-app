@@ -193,7 +193,7 @@ const T: Record<Lang, any> = {
       ['Left · Deliverables', '10 agents grouped Setup / Measure / Act, each showing its latest run. The intent box at the bottom steers Full Scan (e.g. “focus on F&B buyers”) — it changes what Discovery asks.'],
       ['Center · Stage', 'The selected deliverable in full; live phase progress and process log while running, converging to result modules on completion.'],
       ['Right · Context', 'AIGVR trend (Δ vs last), presence, brand rank, high-intent gaps, AI-cited sources, deliverables-ready checklist.'],
-      ['Top bar', 'Reading language (original/中文/EN) · UI language (中/EN/VN) · day/night theme · back to dashboard.'],
+      ['Top bar', 'Reading language (original/中文/EN) · UI language (中/EN/VN) · back to dashboard.'],
     ],
     agentCols: ['Agent', 'What it does', 'Needs', 'Duration'],
     agentDesc: {
@@ -443,20 +443,12 @@ function Rows({ rows }: { rows: [string, string][] }) {
 
 export default function GuideContent() {
   const [lang, setLang] = useState<Lang>('zh');
-  const [theme, setTheme] = useState<'night' | 'day'>('night');
-
   useEffect(() => {
     try {
       const l = localStorage.getItem('memecmo-uilang');
       if (l === 'zh' || l === 'en' || l === 'vi') setLang(l);
-      setTheme(localStorage.getItem('memecmo-theme') === 'day' ? 'day' : 'night');
     } catch { /* ignore */ }
   }, []);
-  useEffect(() => {
-    document.documentElement.classList.remove('theme-night', 'theme-day');
-    document.documentElement.classList.add(theme === 'day' ? 'theme-day' : 'theme-night');
-  }, [theme]);
-
   const t = T[lang];
   const changeLang = (l: Lang) => { setLang(l); try { localStorage.setItem('memecmo-uilang', l); } catch { /* ignore */ } };
 

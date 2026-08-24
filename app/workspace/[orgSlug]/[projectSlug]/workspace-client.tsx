@@ -284,7 +284,6 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
   UI_LANG = uiLang; // module-level so nested renderers can call t()
   SCORE_LABEL = ((organization.metadata as any)?.scoreLabel as string) || 'AI Mindset Index';
   SCORE_DISPLAY = ((organization.metadata as any)?.scoreDisplay === 'enterprise' ? 'enterprise' : 'simple');
-  const [theme, setTheme] = useState<'night' | 'day'>(demoMode ? 'day' : 'night');
   // Credit wallet — shown AND spendable at the point of spend. Root
   // (operator) org has no credit concept; everyone else gets balance + top-up.
   const [credits, setCredits] = useState<{ granted: number; purchased: number; total: number } | null>(null);
@@ -318,25 +317,9 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
     } catch (e) { setWalletError(e instanceof Error ? e.message : String(e)); setWalletBusy(null); }
   };
   useEffect(() => {
-    try { if (!demoMode) setTheme(localStorage.getItem('memecmo-theme') === 'day' ? 'day' : 'night'); } catch { /* ignore */ }
-    if (demoMode) {
-      // Theme class lives on <html> (layout defaults to night) — force day for
-      // the public demo so it matches the marketing funnel.
-      const el = document.documentElement;
-      el.classList.remove('theme-night', 'theme-day');
-      el.classList.add('theme-day');
-    }
     try { const l = localStorage.getItem('memecmo-uilang'); if (l === 'zh' || l === 'vi' || l === 'en') setUiLang(l); } catch { /* ignore */ }
   }, []);
   const changeUiLang = (l: UiLang) => { setUiLang(l); try { localStorage.setItem('memecmo-uilang', l); } catch { /* ignore */ } };
-  const toggleTheme = () => {
-    const next = theme === 'night' ? 'day' : 'night';
-    setTheme(next);
-    try { localStorage.setItem('memecmo-theme', next); } catch { /* ignore */ }
-    const el = document.documentElement;
-    el.classList.remove('theme-night', 'theme-day');
-    el.classList.add('theme-' + next);
-  };
   // Sandbox version stacks survive navigation within the session (keyed by runId).
   const [sandboxVersions, setSandboxVersions] = useState<Record<string, { label: string; content: string }[]>>({});
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
@@ -575,9 +558,6 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
           <a href="/guide" className="text-[11px] px-2 py-1 rounded-md border border-edge text-dim hover:text-ink transition whitespace-nowrap">
             {t('Guide')}
           </a>
-          <button onClick={toggleTheme} aria-label="toggle theme" className="p-1.5 rounded-md border border-edge text-dim hover:text-ink transition">
-            <Icon name={theme === 'night' ? 'sun' : 'moon'} size={15} />
-          </button>
           <div className="flex items-center rounded-md border border-edge overflow-hidden text-[11px]">
             {([['en', 'EN'], ['zh', '中文'], ['vi', 'VN']] as const).map(([v, label]) => (
               <button

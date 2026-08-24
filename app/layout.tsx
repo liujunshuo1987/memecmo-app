@@ -45,15 +45,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} h-full antialiased theme-night`}>
+    <html lang="en" className={`${inter.variable} h-full antialiased theme-day`}>
       <head>
         {/* Apply persisted theme before paint to avoid a flash. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html:
-              "try{var t=localStorage.getItem('memecmo-theme')||'night';document.documentElement.classList.remove('theme-night','theme-day');document.documentElement.classList.add('theme-'+t);}catch(e){}",
-          }}
-        />
       </head>
       <body className="min-h-full flex flex-col bg-canvas text-ink">
         <LanguageProvider>

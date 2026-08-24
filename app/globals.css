@@ -53,15 +53,10 @@
   --color-neon-red: #ff4455;
 }
 
-/* ── MemeCMO "Atelier" warm theme — night + day, one-click switch ──────── */
-.theme-night {
-  --canvas: #1B1416; --surface: #251C1F; --raised: #2E2327;
-  --edge: rgba(243,231,225,0.10); --edge-strong: rgba(243,231,225,0.20);
-  --ink: #F3E7E1; --dim: #B6A39C; --faint: #8A7A7E;
-  --brand: #E59CA6; --on-brand: #3A1E22; --brand-soft: rgba(229,156,166,0.13);
-  --gold: #E3BC7E; --sage: #9DC3A6; --garnet: #E08594;
-}
-.theme-day {
+/* ── MemeCMO "Atelier" theme — ONE visual language (day). Night retired
+   2026-08: tokens live on :root so every page inherits them with no theme
+   class; .theme-day/.theme-night remain as inert aliases for old markup. ── */
+:root, .theme-day, .theme-night {
   --canvas: #FBF7F4; --surface: #FFFFFF; --raised: #F4ECE6;
   --edge: rgba(58,30,34,0.12); --edge-strong: rgba(58,30,34,0.22);
   --ink: #2A2024; --dim: #6E625F; --faint: #9C8E8A;
