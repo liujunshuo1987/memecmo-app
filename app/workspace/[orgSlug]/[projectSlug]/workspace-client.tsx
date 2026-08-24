@@ -21,6 +21,8 @@ interface Props {
   scanHistory: ScanPoint[];
   isOperator?: boolean;
   canDispatch?: boolean;
+  // Public read-only demo: anonymous visitors, no authed API calls, sign-up CTA.
+  demoMode?: boolean;
 }
 
 // Extract a trend point from a monitor / full_scan run's output (mirrors getScanHistory).
@@ -263,7 +265,8 @@ function creditFullScan(m: Record<string, LatestRun>): Record<string, LatestRun>
   return m;
 }
 
-export default function WorkspaceClient({ project, organization, initialRuns, scanHistory, isOperator = false, canDispatch = true }: Props) {
+export default function WorkspaceClient({ project, organization, initialRuns, scanHistory, isOperator = false, canDispatch = true, demoMode = false }: Props) {
+  if (demoMode) canDispatch = false;
   const [history, setHistory] = useState<ScanPoint[]>(scanHistory);
   const [setsOpen, setSetsOpen] = useState(false);
   const [runsByAgent, setRunsByAgent] = useState<Record<string, LatestRun>>(() => {
@@ -480,7 +483,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
     // Synthesized (full-scan-credited) deliverables render from local output —
     // no run refetch, no risk of dispatching anything.
     const entry = agentId ? runsByAgent[agentId] : undefined;
-    if (entry?.local) {
+    if (entry && (entry.local || demoMode)) {
       freshRunRef.current = false;
       maxPctRef.current = 100;
       setActivity([]);
@@ -556,12 +559,12 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
               ◈ {credits.total} credits
             </button>
           )}
-          <button
+          {!demoMode && <button
             onClick={() => setSetsOpen(true)}
             className="text-[11px] px-2 py-1 rounded-md border border-edge text-dim hover:text-ink transition whitespace-nowrap"
           >
             {t('Sets')}
-          </button>
+          </button>}
           <a href="/guide" className="text-[11px] px-2 py-1 rounded-md border border-edge text-dim hover:text-ink transition whitespace-nowrap">
             {t('Guide')}
           </a>
@@ -630,6 +633,15 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
       )}
       {setsOpen && <SetsEditorModal projectId={project.id} onClose={() => setSetsOpen(false)} />}
 
+      {demoMode && (
+        <div className="border-b border-gold/40 bg-gold/10 px-4 py-2.5 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-center">
+          <span className="text-[12px] text-ink"><span className="font-semibold text-gold">LIVE DEMO</span> · {project.brand_name} — real scans on the production engine, refreshed weekly · read-only</span>
+          <span className="flex gap-2">
+            <a href="https://memecmo.ai/#contact" className="text-[11px] px-3 py-1 rounded-md bg-brand text-on-brand font-semibold hover:brightness-110 transition">Get access for your brand →</a>
+            <a href="/login" className="text-[11px] px-3 py-1 rounded-md border border-edge text-dim hover:text-ink transition">Sign in</a>
+          </span>
+        </div>
+      )}
       {/* Three-zone shell: nav rail | stage | context */}
       <div className="wz-shell flex-1 grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)_300px] min-h-0">
         {/* LEFT — deliverables nav */}
@@ -764,7 +776,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
                   <RunResult
                     agentId={runStatus.agentId}
                     output={runStatus.output}
-                    projectId={project.id}
+                    projectId={demoMode ? undefined : project.id}
                     runId={activeRunId ?? undefined}
                     versions={activeRunId ? sandboxVersions[activeRunId] : undefined}
                     onVersions={(v) => { if (activeRunId) setSandboxVersions((m) => ({ ...m, [activeRunId]: v })); }}
