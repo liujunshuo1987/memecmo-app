@@ -19,7 +19,8 @@ export const metadata: Metadata = {
   applicationName: "MemeCMO.ai",
   authors: [{ name: "MemeCMO.ai", url: "https://memecmo.ai" }],
   icons: {
-    icon: "/logo.svg",
+    icon: [{ url: "/favicon.svg?v=2", type: "image/svg+xml" }, { url: "/favicon.ico?v=2", sizes: "48x48" }],
+    shortcut: "/favicon.ico?v=2",
   },
   openGraph: {
     type: "website",
