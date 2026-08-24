@@ -7,7 +7,7 @@ interface MemeCMOLogoProps {
 }
 
 /**
- * MemeCMO brand mark — purple gradient "M" badge.
+ * MemeCMO brand mark — the rose bubble-M (matches favicon + marketing site).
  * Matches the static marketing site (memecmo.ai) so the cross-domain hand-off
  * (memecmo.ai → app.memecmo.ai) feels continuous.
  *
@@ -19,20 +19,17 @@ export default function MemeCMOLogo({
   showWordmark = false,
 }: MemeCMOLogoProps) {
   const badge = (
-    <div
+    <svg
       aria-label="MemeCMO.ai"
-      className={`inline-flex items-center justify-center rounded-[22%] text-ink font-extrabold ${className}`}
-      style={{
-        width: height,
-        height,
-        fontSize: Math.round(height * 0.5),
-        background: 'linear-gradient(135deg, #c850c0, #4158d0)',
-        boxShadow: '0 4px 14px rgba(99, 102, 241, 0.18)',
-        lineHeight: 1,
-      }}
+      className={className}
+      width={height}
+      height={height}
+      viewBox="0 0 64 64"
+      xmlns="http://www.w3.org/2000/svg"
     >
-      M
-    </div>
+      <path d="M14 12 h36 a6 6 0 0 1 6 6 v20 a6 6 0 0 1 -6 6 h-24 l-10 9 v-9 h-2 a6 6 0 0 1 -6 -6 v-20 a6 6 0 0 1 6 -6 z" fill="#C76B7A" />
+      <path d="M22 38 V20 l10 11 10-11 v18" fill="none" stroke="#FFFFFF" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 
   if (!showWordmark) return badge;

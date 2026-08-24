@@ -38,9 +38,9 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0F172A] flex items-center justify-center px-4">
+    <div className="theme-day min-h-screen bg-canvas flex items-center justify-center px-4">
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-1/3 left-1/3 w-96 h-96 bg-[#1D4ED8]/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/3 left-1/3 w-96 h-96 bg-brand-soft rounded-full blur-3xl" />
       </div>
 
       <motion.div
@@ -53,28 +53,28 @@ export default function ResetPasswordPage() {
           <Link href="/" className="inline-block mb-6">
             <span className="inline-flex justify-center"><MemeCMOLogo height={36} showWordmark /></span>
           </Link>
-          <h1 className="text-2xl font-bold text-[#F8FAFC] mb-2">
+          <h1 className="text-2xl font-bold text-ink mb-2">
             {t('auth.resetTitle')}
           </h1>
-          <p className="text-[#94A3B8] text-sm">
+          <p className="text-dim text-sm">
             {t('auth.resetSubtitle')}
           </p>
         </div>
 
-        <div className="bg-[#1E293B]/80 backdrop-blur-xl border border-[#334155] rounded-2xl p-8">
+        <div className="bg-surface border border-edge rounded-2xl p-8">
           {success ? (
             <div className="text-center">
               <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
                 <CheckCircle className="w-8 h-8 text-emerald-400" />
               </div>
-              <h2 className="text-lg font-semibold text-[#F8FAFC] mb-2">
+              <h2 className="text-lg font-semibold text-ink mb-2">
                 {t('auth.resetEmailSent')}
               </h2>
-              <p className="text-[#94A3B8] text-sm mb-6">
+              <p className="text-dim text-sm mb-6">
                 {t('auth.resetEmailSentDesc')}
               </p>
               <Link href="/login">
-                <Button className="w-full bg-gradient-to-r from-[#1D4ED8] to-[#1E40AF] text-[#F8FAFC] rounded-xl">
+                <Button className="w-full bg-brand hover:brightness-110 text-on-brand rounded-xl">
                   {t('auth.backToLogin')}
                 </Button>
               </Link>
@@ -94,18 +94,18 @@ export default function ResetPasswordPage() {
 
               <form onSubmit={handleReset} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-[#94A3B8] mb-1.5">
+                  <label className="block text-sm font-medium text-dim mb-1.5">
                     {t('auth.email')}
                   </label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]" />
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-faint" />
                     <Input
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="you@example.com"
                       required
-                      className="pl-10 bg-[#0F172A] border-[#334155] text-[#F8FAFC] placeholder:text-[#475569] focus:border-[#1D4ED8] focus:ring-[#1D4ED8]/20"
+                      className="pl-10 bg-canvas border-edge text-ink placeholder:text-faint focus:border-brand/50 focus:ring-brand/30"
                     />
                   </div>
                 </div>
@@ -113,7 +113,7 @@ export default function ResetPasswordPage() {
                 <Button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-gradient-to-r from-[#1D4ED8] to-[#1E40AF] hover:from-[#1E40AF] hover:to-[#1D4ED8] text-[#F8FAFC] font-semibold py-3 rounded-xl transition-all duration-300"
+                  className="w-full bg-brand hover:brightness-110 text-on-brand font-semibold py-3 rounded-xl transition-all duration-300"
                 >
                   {loading ? t('auth.sending') : t('auth.sendResetLink')}
                 </Button>
@@ -124,7 +124,7 @@ export default function ResetPasswordPage() {
 
         <Link
           href="/login"
-          className="flex items-center justify-center gap-2 text-sm text-[#64748B] hover:text-[#94A3B8] mt-6 transition-colors"
+          className="flex items-center justify-center gap-2 text-sm text-faint hover:text-ink mt-6 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           {t('auth.backToLogin')}

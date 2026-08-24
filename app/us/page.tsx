@@ -66,9 +66,13 @@ const VERTICALS = [
 
 export default function UsPreviewPage() {
   return (
-    <div className="min-h-screen bg-canvas text-ink">
+    <div className="theme-day min-h-screen bg-canvas text-ink">
       <header className="border-b border-edge px-6 py-3 flex items-center justify-between">
-        <span className="text-xs tracking-[0.2em] uppercase text-dim">MemeCMO · US</span>
+        <span className="flex items-center gap-2.5">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/favicon.svg?v=2" alt="MemeCMO" className="w-6 h-6" />
+          <span className="text-xs tracking-[0.2em] uppercase text-dim">MemeCMO · US</span>
+        </span>
         <div className="flex items-center gap-3">
           <a href="/us/guide" className="text-xs px-2.5 py-1.5 rounded-lg border border-edge text-dim hover:text-ink transition">Guide</a>
           <span className="text-[10px] px-2 py-0.5 rounded-full border border-gold/40 text-gold uppercase tracking-widest">Private preview</span>

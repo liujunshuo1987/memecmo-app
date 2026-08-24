@@ -86,7 +86,7 @@ const SECTIONS: { id: string; title: string; rows?: [string, string][]; body?: s
 
 export default function UsGuidePage() {
   return (
-    <div className="min-h-screen bg-canvas text-ink">
+    <div className="theme-day min-h-screen bg-canvas text-ink">
       <header className="border-b border-edge px-6 py-3 flex items-center justify-between">
         <a href="/us" className="text-xs tracking-[0.2em] uppercase text-dim hover:text-ink">MemeCMO · US</a>
         <div className="flex items-center gap-3">
