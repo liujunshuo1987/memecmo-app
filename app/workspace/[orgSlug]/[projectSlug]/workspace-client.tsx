@@ -319,6 +319,13 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
   };
   useEffect(() => {
     try { if (!demoMode) setTheme(localStorage.getItem('memecmo-theme') === 'day' ? 'day' : 'night'); } catch { /* ignore */ }
+    if (demoMode) {
+      // Theme class lives on <html> (layout defaults to night) — force day for
+      // the public demo so it matches the marketing funnel.
+      const el = document.documentElement;
+      el.classList.remove('theme-night', 'theme-day');
+      el.classList.add('theme-day');
+    }
     try { const l = localStorage.getItem('memecmo-uilang'); if (l === 'zh' || l === 'vi' || l === 'en') setUiLang(l); } catch { /* ignore */ }
   }, []);
   const changeUiLang = (l: UiLang) => { setUiLang(l); try { localStorage.setItem('memecmo-uilang', l); } catch { /* ignore */ } };
