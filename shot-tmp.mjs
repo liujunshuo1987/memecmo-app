@@ -1,0 +1,11 @@
+import puppeteer from 'puppeteer-core';
+const [,, htmlPath, outPath, w, h] = process.argv;
+const browser = await puppeteer.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', args: ['--no-sandbox', '--no-proxy-server'], headless: 'new' });
+const page = await browser.newPage();
+await page.setViewport({ width: +w || 1440, height: +h || 3400, deviceScaleFactor: 1 });
+await page.goto('file://' + htmlPath, { waitUntil: 'networkidle0', timeout: 45000 });
+await page.evaluate(() => document.querySelectorAll('.reveal').forEach(el => el.classList.add('visible')));
+await new Promise((r) => setTimeout(r, 800));
+await page.screenshot({ path: outPath, fullPage: true });
+await browser.close();
+console.log('shot:', outPath);

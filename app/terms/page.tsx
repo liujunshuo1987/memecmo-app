@@ -129,11 +129,11 @@ export default function TermsOfServicePage() {
               {t('terms.contact.body')}
             </p>
             <a
-              href="mailto:liujunshuo1987@gmail.com"
+              href="mailto:samchan@memecmo.ai"
               className="inline-flex items-center gap-2 text-sm text-brand hover:text-brand transition-colors duration-200"
             >
               <Mail className="w-4 h-4" />
-              liujunshuo1987@gmail.com
+              samchan@memecmo.ai
             </a>
           </motion.div>
         </div>

@@ -57,7 +57,7 @@ export default function PricingPage() {
     if (plan.plan_type === 'free') return;
 
     if (plan.plan_type === 'enterprise' && !plan.stripe_price_id) {
-      window.location.href = 'mailto:liujunshuo1987@gmail.com?subject=Enterprise Plan Inquiry';
+      window.location.href = 'mailto:samchan@memecmo.ai?subject=Enterprise Plan Inquiry';
       return;
     }
 

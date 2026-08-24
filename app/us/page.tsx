@@ -196,7 +196,7 @@ export default function UsPreviewPage() {
               Enter the workspace →
             </a>
             <a
-              href="mailto:liujunshuo1987@gmail.com?subject=MemeCMO%20US%20preview%20access"
+              href="mailto:samchan@memecmo.ai?subject=MemeCMO%20US%20preview%20access"
               className="text-sm text-dim underline underline-offset-2 hover:text-ink transition"
             >
               or email us for access
