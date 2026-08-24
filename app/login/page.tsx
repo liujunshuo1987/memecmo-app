@@ -212,7 +212,7 @@ function LoginPageContent() {
               href="/waitlist"
               className="text-brand hover:text-brand font-medium transition-colors"
             >
-              加入等待列表 →
+              {language === 'en' ? 'Join the waitlist →' : language === 'zh-CN' ? '加入等待列表 →' : '加入等待列表 →'}
             </Link>
           )}
         </p>
