@@ -284,7 +284,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
   UI_LANG = uiLang; // module-level so nested renderers can call t()
   SCORE_LABEL = ((organization.metadata as any)?.scoreLabel as string) || 'AI Mindset Index';
   SCORE_DISPLAY = ((organization.metadata as any)?.scoreDisplay === 'enterprise' ? 'enterprise' : 'simple');
-  const [theme, setTheme] = useState<'night' | 'day'>('night');
+  const [theme, setTheme] = useState<'night' | 'day'>(demoMode ? 'day' : 'night');
   // Credit wallet — shown AND spendable at the point of spend. Root
   // (operator) org has no credit concept; everyone else gets balance + top-up.
   const [credits, setCredits] = useState<{ granted: number; purchased: number; total: number } | null>(null);
@@ -318,7 +318,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
     } catch (e) { setWalletError(e instanceof Error ? e.message : String(e)); setWalletBusy(null); }
   };
   useEffect(() => {
-    try { setTheme(localStorage.getItem('memecmo-theme') === 'day' ? 'day' : 'night'); } catch { /* ignore */ }
+    try { if (!demoMode) setTheme(localStorage.getItem('memecmo-theme') === 'day' ? 'day' : 'night'); } catch { /* ignore */ }
     try { const l = localStorage.getItem('memecmo-uilang'); if (l === 'zh' || l === 'vi' || l === 'en') setUiLang(l); } catch { /* ignore */ }
   }, []);
   const changeUiLang = (l: UiLang) => { setUiLang(l); try { localStorage.setItem('memecmo-uilang', l); } catch { /* ignore */ } };
