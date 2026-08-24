@@ -787,7 +787,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
                     runId={activeRunId ?? undefined}
                     versions={activeRunId ? sandboxVersions[activeRunId] : undefined}
                     onVersions={(v) => { if (activeRunId) setSandboxVersions((m) => ({ ...m, [activeRunId]: v })); }}
-                    onDispatch={dispatchAgent}
+                    onDispatch={demoMode ? undefined : dispatchAgent}
                     loop={{ runsByAgent, currentScore: headlineAigvr }}
                   />
                   <details className="print-hide rounded border border-edge bg-surface">
