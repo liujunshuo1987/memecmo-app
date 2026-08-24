@@ -757,7 +757,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
                       ⤓ {t('Export PDF')}
                     </button>
                   )}
-                  {isTerminal && runStatus.agentId && (
+                  {isTerminal && runStatus.agentId && canDispatch && (
                     <button
                       onClick={() => dispatchAgent(runStatus.agentId!)}
                       disabled={sending}
