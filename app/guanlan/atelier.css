@@ -32,6 +32,13 @@
 
   font-family: var(--gl-sans);
   font-weight: 300;
+
+  /* The app's <body> paints MemeCMO's canvas colour under every route. This
+     page must cover it, or the wrong brand shows through on overscroll and
+     anywhere the content is shorter than the viewport. */
+  background: var(--gl-cream);
+  min-height: 100%;
+  flex: 1;
 }
 
 .gl-scope .gl-cream { background: var(--gl-cream); color: var(--gl-ink); }
