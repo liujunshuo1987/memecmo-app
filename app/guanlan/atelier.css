@@ -1,0 +1,116 @@
+/**
+ * 觀瀾智庫 "Atelier" visual language, ported for the /guanlan route only.
+ *
+ * This page is served at geo.neuronsparkmedia.com — a neuronsparkmedia.com
+ * subdomain, branded 觀瀾智庫 — but it renders out of the MemeCMO app, so it
+ * inherited MemeCMO's tokens (bg-canvas / text-ink / border-edge) and read as
+ * a different company's product. The tokens below are the ones the 觀瀾智庫
+ * homepage actually compiles to; keeping them byte-identical is the point,
+ * because the two surfaces have to look like one company.
+ *
+ * Everything is scoped under .gl-scope so MemeCMO's own theme is untouched.
+ * Source of truth: guanlan/app/globals.css — change both together.
+ */
+
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=Noto+Serif+SC:wght@400;600;900&family=JetBrains+Mono:wght@400;500&display=swap");
+
+.gl-scope {
+  --gl-blue: #001dcc;
+  --gl-cream: #f9f2de;
+  --gl-ink: #101418;
+  --gl-vermilion: #e4482b;
+  --gl-orange: #ff6a3d;
+  --gl-night: #05081c;
+  --gl-night-2: #0a0f2e;
+  --gl-periwinkle: #7c9bff;
+
+  --gl-serif: "Noto Serif SC", Georgia, serif;
+  --gl-sans: "Noto Sans SC", system-ui, -apple-system, sans-serif;
+  --gl-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --gl-max: 1240px;
+
+  font-family: var(--gl-sans);
+  font-weight: 300;
+}
+
+.gl-scope .gl-cream { background: var(--gl-cream); color: var(--gl-ink); }
+.gl-scope .gl-night { background: var(--gl-night); color: #fff; }
+
+.gl-scope .gl-display {
+  font-family: var(--gl-serif);
+  font-weight: 900;
+  line-height: 1.26;
+  letter-spacing: -0.01em;
+  text-wrap: pretty;
+}
+
+.gl-scope .gl-label {
+  font-family: var(--gl-mono);
+  font-weight: 500;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  line-height: 1.6;
+}
+
+.gl-scope .gl-mono {
+  font-family: var(--gl-mono);
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+/* Registration ticks — the corner marks from the print register */
+.gl-scope .gl-ticks { position: relative; }
+.gl-scope .gl-ticks::before,
+.gl-scope .gl-ticks::after,
+.gl-scope .gl-ticks > .gl-ticks-b::before,
+.gl-scope .gl-ticks > .gl-ticks-b::after {
+  content: "+";
+  position: absolute;
+  font: 10px/1 var(--gl-mono);
+  color: var(--gl-blue);
+  pointer-events: none;
+}
+.gl-scope .gl-ticks::before { left: -5px; top: -5px; }
+.gl-scope .gl-ticks::after { right: -5px; top: -5px; }
+.gl-scope .gl-ticks > .gl-ticks-b::before { left: -5px; bottom: -5px; }
+.gl-scope .gl-ticks > .gl-ticks-b::after { right: -5px; bottom: -5px; }
+.gl-scope .gl-night .gl-ticks::before,
+.gl-scope .gl-night .gl-ticks::after,
+.gl-scope .gl-night .gl-ticks > .gl-ticks-b::before,
+.gl-scope .gl-night .gl-ticks > .gl-ticks-b::after {
+  color: var(--gl-periwinkle);
+}
+
+.gl-scope .gl-halftone {
+  background-image: radial-gradient(var(--gl-blue) 1px, transparent 1.1px);
+  background-size: 11px 11px;
+  opacity: 0.055;
+}
+
+.gl-scope .gl-grid-night {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+.gl-scope .gl-bridge {
+  height: 120px;
+  background: linear-gradient(180deg, var(--gl-cream) 0%, var(--gl-night-2) 78%, var(--gl-night) 100%);
+}
+
+.gl-scope .gl-card-light {
+  border: 1px solid rgba(0, 29, 204, 0.28);
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.gl-scope .gl-card-night {
+  border: 1px solid rgba(124, 155, 255, 0.22);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+/* Hairline rule used as a section divider in both grounds */
+.gl-scope .gl-rule { border: 0; border-top: 1px solid rgba(0, 29, 204, 0.22); }
+.gl-scope .gl-night .gl-rule { border-top-color: rgba(124, 155, 255, 0.16); }
