@@ -59,15 +59,22 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Region fence: US states and SEA countries are separate product lines. A
-  // non-root org is locked to its region (metadata.region === 'us' → US line,
-  // default → SEA) — enforced here, not just hidden in the picker UI.
+  // Region fence: SEA countries, US states and the Traditional-Chinese line
+  // (Hong Kong / Taiwan, 觀瀾智庫 white-label channel) are separate product
+  // lines. A non-root org is locked to its region (metadata.region: 'us' |
+  // 'hant' | default SEA) — enforced here, not just hidden in the picker UI.
   if (org.type !== 'root') {
-    const isUsMarket = /,\s*US$/i.test(body.targetCountry);
-    const isUsOrg = (org.metadata as any)?.region === 'us';
-    if (isUsMarket !== isUsOrg) {
+    const marketRegion = /,\s*US$/i.test(body.targetCountry)
+      ? 'us'
+      : body.targetCountry === 'Hong Kong' || body.targetCountry === 'Taiwan'
+        ? 'hant'
+        : 'sea';
+    const r = (org.metadata as any)?.region;
+    const orgRegion = r === 'us' || r === 'hant' ? r : 'sea';
+    if (marketRegion !== orgRegion) {
+      const label = { us: 'US', hant: 'Hong Kong & Taiwan', sea: 'Southeast Asia' }[orgRegion];
       return NextResponse.json(
-        { error: `This organization is on the ${isUsOrg ? 'US' : 'Southeast Asia'} line — market "${body.targetCountry}" is outside it.` },
+        { error: `This organization is on the ${label} line — market "${body.targetCountry}" is outside it.` },
         { status: 403 },
       );
     }

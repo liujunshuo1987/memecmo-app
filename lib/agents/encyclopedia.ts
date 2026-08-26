@@ -30,11 +30,11 @@ interface EncyclopediaInput {
 
 const LANGUAGE_NAMES: Record<string, string> = {
   vi: 'Vietnamese', th: 'Thai', fil: 'Filipino (Tagalog)', tl: 'Filipino (Tagalog)',
-  ms: 'Malay', id: 'Indonesian', zh: 'Chinese (Simplified)', en: 'English',
+  ms: 'Malay', id: 'Indonesian', zh: 'Chinese (Simplified)', 'zh-tw': 'Chinese (Traditional)', 'zh-hk': 'Chinese (Traditional)', en: 'English',
 };
 const WIKI_BY_LANG: Record<string, string> = {
   vi: 'vi.wikipedia.org', th: 'th.wikipedia.org', fil: 'tl.wikipedia.org', tl: 'tl.wikipedia.org',
-  ms: 'ms.wikipedia.org', id: 'id.wikipedia.org', zh: 'zh.wikipedia.org', en: 'en.wikipedia.org',
+  ms: 'ms.wikipedia.org', id: 'id.wikipedia.org', zh: 'zh.wikipedia.org', 'zh-tw': 'zh.wikipedia.org', 'zh-hk': 'zh.wikipedia.org', en: 'en.wikipedia.org',
 };
 
 interface EncyclopediaJson {

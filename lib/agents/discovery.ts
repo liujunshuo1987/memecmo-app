@@ -38,7 +38,7 @@ const LANGUAGE_NAMES: Record<string, string> = {
   tl: 'Filipino (Tagalog)',
   ms: 'Malay',
   id: 'Indonesian',
-  zh: 'Chinese (Simplified)',
+  zh: 'Chinese (Simplified)', 'zh-tw': 'Chinese (Traditional)', 'zh-hk': 'Chinese (Traditional)',
   en: 'English',
 };
 

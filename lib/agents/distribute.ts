@@ -31,7 +31,7 @@ interface DistributeInput {
 
 const LANGUAGE_NAMES: Record<string, string> = {
   vi: 'Vietnamese', th: 'Thai', fil: 'Filipino (Tagalog)', tl: 'Filipino (Tagalog)',
-  ms: 'Malay', id: 'Indonesian', zh: 'Chinese (Simplified)', en: 'English',
+  ms: 'Malay', id: 'Indonesian', zh: 'Chinese (Simplified)', 'zh-tw': 'Chinese (Traditional)', 'zh-hk': 'Chinese (Traditional)', en: 'English',
 };
 
 interface Target {

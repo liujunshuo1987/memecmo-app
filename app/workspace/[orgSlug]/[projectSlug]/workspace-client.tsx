@@ -63,6 +63,8 @@ const COUNTRY_FLAG: Record<string, string> = {
   Philippines: '🇵🇭',
   Singapore: '🇸🇬',
   Malaysia: '🇲🇾',
+  'Hong Kong': '🇭🇰',
+  Taiwan: '🇹🇼',
 };
 
 // ── UI i18n (chrome only — static, instant) ──────────────────────────────────
@@ -525,7 +527,10 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
       {/* Top bar */}
       <header className="print-hide border-b border-edge px-6 py-3 flex items-center justify-between bg-canvas/95 backdrop-blur z-10 shrink-0">
         <div className="flex items-center gap-3 min-w-0">
-          <a href="/dashboard" className="text-xs tracking-[0.2em] text-faint uppercase hover:text-dim">MemeCMO.ai</a>
+          {/* White-label: channel orgs can brand the platform (e.g. 觀瀾智庫 GEO 平台). */}
+          <a href="/dashboard" className="text-xs tracking-[0.2em] text-faint uppercase hover:text-dim">
+            {(organization.metadata as any)?.branding?.platformName ?? 'MemeCMO.ai'}
+          </a>
           <span className="text-faint">/</span>
           <a href="/dashboard" className="text-xs text-dim hover:text-ink">{organization.name}</a>
           <span className="text-faint">/</span>

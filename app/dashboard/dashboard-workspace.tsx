@@ -58,11 +58,17 @@ const US_MARKETS = [
   { name: 'Florida, US', lang: 'en', flag: '🇺🇸' },
   { name: 'New York, US', lang: 'en', flag: '🇺🇸' },
 ];
-const COUNTRIES = [...SEA_MARKETS, ...US_MARKETS];
+// Traditional-Chinese line (觀瀾智庫 white-label channel — geo.neuronsparkmedia.com)
+const HANT_MARKETS = [
+  { name: 'Hong Kong', lang: 'zh-TW', flag: '🇭🇰' },
+  { name: 'Taiwan', lang: 'zh-TW', flag: '🇹🇼' },
+];
+const COUNTRIES = [...SEA_MARKETS, ...US_MARKETS, ...HANT_MARKETS];
 
-function orgRegions(org: Organization): { sea: boolean; us: boolean } {
-  if (org.type === 'root') return { sea: true, us: true };
-  return (org.metadata as any)?.region === 'us' ? { sea: false, us: true } : { sea: true, us: false };
+function orgRegions(org: Organization): { sea: boolean; us: boolean; hant: boolean } {
+  if (org.type === 'root') return { sea: true, us: true, hant: true };
+  const r = (org.metadata as any)?.region;
+  return { sea: r !== 'us' && r !== 'hant', us: r === 'us', hant: r === 'hant' };
 }
 const FLAG: Record<string, string> = Object.fromEntries(COUNTRIES.map((c) => [c.name, c.flag]));
 
@@ -582,7 +588,7 @@ function NewProjectModal({
   const regions = orgRegions(org);
   const [brandName, setBrandName] = useState('');
   const [brandUrl, setBrandUrl] = useState('');
-  const [country, setCountry] = useState(regions.sea ? 'Vietnam' : 'California, US');
+  const [country, setCountry] = useState(regions.sea ? 'Vietnam' : regions.us ? 'California, US' : 'Hong Kong');
   const [industry, setIndustry] = useState('');
   const [productLine, setProductLine] = useState('');
   const [busy, setBusy] = useState(false);
@@ -647,24 +653,25 @@ function NewProjectModal({
             <Field label="Market">
               <select value={country} onChange={(e) => setCountry(e.target.value)}
                 className="w-full bg-surface border border-edge rounded-md px-3 py-2 text-sm focus:outline-none focus:border-blue-400/50">
-                {regions.sea && regions.us ? (
-                  <>
-                    <optgroup label="Southeast Asia" className="bg-surface">
-                      {SEA_MARKETS.map((c) => (
+                {(() => {
+                  const groups = [
+                    regions.sea && { label: 'Southeast Asia', markets: SEA_MARKETS },
+                    regions.us && { label: 'United States · state-aware', markets: US_MARKETS },
+                    regions.hant && { label: '繁體中文 · Hong Kong & Taiwan', markets: HANT_MARKETS },
+                  ].filter(Boolean) as { label: string; markets: typeof SEA_MARKETS }[];
+                  if (groups.length === 1) {
+                    return groups[0].markets.map((c) => (
+                      <option key={c.name} value={c.name} className="bg-surface">{c.flag} {c.name}</option>
+                    ));
+                  }
+                  return groups.map((g) => (
+                    <optgroup key={g.label} label={g.label} className="bg-surface">
+                      {g.markets.map((c) => (
                         <option key={c.name} value={c.name} className="bg-surface">{c.flag} {c.name}</option>
                       ))}
                     </optgroup>
-                    <optgroup label="United States · state-aware" className="bg-surface">
-                      {US_MARKETS.map((c) => (
-                        <option key={c.name} value={c.name} className="bg-surface">{c.flag} {c.name}</option>
-                      ))}
-                    </optgroup>
-                  </>
-                ) : (
-                  (regions.us ? US_MARKETS : SEA_MARKETS).map((c) => (
-                    <option key={c.name} value={c.name} className="bg-surface">{c.flag} {c.name}</option>
-                  ))
-                )}
+                  ));
+                })()}
               </select>
             </Field>
             <Field label="Industry (optional)">

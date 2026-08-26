@@ -15,7 +15,11 @@ const nextConfig = {
         source: '/',
         destination: '/dashboard',
         permanent: false,
-        missing: [{ type: 'host', value: 'us.memecmo.ai' }],
+        // Sub-line hosts serve their own landing at / (rewritten below).
+        missing: [
+          { type: 'host', value: 'us.memecmo.ai' },
+          { type: 'host', value: 'geo.neuronsparkmedia.com' },
+        ],
       },
       {
         source: '/privacy-policy',
@@ -66,6 +70,12 @@ const nextConfig = {
           source: '/',
           has: [{ type: 'host', value: 'us.memecmo.ai' }],
           destination: '/us',
+        },
+        // 觀瀾智庫 white-label landing (Traditional-Chinese line, HK/TW).
+        {
+          source: '/',
+          has: [{ type: 'host', value: 'geo.neuronsparkmedia.com' }],
+          destination: '/guanlan',
         },
       ],
     };
