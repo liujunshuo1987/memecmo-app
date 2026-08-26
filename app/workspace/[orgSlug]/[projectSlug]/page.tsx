@@ -38,6 +38,22 @@ export default async function WorkspacePage({ params }: PageProps) {
   const recentRuns = await getRecentRuns(projectAndOrg.project.id, 25);
   const scanHistory = await getScanHistory(projectAndOrg.project.id);
 
+  // White-label inheritance: an end-client org under a branded channel (e.g.
+  // 觀瀾智庫) shows the CHANNEL's platform name. Resolved server-side so the
+  // client component just reads organization.metadata.branding.
+  const orgMeta: any = projectAndOrg.organization.metadata || {};
+  if (!orgMeta.branding?.platformName && projectAndOrg.organization.parent_org_id) {
+    const { data: parent } = await supabase
+      .from('organizations')
+      .select('metadata')
+      .eq('id', projectAndOrg.organization.parent_org_id)
+      .maybeSingle();
+    const parentBranding = (parent?.metadata as any)?.branding;
+    if (parentBranding?.platformName) {
+      (projectAndOrg.organization as any).metadata = { ...orgMeta, branding: parentBranding };
+    }
+  }
+
   // Operators (members of the MemeCMO root org) may open the raw execution
   // trace; clients see the curated progress view only.
   const { data: rootOrg } = await supabase.from('organizations').select('id').eq('type', 'root').maybeSingle();

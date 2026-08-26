@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   // Parent must be visible to the caller (RLS) and a channel_partner/root.
   const { data: parent } = await supabase
     .from('organizations')
-    .select('id, type, status')
+    .select('id, type, status, metadata')
     .eq('slug', body.parentOrgSlug)
     .maybeSingle();
   if (!parent) return NextResponse.json({ error: 'Parent org not found or no access' }, { status: 404 });
@@ -68,6 +68,11 @@ export async function POST(req: NextRequest) {
       parent_org_id: parent.id,
       status: 'pending_approval',
       billing_email: body.billingEmail || null,
+      // Region rides the channel: a client of the 觀瀾 (hant) or US channel is
+      // fenced to that line's markets from birth. Branding is NOT copied — the
+      // workspace resolves it from the parent at render time, so a channel
+      // rebrand propagates to every client instantly.
+      ...((parent.metadata as any)?.region ? { metadata: { region: (parent.metadata as any).region } } : {}),
     })
     .select('*')
     .single();
