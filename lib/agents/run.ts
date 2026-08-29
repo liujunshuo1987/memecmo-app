@@ -302,7 +302,11 @@ export async function executeAgentRun(
     if (agentId === 'full_scan') {
       // One-click cascade: Discovery → Monitor → Report, all into this one run.
       // Per-plan billing levers (null for operator/channel orgs → defaults).
-      const planPolicy = await planPolicyForProject(project.id).catch(() => null);
+      // Trial preview (trigger_method='preview', dispatched by /api/onboarding):
+      // fixed light policy — 2 engines × 8 prompts, no report phase, uncharged.
+      const { data: runRow } = await sb.from('agent_runs').select('trigger_method').eq('id', runId).maybeSingle();
+      const isPreview = runRow?.trigger_method === 'preview';
+      const planPolicy = isPreview ? null : await planPolicyForProject(project.id).catch(() => null);
       const base = {
         brandName: project.brand_name,
         brandUrl: project.brand_url,
@@ -310,8 +314,9 @@ export async function executeAgentRun(
         targetLanguage: project.target_language,
         industry: project.industry,
         userPrompt,
-        libraryCap: planPolicy?.promptLibraryCap,
-        sampleCap: planPolicy?.sampledPerScan,
+        libraryCap: isPreview ? 4 : planPolicy?.promptLibraryCap,
+        sampleCap: isPreview ? 8 : planPolicy?.sampledPerScan,
+        ...(isPreview ? { engineKeys: ['chatgpt', 'google_aio'] } : {}),
       };
 
       // Each phase is one Inngest step → its own short invocation, durable
@@ -383,24 +388,32 @@ export async function executeAgentRun(
         return m;
       });
 
-      const rep = await runStep('phase-report', async () => {
-        await persistAndEmit({ event_type: 'milestone', payload: { label: 'Phase 3/3 · Report', step: 3, totalSteps: 3 } });
-        const r = await runReportAgent({ ...base, scorecard: mon.output }, bandedEmit(66, 34));
-        await sb.from('assets').insert({
-          project_id: project.id, agent_run_id: runId, type: 'geo_report',
-          title: `${project.brand_name} — GEO visibility report`, format: 'markdown',
-          content: (r.output as { markdown?: string }).markdown ?? JSON.stringify(r.output, null, 2),
-          meta: { brand: project.brand_name, country: project.target_country },
+      if (isPreview) {
+        await persistAndEmit({ event_type: 'progress', payload: { pct: 100 } });
+        result = {
+          summary: `Preview scan complete — ${project.brand_name} baseline across ChatGPT and Google AI Overview.`,
+          output: { aigvrScore: (mon.output as { aigvrScore?: number }).aigvrScore, scorecard: mon.output, discovery: disc.output, preview: true },
+        };
+      } else {
+        const rep = await runStep('phase-report', async () => {
+          await persistAndEmit({ event_type: 'milestone', payload: { label: 'Phase 3/3 · Report', step: 3, totalSteps: 3 } });
+          const r = await runReportAgent({ ...base, scorecard: mon.output }, bandedEmit(66, 34));
+          await sb.from('assets').insert({
+            project_id: project.id, agent_run_id: runId, type: 'geo_report',
+            title: `${project.brand_name} — GEO visibility report`, format: 'markdown',
+            content: (r.output as { markdown?: string }).markdown ?? JSON.stringify(r.output, null, 2),
+            meta: { brand: project.brand_name, country: project.target_country },
+          });
+          return r;
         });
-        return r;
-      });
 
-      result = {
-        summary: rep.summary,
-        // All three phase outputs ride on the run so the workspace can credit
-        // each deliverable from a full scan (deliverable-centric bookkeeping).
-        output: { aigvrScore: (mon.output as { aigvrScore?: number }).aigvrScore, scorecard: mon.output, report: rep.output, discovery: disc.output },
-      };
+        result = {
+          summary: rep.summary,
+          // All three phase outputs ride on the run so the workspace can credit
+          // each deliverable from a full scan (deliverable-centric bookkeeping).
+          output: { aigvrScore: (mon.output as { aigvrScore?: number }).aigvrScore, scorecard: mon.output, report: rep.output, discovery: disc.output },
+        };
+      }
     } else if (agentId === 'discovery') {
       result = await runDiscoveryAgent(
         {

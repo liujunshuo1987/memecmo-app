@@ -46,6 +46,9 @@ interface MonitorInput {
   competitorSet?: CompetitorSet | null;
   // Per-plan sampling cap (billing lever). Defaults to SAMPLE_CAP.
   sampleCap?: number;
+  // Engine subset (billing lever / trial preview). Keys from ENGINES +
+  // 'google_aio'; omitted → all available engines.
+  engineKeys?: string[];
   // Standard answers library (B2) — enables the answer-accuracy pass: is what
   // AI actually says CORRECT vs the canonical answer? (support-cost signal)
   standardAnswers?: { prompt: string; local?: string; en?: string }[];
@@ -415,7 +418,10 @@ export async function runMonitorAgent(
 
   // Real Google AI Overview engine joins only when a SERP key is configured.
   const serpKey = process.env.SERPAPI_KEY;
-  const engines: Engine[] = serpKey ? [...ENGINES, AIO_ENGINE] : [...ENGINES];
+  const enginePool: Engine[] = serpKey ? [...ENGINES, AIO_ENGINE] : [...ENGINES];
+  const engines: Engine[] = input.engineKeys?.length
+    ? enginePool.filter((e) => input.engineKeys!.includes(e.key))
+    : enginePool;
   const kindByLabel = new Map(engines.map((e) => [e.label, e.kind]));
   const loc = localeFor(targetCountry, input.targetLanguage);
 
