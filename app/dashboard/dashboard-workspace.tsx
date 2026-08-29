@@ -389,20 +389,29 @@ function BillingModal({ org, bill, plans, stripeReady, onClose }: {
                   {current && <span className="text-[9px] uppercase tracking-wider text-brand">当前</span>}
                 </div>
                 <div className="text-xl font-bold text-ink tabular-nums">
-                  {p.price_usd_month != null ? `$${p.price_usd_month}` : '—'}
-                  <span className="text-[10px] font-normal text-faint"> /月</span>
+                  {p.price_usd_month != null ? `$${p.price_usd_month}` : '面议'}
+                  {p.price_usd_month != null && <span className="text-[10px] font-normal text-faint"> /月</span>}
                 </div>
                 <ul className="text-[11px] text-dim space-y-0.5">
                   <li>{p.monthly_scan_quota} 次扫描 / 月</li>
                   <li>最多 {p.max_projects} 个项目</li>
                 </ul>
-                <button
-                  disabled={!stripeReady || current || busy !== null}
-                  onClick={() => checkout(p.id)}
-                  className="w-full text-xs px-3 py-1.5 rounded-md bg-brand text-on-brand hover:brightness-110 disabled:bg-raised disabled:text-faint transition"
-                >
-                  {busy === p.id ? '跳转中…' : current ? '使用中' : '订阅 Subscribe'}
-                </button>
+                {p.price_usd_month == null ? (
+                  <a
+                    href="mailto:samchan@memecmo.ai?subject=MemeCMO%20Scale%20plan"
+                    className="block w-full text-center text-xs px-3 py-1.5 rounded-md border border-edge text-dim hover:text-ink transition"
+                  >
+                    联系我们 Contact us
+                  </a>
+                ) : (
+                  <button
+                    disabled={!stripeReady || current || busy !== null}
+                    onClick={() => checkout(p.id)}
+                    className="w-full text-xs px-3 py-1.5 rounded-md bg-brand text-on-brand hover:brightness-110 disabled:bg-raised disabled:text-faint transition"
+                  >
+                    {busy === p.id ? '跳转中…' : current ? '使用中' : '订阅 Subscribe'}
+                  </button>
+                )}
               </div>
             );
           })}
