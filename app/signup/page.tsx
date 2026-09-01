@@ -10,10 +10,11 @@ import { Input } from '@/components/ui/input';
 import { createClient } from '@/lib/supabase/client';
 import MemeCMOLogo from '@/components/memecmo-logo';
 import { useLanguage } from '@/contexts/language-context';
-import OAuthButtons from '@/components/oauth-buttons';
+import OAuthButtons, { ENABLED_PROVIDERS } from '@/components/oauth-buttons';
 
-// Flip to true once Google/Facebook providers are configured in Supabase Auth.
-const OAUTH_ENABLED = false;
+// Driven by NEXT_PUBLIC_OAUTH_PROVIDERS — set in Vercel as each provider app
+// gets configured (see MemeCMO_OAuth配置指引).
+const OAUTH_ENABLED = ENABLED_PROVIDERS.length > 0;
 
 function SignupForm() {
   const searchParams = useSearchParams();

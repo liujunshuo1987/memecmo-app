@@ -9,6 +9,14 @@ interface OAuthButtonsProps {
   redirectTo?: string;
 }
 
+// Providers go live one at a time as their console apps get configured:
+// set NEXT_PUBLIC_OAUTH_PROVIDERS="google,linkedin_oidc,facebook" in Vercel
+// and redeploy — no code change per provider.
+export const ENABLED_PROVIDERS = (process.env.NEXT_PUBLIC_OAUTH_PROVIDERS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 export default function OAuthButtons({ redirectTo = '/dashboard' }: OAuthButtonsProps) {
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
   const { t } = useLanguage();
@@ -33,6 +41,7 @@ export default function OAuthButtons({ redirectTo = '/dashboard' }: OAuthButtons
 
   return (
     <div className="space-y-3">
+      {ENABLED_PROVIDERS.includes('google') && (
       <Button
         type="button"
         variant="outline"
@@ -55,7 +64,9 @@ export default function OAuthButtons({ redirectTo = '/dashboard' }: OAuthButtons
         )}
         {t('auth.continueWithGoogle')}
       </Button>
+      )}
 
+      {ENABLED_PROVIDERS.includes('facebook') && (
       <Button
         type="button"
         variant="outline"
@@ -75,7 +86,9 @@ export default function OAuthButtons({ redirectTo = '/dashboard' }: OAuthButtons
         )}
         {t('auth.continueWithFacebook')}
       </Button>
+      )}
 
+      {ENABLED_PROVIDERS.includes('linkedin_oidc') && (
       <Button
         type="button"
         variant="outline"
@@ -95,6 +108,7 @@ export default function OAuthButtons({ redirectTo = '/dashboard' }: OAuthButtons
         )}
         {t('auth.continueWithLinkedIn')}
       </Button>
+      )}
     </div>
   );
 }
