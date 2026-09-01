@@ -79,6 +79,7 @@ const entityGraph = {
         'https://www.icris.cr.gov.hk/csci/cps_criteria.do?corpNo=80218619',
         'https://www.linkedin.com/company/memecmo',
         'https://www.crunchbase.com/organization/memecmo',
+        'https://www.wikidata.org/wiki/Q141180716',
       ],
       founder: { '@id': 'https://memecmo.ai/#chen-songyin' },
       employee: [
