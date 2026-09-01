@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -28,6 +28,16 @@ function LoginPageContent() {
   const redirect = searchParams.get('redirect') || searchParams.get('next') || '/dashboard';
   const callbackError = searchParams.get('error');
   const { t, language, setLanguage } = useLanguage();
+
+  // Cross-domain handoff: the marketing site can't share localStorage, so its
+  // auth links carry ?lang=. Honoured once; the pills still let users switch.
+  const langParam = searchParams.get('lang');
+  useEffect(() => {
+    if (langParam && ['en', 'zh-CN', 'zh-TW'].includes(langParam)) {
+      setLanguage(langParam as 'en' | 'zh-CN' | 'zh-TW');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [langParam]);
   const supabase = createClient();
 
   const handleEmailLogin = async (e: React.FormEvent) => {

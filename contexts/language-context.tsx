@@ -34,6 +34,12 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     for (const k of keys) {
       value = value?.[k];
     }
+    // Missing key → English, not the raw key: this is what lets a new
+    // language ship incrementally instead of all-570-strings-at-once.
+    if (value == null && language !== 'en') {
+      value = translations['en'];
+      for (const k of keys) value = value?.[k];
+    }
 
     return value || key;
   };
@@ -543,6 +549,7 @@ MemeCMO.ai引入古典文獻學的「<strong>辨偽</strong>」（Authentication
       sendResetLink: '發送重設連結',
       sending: '發送中...',
       continueWithGoogle: '使用 Google 繼續',
+      continueWithLinkedIn: '使用 LinkedIn 繼續',
       continueWithFacebook: '使用 Facebook 繼續',
       orContinueWith: '或使用郵箱',
       oauthError: '第三方登入失敗，請重試',
@@ -1114,6 +1121,7 @@ MemeCMO.ai引入古典文献学的「<strong>辨伪</strong>」（Authentication
       sendResetLink: '发送重设链接',
       sending: '发送中...',
       continueWithGoogle: '使用 Google 继续',
+      continueWithLinkedIn: '使用 LinkedIn 继续',
       continueWithFacebook: '使用 Facebook 继续',
       orContinueWith: '或使用邮箱',
       oauthError: '第三方登录失败，请重试',
@@ -1685,6 +1693,7 @@ The advantages of this multi-agent architecture include: (1) <strong>24/7 automa
       sendResetLink: 'Send reset link',
       sending: 'Sending...',
       continueWithGoogle: 'Continue with Google',
+      continueWithLinkedIn: 'Continue with LinkedIn',
       continueWithFacebook: 'Continue with Facebook',
       orContinueWith: 'or continue with email',
       oauthError: 'Social login failed, please try again',

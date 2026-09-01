@@ -14,7 +14,7 @@ export default function OAuthButtons({ redirectTo = '/dashboard' }: OAuthButtons
   const { t } = useLanguage();
   const supabase = createClient();
 
-  const handleOAuth = async (provider: 'google' | 'facebook') => {
+  const handleOAuth = async (provider: 'google' | 'facebook' | 'linkedin_oidc') => {
     setLoadingProvider(provider);
 
     const callbackUrl = `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`;
@@ -74,6 +74,26 @@ export default function OAuthButtons({ redirectTo = '/dashboard' }: OAuthButtons
           </svg>
         )}
         {t('auth.continueWithFacebook')}
+      </Button>
+
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => handleOAuth('linkedin_oidc')}
+        disabled={loadingProvider !== null}
+        className="w-full bg-surface border-edge text-ink hover:bg-raised hover:border-edge-strong rounded-xl py-3 transition-all duration-200"
+      >
+        {loadingProvider === 'linkedin_oidc' ? (
+          <svg className="animate-spin h-4 w-4 mr-2" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
+        ) : (
+          <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="#0A66C2">
+            <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 11-.001-4.124 2.062 2.062 0 01.001 4.124zM7.119 20.452H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.225 0z"/>
+          </svg>
+        )}
+        {t('auth.continueWithLinkedIn')}
       </Button>
     </div>
   );

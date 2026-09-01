@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -30,8 +30,17 @@ function SignupForm() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const router = useRouter();
-  const { t } = useLanguage();
+  const { t, setLanguage } = useLanguage();
   const supabase = createClient();
+
+  // Cross-domain handoff (see login page): marketing-site links carry ?lang=.
+  const langParam = searchParams.get('lang');
+  useEffect(() => {
+    if (langParam && ['en', 'zh-CN', 'zh-TW'].includes(langParam)) {
+      setLanguage(langParam as 'en' | 'zh-CN' | 'zh-TW');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [langParam]);
 
   const passwordRequirements = [
     { label: t('auth.passwordMin8'), met: password.length >= 8 },

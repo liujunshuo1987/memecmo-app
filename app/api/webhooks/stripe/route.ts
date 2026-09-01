@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 import { serviceClient } from '@/lib/commerce';
 import { isBillingConfigured, getStripe, syncSubscription } from '@/lib/billing';
-import { addPurchasedCredits } from '@/lib/credits';
+import { addPurchasedCredits, applyPlanAllowance } from '@/lib/credits';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -46,6 +46,27 @@ export async function POST(req: NextRequest) {
             subscription.metadata = { ...subscription.metadata, ...session.metadata };
           }
           await syncSubscription(subscription);
+          // First activation: grant the first month's included credits NOW —
+          // the monthly cron only fires on the 1st, and a new subscriber must
+          // not sit at zero balance until then. applyPlanAllowance tops the
+          // granted pool up to the plan's allowance, so webhook retries are
+          // harmless. Renewal top-ups stay with the cron.
+          const orgId = subscription.metadata?.orgId;
+          if (orgId) {
+            const sb = serviceClient();
+            const { data: sub } = await sb
+              .from('org_subscriptions')
+              .select('plan_id, plans(included_credits_monthly)')
+              .eq('organization_id', orgId)
+              .maybeSingle();
+            const included = Number((sub?.plans as any)?.included_credits_monthly ?? 0);
+            if (included > 0) await applyPlanAllowance(sb, orgId, included);
+            // Self-serve trial → paying customer: lift the preview fences.
+            const { data: org } = await sb.from('organizations').select('metadata').eq('id', orgId).maybeSingle();
+            if ((org?.metadata as any)?.trial) {
+              await sb.from('organizations').update({ metadata: { ...(org!.metadata as any), trial: false } }).eq('id', orgId);
+            }
+          }
         } else if (session.mode === 'payment' && session.payment_status === 'paid' && session.metadata?.orgId && session.metadata?.credits) {
           // Credit pack purchase — fulfil into the purchased pool (idempotent
           // on the session id; Stripe retries webhooks).
