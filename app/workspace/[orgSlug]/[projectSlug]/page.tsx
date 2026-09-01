@@ -101,6 +101,7 @@ export default async function WorkspacePage({ params }: PageProps) {
       scanHistory={scanHistory}
       isOperator={isOperator}
       canDispatch={canDispatch}
+      trialMode={(projectAndOrg.organization.metadata as any)?.trial === true}
     />
   );
 }

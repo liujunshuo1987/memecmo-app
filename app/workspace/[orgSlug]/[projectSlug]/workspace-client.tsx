@@ -23,6 +23,8 @@ interface Props {
   canDispatch?: boolean;
   // Public read-only demo: anonymous visitors, no authed API calls, sign-up CTA.
   demoMode?: boolean;
+  // Self-serve trial org (metadata.trial): preview banner + upgrade CTA.
+  trialMode?: boolean;
 }
 
 // Extract a trend point from a monitor / full_scan run's output (mirrors getScanHistory).
@@ -267,7 +269,7 @@ function creditFullScan(m: Record<string, LatestRun>): Record<string, LatestRun>
   return m;
 }
 
-export default function WorkspaceClient({ project, organization, initialRuns, scanHistory, isOperator = false, canDispatch = true, demoMode = false }: Props) {
+export default function WorkspaceClient({ project, organization, initialRuns, scanHistory, isOperator = false, canDispatch = true, demoMode = false, trialMode = false }: Props) {
   if (demoMode) canDispatch = false;
   const [history, setHistory] = useState<ScanPoint[]>(scanHistory);
   const [setsOpen, setSetsOpen] = useState(false);
@@ -591,6 +593,26 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
           </span>
         </div>
       </header>
+
+      {/* Self-serve trial: preview covered 2 of 5 engines — the banner is the
+          one-click path to the plan picker (deep-links the billing modal). */}
+      {trialMode && (
+        <div className="print-hide flex items-center justify-between gap-3 px-6 py-2.5 bg-brand-soft border-b border-brand/20">
+          <span className="text-[12px] text-ink">
+            {uiLang === 'zh'
+              ? '预览模式 · 已探测 2/5 引擎(ChatGPT + Google AI Overview)— 解锁 Gemini、Perplexity、Claude 与每周自动扫描'
+              : uiLang === 'vi'
+                ? 'Chế độ xem trước · 2/5 công cụ đã quét — mở khóa Gemini, Perplexity, Claude và quét hàng tuần'
+                : 'Preview mode · 2 of 5 engines scanned — unlock Gemini, Perplexity, Claude and weekly scans'}
+          </span>
+          <a
+            href={`/dashboard?billing=${organization.slug}`}
+            className="shrink-0 text-[12px] font-semibold px-3.5 py-1.5 rounded-lg bg-brand text-on-brand hover:brightness-110 transition whitespace-nowrap"
+          >
+            {uiLang === 'zh' ? '解锁全量 · $99 起' : uiLang === 'vi' ? 'Mở khóa · từ $99' : 'Unlock full scans · from $99'}
+          </a>
+        </div>
+      )}
 
       {walletOpen && credits && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" onClick={() => setWalletOpen(false)}>

@@ -96,6 +96,16 @@ export default function DashboardClient({ groups, userEmail, isRootAdmin, billin
   const [billingOrg, setBillingOrg] = useState<Organization | null>(null);
   const [busyApprove, setBusyApprove] = useState<string | null>(null);
 
+  // Deep link from the workspace trial banner: /dashboard?billing=<orgSlug>
+  // opens the plan picker directly — the upgrade path stays one click long.
+  useEffect(() => {
+    const slug = new URLSearchParams(window.location.search).get('billing');
+    if (!slug) return;
+    const hit = groups.find((g) => g.org.slug === slug);
+    if (hit) setBillingOrg(hit.org);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const signOut = async () => {
     await createClient().auth.signOut();
     router.push('/login');
@@ -139,8 +149,16 @@ export default function DashboardClient({ groups, userEmail, isRootAdmin, billin
         </p>
 
         {groups.length === 0 && (
-          <div className="text-sm text-faint border border-edge rounded-lg p-6">
-            You&apos;re not a member of any organization yet. Contact your administrator.
+          <div className="border border-edge rounded-xl p-8 bg-surface text-center space-y-3">
+            <div className="text-base font-semibold text-ink">创建你的品牌工作区 · Create your brand workspace</div>
+            <p className="text-sm text-dim max-w-md mx-auto leading-relaxed">
+              输入品牌与市场,3 分钟看到 AI 眼中的你——免费预览,无需信用卡。<br />
+              Enter your brand and see how AI talks about it — free preview, no credit card.
+            </p>
+            <a href="/onboarding" className="inline-block text-sm font-semibold px-5 py-2.5 rounded-xl bg-brand text-on-brand hover:brightness-110 transition">
+              开始免费预览 · Start free preview →
+            </a>
+            <p className="text-[11px] text-faint">受邀加入团队?请联系你的管理员获取邀请。 Joining a team? Ask your admin for an invite.</p>
           </div>
         )}
 
