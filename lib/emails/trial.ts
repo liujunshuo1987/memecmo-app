@@ -91,21 +91,23 @@ export function nurtureD1Email(c: TrialEmailCtx): { subject: string; html: strin
 }
 
 export function nurtureD3Email(c: TrialEmailCtx): { subject: string; html: string } {
+  // Client kept anonymous until we have their written OK to be named
+  // (founder decision 2026-08-31).
   if (c.lang === 'vi') {
     return {
-      subject: 'Focus Media Việt Nam đã tăng hiện diện AI +6,8% trong một tháng như thế nào',
+      subject: 'Một tập đoàn truyền thông hàng đầu Việt Nam đã tăng hiện diện AI +6,8% trong một tháng',
       html: shell(`
         <h1 style="${H1}">Một khách hàng thực, số liệu thực</h1>
-        <p style="${P}">Focus Media Việt Nam đo hiện diện AI hàng tuần trên 5 công cụ, sửa các câu trả lời sai (độ chính xác 73% được kiểm định), và tăng chỉ số +6,8% trong tháng đầu vận hành đầy đủ.</p>
+        <p style="${P}">Một tập đoàn truyền thông hàng đầu tại Việt Nam đo hiện diện AI hàng tuần trên 5 công cụ, sửa các câu trả lời sai (độ chính xác 73% được kiểm định), và tăng chỉ số +6,8% trong tháng đầu vận hành đầy đủ.</p>
         <p style="${P}">Bản xem trước của bạn mới chạy 2/5 công cụ. Gói đầy đủ mở khóa Gemini, Perplexity, Claude, quét hàng tuần tự động và bộ 10 agent sản xuất nội dung.</p>
         <p style="margin:18px 0 0;"><a href="${upgrade(c)}" style="${BTN}">Xem các gói · từ $99/tháng →</a></p>`, FOOTER.vi),
     };
   }
   return {
-    subject: 'How Focus Media Vietnam lifted AI visibility +6.8% in a month',
+    subject: 'How a leading Vietnamese media group lifted AI visibility +6.8% in a month',
     html: shell(`
       <h1 style="${H1}">A real client, real numbers</h1>
-      <p style="${P}">Focus Media Vietnam measures its AI presence weekly across 5 engines, fixes wrong answers (73% audited accuracy), and lifted its index +6.8% in the first full month.</p>
+      <p style="${P}">A leading Vietnamese media group measures its AI presence weekly across 5 engines, fixes wrong answers (73% audited accuracy), and lifted its index +6.8% in the first full month on the platform.</p>
       <p style="${P}">Your preview covered 2 of 5 engines. The full plan unlocks Gemini, Perplexity, Claude, automatic weekly scans, and the ten-agent content suite.</p>
       <p style="margin:18px 0 0;"><a href="${upgrade(c)}" style="${BTN}">See plans · from $99/mo →</a></p>`, FOOTER.en),
   };
