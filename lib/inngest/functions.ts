@@ -6,6 +6,8 @@ import { executeAgentRun } from '@/lib/agents/run';
 import { recordUsage, isMeteredKind } from '@/lib/commerce';
 import { sendProjectDigest, maybeSendScanAlert } from '@/lib/reports/digest';
 import { applyMonthlyGrant, applyPlanAllowance } from '@/lib/credits';
+import { sendEmail } from '@/lib/email';
+import { previewReadyEmail, nurtureD1Email, nurtureD3Email, nurtureD7Email, TrialEmailCtx } from '@/lib/emails/trial';
 
 function svc() {
   return createServiceClient(
@@ -117,6 +119,55 @@ export const runAgent = inngest.createFunction(
       await step.run('scan-alert', () => maybeSendScanAlert(sb, projectId, runId));
     }
 
+    // Funnel D4/E1: a completed trial preview mails the visitor a link back to
+    // their report — the win-back for tabs closed mid-scan. Idempotent via the
+    // funnel_events row.
+    if (agentId === 'full_scan') {
+      await step.run('preview-email', async () => {
+        const { data: run } = await sb
+          .from('agent_runs')
+          .select('trigger_method, status, output, triggered_by')
+          .eq('id', runId)
+          .maybeSingle();
+        if (run?.trigger_method !== 'preview' || run.status !== 'completed' || !run.triggered_by) return 'not-a-preview';
+        const { data: project } = await sb
+          .from('projects')
+          .select('slug, brand_name, target_language, organization_id')
+          .eq('id', projectId)
+          .single();
+        const { data: org } = await sb
+          .from('organizations')
+          .select('slug, billing_email')
+          .eq('id', project!.organization_id)
+          .single();
+        if (!org?.billing_email) return 'no-email';
+        const { data: dup } = await sb
+          .from('funnel_events')
+          .select('id')
+          .eq('event', 'email_preview_ready')
+          .eq('meta->>runId', runId)
+          .maybeSingle();
+        if (dup) return 'already-sent';
+        const out: any = run.output || {};
+        const ctx: TrialEmailCtx = {
+          brand: project!.brand_name,
+          orgSlug: org.slug,
+          projectSlug: project!.slug,
+          lang: project!.target_language === 'vi' ? 'vi' : 'en',
+          score: out.aigvrScore ?? null,
+          gaps: Array.isArray(out.scorecard?.gaps) ? out.scorecard.gaps.length : null,
+        };
+        const mail = previewReadyEmail(ctx);
+        const res = await sendEmail({ to: [org.billing_email], subject: mail.subject, html: mail.html });
+        await sb.from('funnel_events').insert({
+          organization_id: project!.organization_id,
+          event: 'email_preview_ready',
+          meta: { runId, sent: res.sent, to: org.billing_email },
+        });
+        return res.sent ? 'sent' : `failed: ${res.error}`;
+      });
+    }
+
     return { runId, agentId, status: 'done' };
   },
 );
@@ -217,4 +268,76 @@ export const scheduledDigest = inngest.createFunction(
   },
 );
 
-export const functions = [runAgent, scheduledWeekly, scheduledMonthly, scheduledDigest];
+// Trial nurture (funnel D4/E2-E4) — daily 03:30 UTC (10:30 Hanoi morning).
+// Unconverted trial orgs get exactly three more touches after the preview
+// email: day 1 (interpret gaps), day 3 (FMVN proof), day 7 (honest close).
+// Each is sent once, deduped through funnel_events; conversion (trial=false)
+// or a recorded opt-out stops the sequence.
+const NURTURE_STAGES: { event: string; minDays: number; build: (c: TrialEmailCtx) => { subject: string; html: string } }[] = [
+  { event: 'email_nurture_d1', minDays: 1, build: nurtureD1Email },
+  { event: 'email_nurture_d3', minDays: 3, build: nurtureD3Email },
+  { event: 'email_nurture_d7', minDays: 7, build: nurtureD7Email },
+];
+
+export const scheduledTrialNurture = inngest.createFunction(
+  { id: 'trial-nurture', name: 'Trial nurture emails', triggers: [{ cron: '30 3 * * *' }] },
+  async ({ step }) => {
+    const sb = svc();
+    const sent: string[] = [];
+    const orgs = await step.run('list-trial-orgs', async () => {
+      const { data } = await sb
+        .from('organizations')
+        .select('id, slug, billing_email, created_at, metadata')
+        .eq('metadata->>trial', 'true')
+        .eq('metadata->>selfServe', 'true');
+      return data ?? [];
+    });
+    for (const org of orgs) {
+      if (!org.billing_email) continue;
+      const ageDays = (Date.now() - new Date(org.created_at).getTime()) / 86400000;
+      const stage = [...NURTURE_STAGES].reverse().find((s) => ageDays >= s.minDays);
+      if (!stage) continue;
+      await step.run(`nurture-${org.id}`, async () => {
+        const { data: history } = await sb
+          .from('funnel_events')
+          .select('event')
+          .eq('organization_id', org.id)
+          .in('event', [...NURTURE_STAGES.map((s) => s.event), 'email_optout']);
+        const seen = new Set((history ?? []).map((h) => h.event));
+        if (seen.has('email_optout') || seen.has(stage.event)) return 'skip';
+        const { data: project } = await sb
+          .from('projects')
+          .select('slug, brand_name, target_language, id')
+          .eq('organization_id', org.id)
+          .limit(1)
+          .maybeSingle();
+        if (!project) return 'no-project';
+        const { data: run } = await sb
+          .from('agent_runs')
+          .select('output')
+          .eq('project_id', project.id)
+          .eq('status', 'completed')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const out: any = run?.output || {};
+        const ctx: TrialEmailCtx = {
+          brand: project.brand_name,
+          orgSlug: org.slug,
+          projectSlug: project.slug,
+          lang: project.target_language === 'vi' ? 'vi' : 'en',
+          score: out.aigvrScore ?? null,
+          gaps: Array.isArray(out.scorecard?.gaps) ? out.scorecard.gaps.length : null,
+        };
+        const mail = stage.build(ctx);
+        const res = await sendEmail({ to: [org.billing_email], subject: mail.subject, html: mail.html });
+        await sb.from('funnel_events').insert({ organization_id: org.id, event: stage.event, meta: { sent: res.sent, to: org.billing_email } });
+        sent.push(`${org.slug}:${stage.event}`);
+        return res.sent ? 'sent' : `failed: ${res.error}`;
+      });
+    }
+    return { trialOrgs: orgs.length, sent };
+  },
+);
+
+export const functions = [runAgent, scheduledWeekly, scheduledMonthly, scheduledDigest, scheduledTrialNurture];
