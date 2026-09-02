@@ -1308,6 +1308,102 @@ function ClosedLoop({ o, loop, anchorAgent }: { o: Record<string, any>; loop: { 
 
 // Trial teaser (freemium depth-gate): the preview ran a real Site audit, but
 // unpaid workspaces see only the counts — what was found, not the fixes.
+// Preview verdict (trial cold-start): a wall of zeros reads as "broken" or
+// "hopeless" — neither converts. Lead with what HAPPENED instead: the real
+// question, the real AI answer, who got recommended, and why an empty record
+// is the fastest to change. Zeros become evidence of opportunity.
+function PreviewVerdict({ sc, brand, upgradeHref }: { sc: any; brand: string; upgradeHref?: string }) {
+  const zh = UI_LANG === 'zh';
+  const vi = UI_LANG === 'vi';
+  const samples: any[] = Array.isArray(sc.rawSamples) ? sc.rawSamples : [];
+  if (!samples.length) return null;
+  const hits = samples.filter((x) => x.brandPresent).length;
+  const bench: any[] = (Array.isArray(sc.competitorBenchmark) ? sc.competitorBenchmark : []).filter((b: any) => !b.isBrand);
+  const rivals = bench.slice(0, 3);
+  const rivalNames = rivals.map((r) => String(r.name));
+  const exhibit =
+    samples.find((x) => x.key && !x.brandPresent && (x.competitorsPresent?.length || 0) > 0) ||
+    samples.find((x) => !x.brandPresent && (x.competitorsPresent?.length || 0) > 0) ||
+    samples.find((x) => !x.brandPresent);
+  const domains: string[] = (sc.sourceAuthority?.ranking || [])
+    .filter((d: any) => !d.isBrand)
+    .slice(0, 4)
+    .map((d: any) => d.domain);
+
+  const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  let snippetHtml = exhibit ? esc(String(exhibit.snippet || '').slice(0, 260)) + '…' : '';
+  for (const n of rivalNames) {
+    if (!n) continue;
+    snippetHtml = snippetHtml.split(esc(n)).join(`<b style="color:var(--garnet)">${esc(n)}</b>`);
+  }
+
+  const headline = hits === 0
+    ? (zh ? `我们替买家问了 AI ${samples.length} 个问题 — ${brand} 一次都没有出现。`
+      : vi ? `Chúng tôi đã hỏi AI ${samples.length} câu hỏi của người mua — ${brand} không xuất hiện lần nào.`
+      : `We asked AI ${samples.length} real buyer questions — ${brand} never came up.`)
+    : (zh ? `${samples.length} 个买家问题中,${brand} 只出现了 ${hits} 次。`
+      : vi ? `Trong ${samples.length} câu hỏi, ${brand} chỉ xuất hiện ${hits} lần.`
+      : `Across ${samples.length} buyer questions, ${brand} appeared just ${hits} time${hits === 1 ? '' : 's'}.`);
+
+  return (
+    <div className="rounded-xl border border-edge bg-surface p-5 space-y-4">
+      <div className="text-[15px] font-semibold text-ink leading-relaxed">{headline}</div>
+
+      {exhibit && (
+        <div className="rounded-lg bg-raised/70 p-4 space-y-2">
+          <div className="text-[10px] uppercase tracking-widest text-faint">
+            {zh ? '证物 · 真实问答' : vi ? 'Bằng chứng · hỏi đáp thật' : 'Exhibit · a real exchange'}
+          </div>
+          <div className="text-[13px] text-ink font-medium">“{exhibit.prompt}”</div>
+          <div className="text-[12px] text-dim leading-relaxed" dangerouslySetInnerHTML={{ __html: snippetHtml }} />
+          <div className="flex items-center gap-2 pt-1">
+            <span className="text-[10px] px-2 py-0.5 rounded-full border border-edge text-dim">{exhibit.engine}</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-garnet/10 text-garnet font-semibold">
+              {zh ? `${brand}:未出现` : vi ? `${brand}: vắng mặt` : `${brand}: absent`}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {rivals.length > 0 && (
+        <div className="space-y-1.5">
+          <div className="text-[10px] uppercase tracking-widest text-faint">
+            {zh ? 'AI 现在推荐的是谁' : vi ? 'AI đang đề xuất ai' : 'Who AI recommends instead'}
+          </div>
+          {rivals.map((r) => (
+            <div key={r.name} className="flex items-center gap-3">
+              <span className="text-[12px] text-ink w-44 truncate">{r.name}</span>
+              <div className="flex-1 h-1.5 bg-raised rounded-full overflow-hidden"><i className="block h-full bg-brand rounded-full" style={{ width: `${Math.max(4, r.sovPct)}%` }} /></div>
+              <span className="text-[11px] text-dim tabular-nums w-10 text-right">{r.sovPct}%</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {domains.length > 0 && (
+        <div className="text-[12px] text-dim leading-relaxed">
+          {zh ? 'AI 的答案主要引用: ' : vi ? 'AI trích dẫn chủ yếu từ: ' : 'AI sources these answers from: '}
+          {domains.map((d, i) => <span key={d} className="text-ink font-medium">{i > 0 ? ' · ' : ''}{d}</span>)}
+          {zh ? ' —— 这些就是要去占的位置。' : vi ? ' — đây là những vị trí cần chiếm.' : ' — these are the seats to take.'}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between gap-3 pt-1 border-t border-edge/60">
+        <p className="text-[12px] text-dim leading-relaxed">
+          {zh ? '空白的记录改写起来最快:这些答案还没被谁真正占住,先动手的品牌先定义它们。'
+            : vi ? 'Hồ sơ trống thay đổi nhanh nhất: những câu trả lời này chưa thuộc về ai — thương hiệu đi trước sẽ định nghĩa chúng.'
+            : 'An empty record is the fastest to rewrite: nobody truly owns these answers yet — first movers define them.'}
+        </p>
+        {upgradeHref && (
+          <a href={upgradeHref} className="shrink-0 text-[12px] font-semibold px-3.5 py-1.5 rounded-lg bg-brand text-on-brand hover:brightness-110 transition whitespace-nowrap">
+            {zh ? '开始占位 · $99 起' : vi ? 'Bắt đầu · từ $99' : 'Start claiming · from $99'}
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function TrialSiteTeaser({ site, upgradeHref }: { site: any; upgradeHref?: string }) {
   const checklist: any[] = Array.isArray(site.aeoChecklist) ? site.aeoChecklist : [];
   const missing = checklist.filter((c) => c?.status === 'missing').length;
@@ -1363,6 +1459,7 @@ function RunResult({ agentId, output, projectId, runId, versions, onVersions, on
       {agentId === 'profile' && projectId && <BrandDocsPanel projectId={projectId} />}
       {agentId === 'full_scan' ? (
         <>
+          {trialMode && output.scorecard && <PreviewVerdict sc={output.scorecard} brand={output.scorecard.brand || ''} upgradeHref={upgradeHref} />}
           {output.scorecard && <MonitorResult o={output.scorecard} />}
           {trialMode && output.site && <TrialSiteTeaser site={output.site} upgradeHref={upgradeHref} />}
           {output.report && <ReportResult o={output.report} />}
