@@ -59,7 +59,7 @@ export default async function DashboardPage() {
   // Plans catalogue (public read) + whether payments are live on this deploy.
   const { data: plansCatalog } = await supabase
     .from('plans')
-    .select('id, name, price_usd_month, monthly_scan_quota, max_projects, stripe_price_id')
+    .select('id, name, price_usd_month, monthly_scan_quota, max_projects, included_credits_monthly, scan_cadence, stripe_price_id')
     .order('sort');
   const stripeKey = process.env.STRIPE_SECRET_KEY || '';
   const stripeReady = stripeKey.startsWith('sk_') && stripeKey.length > 20;

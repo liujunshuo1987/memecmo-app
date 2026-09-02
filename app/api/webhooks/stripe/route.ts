@@ -62,9 +62,32 @@ export async function POST(req: NextRequest) {
             const included = Number((sub?.plans as any)?.included_credits_monthly ?? 0);
             if (included > 0) await applyPlanAllowance(sb, orgId, included);
             // Self-serve trial → paying customer: lift the preview fences.
-            const { data: org } = await sb.from('organizations').select('metadata').eq('id', orgId).maybeSingle();
+            const { data: org } = await sb.from('organizations').select('metadata, billing_email').eq('id', orgId).maybeSingle();
             if ((org?.metadata as any)?.trial) {
               await sb.from('organizations').update({ metadata: { ...(org!.metadata as any), trial: false } }).eq('id', orgId);
+            }
+            // Plans v3.1 promise "weekly auto-scan + email report" — make it
+            // real the moment the subscription activates. Only projects with
+            // no reporting configured are touched (never override a custom
+            // cadence set by an operator).
+            const { data: projects } = await sb
+              .from('projects')
+              .select('id, metadata, target_language')
+              .eq('organization_id', orgId);
+            for (const p of projects ?? []) {
+              const meta = (p.metadata as any) || {};
+              if (meta.reporting) continue;
+              await sb.from('projects').update({
+                metadata: {
+                  ...meta,
+                  reporting: 'weekly',
+                  reportSchedule: {
+                    ...(meta.reportSchedule || {}),
+                    recipients: (meta.reportSchedule?.recipients?.length ? meta.reportSchedule.recipients : (org?.billing_email ? [org.billing_email] : [])),
+                    language: meta.reportSchedule?.language || (p.target_language === 'vi' ? 'vi' : 'en'),
+                  },
+                },
+              }).eq('id', p.id);
             }
           }
         } else if (session.mode === 'payment' && session.payment_status === 'paid' && session.metadata?.orgId && session.metadata?.credits) {

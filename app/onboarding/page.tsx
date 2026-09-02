@@ -6,7 +6,7 @@
 // answer real questions about their brand.
 
 import { Suspense, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import MemeCMOLogo from '@/components/memecmo-logo';
 import { useLanguage } from '@/contexts/language-context';
@@ -82,13 +82,32 @@ interface FeedLine {
 
 function OnboardingContent() {
   const router = useRouter();
-  const { language } = useLanguage();
+  const searchParams = useSearchParams();
+  const { language, setLanguage } = useLanguage();
   const c = COPY[language] || COPY.en;
 
+  // The homepage search box lands here with ?url= (+ optional market/lang):
+  // prefill everything so the visitor's next click is already "start scan".
+  const urlParam = (searchParams.get('url') || '').trim();
+  const guessedBrand = urlParam
+    ? (urlParam.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0].split('.')[0] || '')
+        .replace(/[-_]+/g, ' ')
+        .replace(/\b\w/g, (ch) => ch.toUpperCase())
+    : '';
+  const marketParam = searchParams.get('market');
+
   const [phase, setPhase] = useState<'form' | 'starting' | 'running' | 'done' | 'error'>('form');
-  const [brandName, setBrandName] = useState('');
-  const [brandUrl, setBrandUrl] = useState('');
-  const [market, setMarket] = useState('Vietnam');
+  const [brandName, setBrandName] = useState(guessedBrand);
+  const [brandUrl, setBrandUrl] = useState(urlParam);
+  const [market, setMarket] = useState(marketParam && MARKETS.some((m) => m.value === marketParam) ? marketParam : 'Vietnam');
+
+  const langParam = searchParams.get('lang');
+  useEffect(() => {
+    if (langParam && ['en', 'zh-CN', 'zh-TW'].includes(langParam)) {
+      setLanguage(langParam as 'en' | 'zh-CN' | 'zh-TW');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [langParam]);
   const [error, setError] = useState('');
   const [pct, setPct] = useState(0);
   const [feed, setFeed] = useState<FeedLine[]>([]);
@@ -97,10 +116,14 @@ function OnboardingContent() {
   const since = useRef('1970-01-01T00:00:00Z');
   const feedId = useRef(0);
 
-  // Signed-out visitors go sign up first and come straight back.
+  // Signed-out visitors go sign up first and come straight back — with the
+  // homepage search box's prefill query preserved through the auth hop.
   useEffect(() => {
     createClient().auth.getUser().then(({ data }) => {
-      if (!data.user) router.replace('/signup?next=/onboarding');
+      if (!data.user) {
+        const back = '/onboarding' + window.location.search;
+        router.replace('/signup?next=' + encodeURIComponent(back));
+      }
     });
   }, [router]);
 

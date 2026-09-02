@@ -28,6 +28,8 @@ interface PlanRow {
   price_usd_month: number | null;
   monthly_scan_quota: number;
   max_projects: number;
+  included_credits_monthly?: number | null;
+  scan_cadence?: string | null;
   stripe_price_id: string | null;
 }
 interface Props {
@@ -411,8 +413,14 @@ function BillingModal({ org, bill, plans, stripeReady, onClose }: {
                   {p.price_usd_month != null && <span className="text-[10px] font-normal text-faint"> /月</span>}
                 </div>
                 <ul className="text-[11px] text-dim space-y-0.5">
-                  <li>{p.monthly_scan_quota} 次扫描 / 月</li>
-                  <li>最多 {p.max_projects} 个项目</li>
+                  {p.scan_cadence === 'weekly' && (
+                    <li className="text-sage font-medium">每周自动扫描 + 邮件周报 · Weekly auto-scan &amp; report</li>
+                  )}
+                  <li>手动加扫 {p.monthly_scan_quota} 次 / 月 · {p.monthly_scan_quota} manual scans</li>
+                  <li>最多 {p.max_projects} 个项目 · {p.max_projects} project{p.max_projects > 1 ? 's' : ''}</li>
+                  {p.included_credits_monthly != null && p.included_credits_monthly > 0 && (
+                    <li>含 {p.included_credits_monthly} credits / 月</li>
+                  )}
                 </ul>
                 {p.price_usd_month == null ? (
                   <a
