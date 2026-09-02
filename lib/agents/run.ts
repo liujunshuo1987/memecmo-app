@@ -389,10 +389,38 @@ export async function executeAgentRun(
       });
 
       if (isPreview) {
+        // Preview also runs the Site audit (cheap: homepage fetch + one model
+        // pass). Trial users see only the COUNTS — "X issues · Y fixes ·
+        // unlock" — the teaser that carries the upgrade (founder ask 8/31).
+        const site = await runStep('phase-site', async () => {
+          await persistAndEmit({ event_type: 'milestone', payload: { label: 'Phase 3/3 · Site check', step: 3, totalSteps: 3 } });
+          try {
+            const r = await runSiteAgent(
+              {
+                brandName: project.brand_name,
+                brandUrl: project.brand_url,
+                targetCountry: project.target_country,
+                targetLanguage: project.target_language,
+                industry: project.industry,
+                brandProfile: await loadBrandProfile(sb, project.id),
+              },
+              bandedEmit(66, 30),
+            );
+            await sb.from('assets').insert({
+              project_id: project.id, agent_run_id: runId, type: 'site_optimization',
+              title: `${project.brand_name} — homepage AEO audit (preview)`, format: 'markdown',
+              content: (r.output as { fullMarkdown?: string }).fullMarkdown ?? JSON.stringify(r.output, null, 2),
+              meta: { brand: project.brand_name, preview: true },
+            });
+            return r;
+          } catch {
+            return null; // site unreachable or model hiccup — preview still ships
+          }
+        });
         await persistAndEmit({ event_type: 'progress', payload: { pct: 100 } });
         result = {
           summary: `Preview scan complete — ${project.brand_name} baseline across ChatGPT and Google AI Overview.`,
-          output: { aigvrScore: (mon.output as { aigvrScore?: number }).aigvrScore, scorecard: mon.output, discovery: disc.output, preview: true },
+          output: { aigvrScore: (mon.output as { aigvrScore?: number }).aigvrScore, scorecard: mon.output, discovery: disc.output, preview: true, site: site?.output ?? null },
         };
       } else {
         const rep = await runStep('phase-report', async () => {

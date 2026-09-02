@@ -693,6 +693,8 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
                     agentId={aid}
                     run={runsByAgent[aid]}
                     canRun={canDispatch}
+                    locked={trialMode && group.label.startsWith('Act')}
+                    lockHref={`/dashboard?billing=${organization.slug}`}
                     running={sending && runStatus?.agentId === aid && !isTerminal}
                     isViewing={runStatus?.agentId === aid || emptyAgent === aid}
                     onView={viewRun}
@@ -788,6 +790,8 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
                     <TranslatedView agentId={runStatus.agentId} output={runStatus.output} summary={runStatus.summary} to="zh" />
                   )}
                   <RunResult
+                    trialMode={trialMode}
+                    upgradeHref={`/dashboard?billing=${organization.slug}`}
                     agentId={runStatus.agentId}
                     output={runStatus.output}
                     projectId={demoMode ? undefined : project.id}
@@ -830,7 +834,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
 }
 
 function NavItem({
-  agentId, run, running, isViewing, onView, onRun, onEmpty, disabled, canRun = true,
+  agentId, run, running, isViewing, onView, onRun, onEmpty, disabled, canRun = true, locked = false, lockHref,
 }: {
   agentId: string;
   run?: LatestRun;
@@ -838,6 +842,8 @@ function NavItem({
   isViewing: boolean;
   onView: (runId: string, agentId: string) => void;
   onRun: (agentId: string) => void;
+  locked?: boolean;
+  lockHref?: string;
   onEmpty: (agentId: string) => void;
   disabled: boolean;
   canRun?: boolean;
@@ -860,6 +866,11 @@ function NavItem({
       <span className="text-[13px] text-ink truncate flex-1">{t(a?.shortName ?? agentId)}</span>
       {running ? (
         <span className="text-[10px] text-brand shrink-0">…</span>
+      ) : locked && !ready ? (
+        <a href={lockHref} onClick={(e) => e.stopPropagation()}
+          className="text-[10px] shrink-0 px-1.5 py-0.5 rounded border border-brand/40 text-brand hover:bg-brand-soft transition">
+          {UI_LANG === 'zh' ? '解锁' : UI_LANG === 'vi' ? 'Mở khóa' : 'Unlock'}
+        </a>
       ) : ready ? (
         <span className="w-1.5 h-1.5 rounded-full bg-sage inline-block shrink-0" title="ready" />
       ) : canRun ? (
@@ -1295,7 +1306,43 @@ function ClosedLoop({ o, loop, anchorAgent }: { o: Record<string, any>; loop: { 
   );
 }
 
-function RunResult({ agentId, output, projectId, runId, versions, onVersions, onDispatch, loop }: {
+// Trial teaser (freemium depth-gate): the preview ran a real Site audit, but
+// unpaid workspaces see only the counts — what was found, not the fixes.
+function TrialSiteTeaser({ site, upgradeHref }: { site: any; upgradeHref?: string }) {
+  const checklist: any[] = Array.isArray(site.aeoChecklist) ? site.aeoChecklist : [];
+  const missing = checklist.filter((c) => c?.status === 'missing').length;
+  const edits = Array.isArray(site.homepageEdits) ? site.homepageEdits.length : 0;
+  const blocks = Array.isArray(site.schema) ? site.schema.length : 0;
+  const zh = UI_LANG === 'zh';
+  const vi = UI_LANG === 'vi';
+  return (
+    <div className="rounded-lg border border-brand/30 bg-brand-soft/40 p-4 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-[13px] font-semibold text-ink">
+          {zh ? '网站 AEO 体检(预览已完成)' : vi ? 'Kiểm tra AEO website (đã hoàn tất)' : 'Homepage AEO audit (completed in preview)'}
+        </div>
+        <span className="text-[10px] px-2 py-0.5 rounded-full bg-raised text-faint">{zh ? '已锁定' : vi ? 'Đã khóa' : 'Locked'}</span>
+      </div>
+      <div className="flex flex-wrap gap-4 text-[13px] text-ink tabular-nums">
+        <span><b className="text-garnet">{missing}</b> {zh ? `项缺失(共 ${checklist.length} 项检查)` : vi ? `mục thiếu / ${checklist.length} kiểm tra` : `missing of ${checklist.length} checks`}</span>
+        <span><b>{edits}</b> {zh ? '处首页修改建议' : vi ? 'đề xuất chỉnh sửa' : 'homepage edit suggestions'}</span>
+        <span><b>{blocks}</b> {zh ? '个待部署 JSON-LD 区块' : vi ? 'khối JSON-LD chờ triển khai' : 'JSON-LD blocks ready to ship'}</span>
+      </div>
+      <p className="text-[11px] text-dim">
+        {zh ? '具体问题清单、修改文案与可直接部署的代码,订阅后全部解锁。'
+          : vi ? 'Danh sách chi tiết, nội dung chỉnh sửa và mã sẵn sàng triển khai — mở khóa khi đăng ký.'
+          : 'The full issue list, suggested copy and deploy-ready code unlock with a plan.'}
+      </p>
+      {upgradeHref && (
+        <a href={upgradeHref} className="inline-block text-[12px] font-semibold px-3.5 py-1.5 rounded-lg bg-brand text-on-brand hover:brightness-110 transition">
+          {zh ? '解锁全部建议 · $99 起' : vi ? 'Mở khóa · từ $99' : 'Unlock all fixes · from $99'}
+        </a>
+      )}
+    </div>
+  );
+}
+
+function RunResult({ agentId, output, projectId, runId, versions, onVersions, onDispatch, loop, trialMode, upgradeHref }: {
   agentId?: string;
   output: Record<string, any>;
   projectId?: string;
@@ -1304,6 +1351,8 @@ function RunResult({ agentId, output, projectId, runId, versions, onVersions, on
   onVersions?: (v: { label: string; content: string }[]) => void;
   onDispatch?: (agentId: string) => void;
   loop?: { runsByAgent: Record<string, LatestRun>; currentScore: number | null };
+  trialMode?: boolean;
+  upgradeHref?: string;
 }) {
   const advisory = agentId === 'monitor' || agentId === 'report' || agentId === 'full_scan';
   // Deliverables the CLIENT should sign off on (agency workflow).
@@ -1315,6 +1364,7 @@ function RunResult({ agentId, output, projectId, runId, versions, onVersions, on
       {agentId === 'full_scan' ? (
         <>
           {output.scorecard && <MonitorResult o={output.scorecard} />}
+          {trialMode && output.site && <TrialSiteTeaser site={output.site} upgradeHref={upgradeHref} />}
           {output.report && <ReportResult o={output.report} />}
           {output.report && loop && <ClosedLoop o={output.report} loop={loop} anchorAgent="full_scan" />}
         </>
