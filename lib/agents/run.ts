@@ -363,7 +363,11 @@ export async function executeAgentRun(
         return d;
       });
 
-      const mon = await runStep('phase-monitor', async () => {
+      // Preview: monitor and the site audit have no data dependency — run them
+      // as PARALLEL Inngest steps (CREAO lesson, 8/31: deterministic tracks
+      // decoupled). Monitor owns the progress band; site emits milestones only,
+      // so the bar stays monotonic. Full scans keep monitor's original band.
+      const runMonitorStep = () => runStep('phase-monitor', async () => {
         await persistAndEmit({ event_type: 'milestone', payload: { label: 'Phase 2/3 · Monitor', step: 2, totalSteps: 3 } });
         const rawPromptSet = ((disc.output as { promptSet?: unknown[] }).promptSet as { category: string; label: string; prompts: string[] }[]) || [];
         const rawKeyPrompts = ((disc.output as { keyPrompts?: unknown[] }).keyPrompts as string[]) || [];
@@ -372,7 +376,7 @@ export async function executeAgentRun(
         // No nested stepper: this whole phase is already one step.
         const m = await runMonitorAgent(
           { ...base, promptSet, keyPrompts, competitorSet: await loadCompetitorSet(sb, project.id), standardAnswers: await loadStandardAnswers(sb, project.id) },
-          bandedEmit(33, 33),
+          bandedEmit(33, isPreview ? 60 : 33),
         );
         const sa = await recordCitationsAndIndex(sb, project.id, runId, domainOf(project.brand_url || ''), (m.output as { rawSamples?: any[] }).rawSamples || []);
         (m.output as Record<string, unknown>).sourceAuthority = sa;
@@ -392,7 +396,7 @@ export async function executeAgentRun(
         // Preview also runs the Site audit (cheap: homepage fetch + one model
         // pass). Trial users see only the COUNTS — "X issues · Y fixes ·
         // unlock" — the teaser that carries the upgrade (founder ask 8/31).
-        const site = await runStep('phase-site', async () => {
+        const runSiteStep = () => runStep('phase-site', async () => {
           await persistAndEmit({ event_type: 'milestone', payload: { label: 'Phase 3/3 · Site check', step: 3, totalSteps: 3 } });
           try {
             const r = await runSiteAgent(
@@ -404,7 +408,7 @@ export async function executeAgentRun(
                 industry: project.industry,
                 brandProfile: await loadBrandProfile(sb, project.id),
               },
-              bandedEmit(66, 30),
+              async (ev) => { if (ev.event_type !== 'progress') await persistAndEmit(ev); },
             );
             await sb.from('assets').insert({
               project_id: project.id, agent_run_id: runId, type: 'site_optimization',
@@ -417,12 +421,14 @@ export async function executeAgentRun(
             return null; // site unreachable or model hiccup — preview still ships
           }
         });
+        const [mon, site] = await Promise.all([runMonitorStep(), runSiteStep()]);
         await persistAndEmit({ event_type: 'progress', payload: { pct: 100 } });
         result = {
           summary: `Preview scan complete — ${project.brand_name} baseline across ChatGPT and Google AI Overview.`,
           output: { aigvrScore: (mon.output as { aigvrScore?: number }).aigvrScore, scorecard: mon.output, discovery: disc.output, preview: true, site: site?.output ?? null },
         };
       } else {
+        const mon = await runMonitorStep();
         const rep = await runStep('phase-report', async () => {
           await persistAndEmit({ event_type: 'milestone', payload: { label: 'Phase 3/3 · Report', step: 3, totalSteps: 3 } });
           const r = await runReportAgent({ ...base, scorecard: mon.output }, bandedEmit(66, 34));
