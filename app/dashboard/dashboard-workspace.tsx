@@ -443,6 +443,17 @@ function BillingModal({ org, bill, plans, stripeReady, onClose }: {
           })}
         </div>
 
+        <div className="text-right">
+          <a
+            href="https://memecmo.ai/compare/"
+            target="_blank"
+            rel="noreferrer"
+            className="text-[11px] text-dim hover:text-ink underline underline-offset-2"
+          >
+            看看这些价格在市面上意味着什么 · How we compare →
+          </a>
+        </div>
+
         <div className="rounded-lg border border-edge bg-canvas p-4 space-y-2">
           <div className="flex items-baseline justify-between">
             <span className="text-xs font-semibold text-ink">Credits · 主动扫描与加跑</span>
