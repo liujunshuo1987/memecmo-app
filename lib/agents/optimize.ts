@@ -124,7 +124,21 @@ export async function runOptimizeAgent(
 
   let parsed: ContentJson;
   try {
-    parsed = parseJsonFromLLM<ContentJson>(res.content);
+    try {
+      parsed = parseJsonFromLLM<ContentJson>(res.content);
+    } catch (e) {
+      // One retry: truncated / malformed JSON is nondeterministic — a fresh
+      // generation with an explicit only-JSON instruction usually lands.
+      await emit({ event_type: 'log', payload: { text: 'Output was not valid JSON — retrying once with a stricter instruction.' } });
+      const retry = await poeChat({
+        model: DEFAULT_MODEL,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user + '\n\nIMPORTANT: Respond with ONLY the JSON object. No markdown fences, no commentary. Ensure the JSON is complete and valid.' },
+        ],
+      });
+      parsed = parseJsonFromLLM<ContentJson>(retry.content);
+    }
   } catch (e) {
     throw new Error(`Optimize model returned unparseable output: ${e instanceof Error ? e.message : String(e)}`);
   }

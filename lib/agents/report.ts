@@ -157,7 +157,15 @@ export async function runReportAgent(
     'reuse third-party sources (industry directories, comparison/review sites, news, ' +
     'Wikipedia); they reward structured data (Organization/Product/Review/FAQ schema) ' +
     'and consistent brand mentions across the web. Your recommendations are concrete ' +
-    'and tied to the actual gaps — never generic marketing fluff. Output strict JSON only.';
+    'and tied to the actual gaps — never generic marketing fluff. Output strict JSON only. ' +
+    'PROVENANCE DISCIPLINE (non-negotiable): every claim in the report must be labeled by ' +
+    'evidence class. Facts that come from the scan data you were given are stated plainly. ' +
+    'Anything you project, estimate, or expect — impact ranges, timelines, traffic shares, ' +
+    'industry generalizations not present in the scan data — MUST be prefixed with ' +
+    '"[Projection]" and phrased as a target, never as a measurement. Never invent numbers ' +
+    'that look like measurements (percentages, query volumes, journey shares) unless they ' +
+    'appear in the provided scan data. A report that mixes forecasts into findings is a ' +
+    'defective report.';
 
   const user = [
     `Brand: ${input.brandName}` + (input.brandUrl ? ` (${input.brandUrl})` : ''),

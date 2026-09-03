@@ -19,6 +19,7 @@ import { runEncyclopediaAgent } from './encyclopedia';
 import { runProfileAgent } from './profile';
 import { runStandardAnswersAgent } from './answers';
 import { planPolicyForProject } from '@/lib/commerce';
+import { refundFailedRun } from '@/lib/credits';
 
 // Latest standard-answers library (B2) → the canonical answers the accuracy
 // pass judges real AI answers against. Null when the library hasn't been built.
@@ -876,5 +877,10 @@ export async function executeAgentRun(
         error_message: msg,
       })
       .eq('id', runId);
+    // Failed runs never keep the client's credits (idempotent, pool-mirroring).
+    try {
+      const refunded = await refundFailedRun(sb, runId);
+      if (refunded > 0) await persistAndEmit({ event_type: 'log', payload: { text: `Run failed — ${refunded} credits refunded automatically.` } });
+    } catch { /* refund is best-effort; ledger stays consistent via idempotency */ }
   }
 }

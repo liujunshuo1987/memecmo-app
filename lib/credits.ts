@@ -67,6 +67,37 @@ export async function spendCredits(
   return { ok: true, balance: { granted: bal.granted - fromGranted, purchased: bal.purchased - fromPurchased, total: bal.total - amount } };
 }
 
+/**
+ * Refund every credit spent on a FAILED run — a client must never pay for a
+ * deliverable that didn't arrive (CREAO trial incident 2026-09-03). Mirrors
+ * each spend row back into its original pool; idempotent per run.
+ */
+export async function refundFailedRun(
+  sb: SupabaseClient,
+  agentRunId: string,
+): Promise<number> {
+  const { data: spends } = await sb
+    .from('credit_ledger')
+    .select('organization_id, pool, delta')
+    .eq('agent_run_id', agentRunId)
+    .eq('kind', 'spend');
+  if (!spends?.length) return 0;
+  const { data: prior } = await sb
+    .from('credit_ledger')
+    .select('id')
+    .eq('agent_run_id', agentRunId)
+    .eq('kind', 'refund')
+    .limit(1)
+    .maybeSingle();
+  if (prior) return 0;
+  let total = 0;
+  await sb.from('credit_ledger').insert(spends.map((s) => {
+    total += -s.delta;
+    return { organization_id: s.organization_id, pool: s.pool, delta: -s.delta, kind: 'refund', reason: 'failed_run', agent_run_id: agentRunId };
+  }));
+  return total;
+}
+
 export async function grantCredits(
   sb: SupabaseClient,
   orgId: string,

@@ -119,9 +119,14 @@ export async function poeChat(opts: PoeChatOptions): Promise<PoeResult> {
 export function parseJsonFromLLM<T = unknown>(text: string): T {
   const trimmed = text.trim();
 
-  // 1. Strip ```json ... ``` or ``` ... ``` fences.
+  // 1. Strip ```json ... ``` or ``` ... ``` fences — including an UNCLOSED
+  // opening fence (truncated output was the #1 real-world parse failure:
+  // CREAO's optimize run died on `\`\`\`json {...` cut off mid-object).
   const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const candidate = fence ? fence[1].trim() : trimmed;
+  const unclosed = !fence && /^```(?:json)?/i.test(trimmed)
+    ? trimmed.replace(/^```(?:json)?\s*/i, '')
+    : null;
+  const candidate = fence ? fence[1].trim() : (unclosed ?? trimmed);
 
   try {
     return JSON.parse(candidate) as T;
@@ -139,6 +144,24 @@ export function parseJsonFromLLM<T = unknown>(text: string): T {
         return JSON.parse(candidate.slice(start, end + 1)) as T;
       } catch {
         /* fall through */
+      }
+    }
+    // 3. Truncation salvage: largest balanced prefix (string-aware brace scan).
+    if (start !== -1) {
+      let depth = 0, inStr = false, esc = false, lastBalanced = -1;
+      for (let i = start; i < candidate.length; i++) {
+        const ch = candidate[i];
+        if (esc) { esc = false; continue; }
+        if (ch === '\\') { esc = true; continue; }
+        if (ch === '"') { inStr = !inStr; continue; }
+        if (inStr) continue;
+        if (ch === '{' || ch === '[') depth++;
+        else if (ch === '}' || ch === ']') { depth--; if (depth === 0) lastBalanced = i; }
+      }
+      if (lastBalanced > start) {
+        try {
+          return JSON.parse(candidate.slice(start, lastBalanced + 1)) as T;
+        } catch { /* fall through */ }
       }
     }
     throw new Error(`Could not parse JSON from LLM output: ${text.slice(0, 200)}…`);
