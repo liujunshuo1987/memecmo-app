@@ -7,6 +7,7 @@
 // which Vercel freezes immediately).
 
 import { createClient as createServiceClient } from '@supabase/supabase-js';
+import { createHash } from 'node:crypto';
 import { AGENTS } from './registry';
 import { runDiscoveryAgent } from './discovery';
 import { runMonitorAgent } from './monitor';
@@ -184,12 +185,21 @@ function domainOf(url: string): string {
 // Persist this scan's citations to the Source-Authority Index and return the
 // CROSS-SCAN ranking (which domains the engines cite most for this project,
 // across all scans so far). The compounding GEO-native authority signal.
+// Evidence-grade fields (corpus-leverage S1, 2026-09): every citation row now
+// carries the CONTEXT it appeared in — which question intent, whether the
+// brand won that answer, who else was present. prompt_hash groups citations
+// by question without storing the question on every row.
+export function promptHash(prompt: string | undefined | null): string | null {
+  if (!prompt) return null;
+  return createHash('sha256').update(String(prompt).trim().toLowerCase()).digest('hex').slice(0, 16);
+}
+
 async function recordCitationsAndIndex(
   sb: ReturnType<typeof svc>,
   projectId: string,
   agentRunId: string,
   brandDomain: string,
-  rawSamples: { engine?: string; stage?: string; citations?: string[] }[],
+  rawSamples: { engine?: string; stage?: string; citations?: string[]; intent?: string; prompt?: string; brandPresent?: boolean; competitorsPresent?: string[] }[],
 ): Promise<{ ranking: { domain: string; citations: number; engines: number; isBrand: boolean }[]; totalCitations: number }> {
   const rows: Record<string, unknown>[] = [];
   for (const s of rawSamples || []) {
@@ -204,6 +214,10 @@ async function recordCitationsAndIndex(
         domain: dom,
         url,
         is_brand_domain: !!brandDomain && dom === brandDomain,
+        intent: s.intent ?? null,
+        prompt_hash: promptHash(s.prompt),
+        brand_present: typeof s.brandPresent === 'boolean' ? s.brandPresent : null,
+        competitors: Array.isArray(s.competitorsPresent) && s.competitorsPresent.length ? s.competitorsPresent : null,
       });
     }
   }
