@@ -216,12 +216,24 @@ export function parseJsonFromLLM<T = unknown>(text: string): T {
   // 1. Strip ```json ... ``` or ``` ... ``` fences — including an UNCLOSED
   // opening fence (truncated output was the #1 real-world parse failure:
   // CREAO's optimize run died on `\`\`\`json {...` cut off mid-object).
-  const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  //
+  // The outer fence must be matched GREEDILY (to the LAST closing fence): a
+  // Markdown article or distribution draft inside the JSON routinely carries
+  // its own ```json schema example, and the lazy match used to cut the
+  // candidate at that inner fence (NeuronSpark optimize + distribute, 2026-09-23).
+  const fence = trimmed.match(/^```(?:json)?\s*([\s\S]*)```\s*$/i) ?? trimmed.match(/```(?:json)?\s*([\s\S]*)```/i);
   const unclosed = !fence && /^```(?:json)?/i.test(trimmed)
     ? trimmed.replace(/^```(?:json)?\s*/i, '')
     : null;
-  const candidate = fence ? fence[1].trim() : (unclosed ?? trimmed);
+  const raw = fence ? fence[1].trim() : (unclosed ?? trimmed);
 
+  const attempt = (c: string): T | undefined => { try { return JSON.parse(c) as T; } catch { return undefined; } };
+  const direct = attempt(raw);
+  if (direct !== undefined) return direct;
+  // 1b. Repair the two habitual model mistakes inside string literals — raw
+  // line breaks / tabs instead of \n \t, and Markdown escapes (\* \_ \#)
+  // that are not legal JSON escapes — then try again. Structure untouched.
+  const candidate = repairJsonStrings(raw);
   try {
     return JSON.parse(candidate) as T;
   } catch {
@@ -257,7 +269,113 @@ export function parseJsonFromLLM<T = unknown>(text: string): T {
           return JSON.parse(candidate.slice(start, lastBalanced + 1)) as T;
         } catch { /* fall through */ }
       }
+      // 3b. Top-level object never closed (cut mid-string / mid-value): close
+      // the open string, drop a dangling key or comma, close every open
+      // bracket. Partial but valid beats nothing — and the caller's
+      // assertComplete() already refused finish_reason=length upstream.
+      const closed = closeTruncatedJson(candidate.slice(start));
+      if (closed) { try { return JSON.parse(closed) as T; } catch { /* fall through */ } }
     }
-    throw new Error(`Could not parse JSON from LLM output: ${text.slice(0, 200)}…`);
+    // Diagnosis to server logs: where the parser gave up, with context.
+    let where = '';
+    try { JSON.parse(candidate); } catch (e) {
+      const m = /position (\d+)/.exec(e instanceof Error ? e.message : String(e));
+      const pos = m ? Number(m[1]) : -1;
+      where = e instanceof Error ? e.message : String(e);
+      if (pos >= 0) console.error(`[parseJsonFromLLM] ${where} — context: …${candidate.slice(Math.max(0, pos - 160), pos)}⟦HERE⟧${candidate.slice(pos, pos + 120)}…`);
+      else console.error(`[parseJsonFromLLM] ${where}`);
+    }
+    throw new Error(`Could not parse JSON from LLM output${where ? ` (${where})` : ''}: ${text.slice(0, 200)}…`);
   }
+}
+
+// Close a truncated JSON document: terminate an open string, remove a
+// dangling `"key":` or trailing comma, then close open brackets innermost-first.
+export function closeTruncatedJson(src: string): string | null {
+  const stack: string[] = [];
+  let inStr = false, esc = false;
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+    if (inStr) { if (esc) esc = false; else if (ch === '\\') esc = true; else if (ch === '"') inStr = false; continue; }
+    if (ch === '"') inStr = true;
+    else if (ch === '{' || ch === '[') stack.push(ch === '{' ? '}' : ']');
+    else if (ch === '}' || ch === ']') stack.pop();
+  }
+  if (!stack.length) return null;
+  let out = src;
+  if (inStr) out += '"';
+  out = out.replace(/\s+$/, '');
+  out = out.replace(/,?\s*"(?:[^"\\]|\\.)*"\s*:\s*("(?:[^"\\]|\\.)*")?\s*$/, (m, val) => (val ? m : '')); // dangling key (value absent) → drop
+  out = out.replace(/,\s*$/, '');
+  return out + stack.reverse().join('');
+}
+
+// Repair the habitual model mistakes INSIDE JSON string literals without
+// touching structure: raw control characters (newline/tab), illegal
+// Markdown escapes (\* \_ \%), and — the one that killed NeuronSpark's
+// content run twice on 2026-09-23 — unescaped double quotes inside a value
+// (a JSON-LD example like "@type": "FAQPage" pasted into the article). A
+// quote is a real terminator only if what follows fits the JSON context: a
+// key must be followed by ':'; a value by ',' '}' ']' or end — and after a
+// ',' the next token must actually look like a key (in an object) or a
+// value (in an array). Anything else is an inner quote and gets escaped.
+export function repairJsonStrings(src: string): string {
+  let out = '';
+  const stack: { obj: boolean; expectKey: boolean }[] = [];
+  let inStr = false, isKey = false;
+  const top = () => stack[stack.length - 1];
+  const nextNonWs = (i: number) => { while (i < src.length && /\s/.test(src[i])) i++; return i; };
+  const looksLikeKey = (i: number) => /^"(?:[^"\\]|\\.)*"\s*:/.test(src.slice(i, i + 400));
+  const looksLikeValue = (i: number) => /^(?:"|-?\d|\{|\[|true|false|null)/.test(src.slice(i, i + 8));
+  const terminates = (i: number): boolean => {
+    const j = nextNonWs(i + 1);
+    if (j >= src.length) return true;
+    const c = src[j];
+    if (isKey) return c === ':';
+    if (c === '}' || c === ']') return true;
+    if (c === ',') {
+      const k = nextNonWs(j + 1);
+      if (k >= src.length) return true;
+      const t = top();
+      if (!t) return true;
+      return t.obj ? looksLikeKey(k) : looksLikeValue(k);
+    }
+    return false;
+  };
+  // Embedded JSON-like snippet inside a value ({"@type": …} / ["a", …]):
+  // while its braces are open, no quote can be the string's terminator.
+  let inner = 0;
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+    if (!inStr) {
+      out += ch;
+      if (ch === '{') stack.push({ obj: true, expectKey: true });
+      else if (ch === '[') stack.push({ obj: false, expectKey: false });
+      else if (ch === '}' || ch === ']') stack.pop();
+      else if (ch === ':') { const t = top(); if (t) t.expectKey = false; }
+      else if (ch === ',') { const t = top(); if (t) t.expectKey = t.obj; }
+      else if (ch === '"') { inStr = true; inner = 0; const t = top(); isKey = !!t && t.obj && t.expectKey; }
+      continue;
+    }
+    if (ch === '{' && /^\{\s*"/.test(src.slice(i, i + 12))) inner++;
+    else if (ch === '[' && /^\[\s*(?:"|\{|-?\d)/.test(src.slice(i, i + 12))) inner++;
+    else if ((ch === '}' || ch === ']') && inner > 0) inner--;
+    if (ch === '"') {
+      if (inner === 0 && terminates(i)) { out += ch; inStr = false; continue; }
+      out += '\\"'; continue; // inner quote
+    }
+    if (ch === '\\') {
+      const nx = src[i + 1];
+      if (nx === '"' || nx === '\\' || nx === '/' || nx === 'b' || nx === 'f' || nx === 'n' || nx === 'r' || nx === 't') { out += ch + nx; i++; continue; }
+      if (nx === 'u' && /^[0-9a-fA-F]{4}$/.test(src.slice(i + 2, i + 6))) { out += src.slice(i, i + 6); i += 5; continue; }
+      out += '\\\\'; continue; // lone backslash (\*, \_, \#, trailing) → escaped backslash
+    }
+    if (ch === '\n') { out += '\\n'; continue; }
+    if (ch === '\r') { out += '\\r'; continue; }
+    if (ch === '\t') { out += '\\t'; continue; }
+    const code = ch.charCodeAt(0);
+    if (code < 0x20) { out += '\\u' + code.toString(16).padStart(4, '0'); continue; }
+    out += ch;
+  }
+  return out;
 }
