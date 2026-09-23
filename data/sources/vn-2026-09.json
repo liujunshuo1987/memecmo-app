@@ -1,0 +1,849 @@
+{
+  "market": "VN",
+  "marketName": {
+    "pattern": "viet%",
+    "en": "Vietnam",
+    "vi": "Việt Nam"
+  },
+  "month": "2026-09",
+  "generatedAt": "2026-09-23T18:21:48.788Z",
+  "window": {
+    "days": 60,
+    "from": "2026-07-27",
+    "to": "2026-09-21"
+  },
+  "basis": {
+    "answersWithCitations": 1992,
+    "projects": 10,
+    "organizations": 4,
+    "industries": 6,
+    "engines": [
+      "ChatGPT",
+      "Claude",
+      "Google AI Overview",
+      "Perplexity"
+    ],
+    "from": "2026-07-27",
+    "to": "2026-09-21"
+  },
+  "rules": {
+    "minProjects": 5,
+    "volume": 40,
+    "engines": 2,
+    "stabilityPerHalf": 5,
+    "unit": "answers citing the domain (one answer citing several pages of a site counts once)",
+    "tiers": {
+      "T1": "all three tests",
+      "T2": "two of three",
+      "T3": "not listed"
+    }
+  },
+  "counts": {
+    "candidates": 600,
+    "listed": 37,
+    "t1": 30,
+    "t2": 7,
+    "brandOwned": 6,
+    "belowProjects": 549
+  },
+  "rows": [
+    {
+      "rank": 1,
+      "domain": "facebook.com",
+      "answers": 427,
+      "engines": 2,
+      "engineList": [
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 10,
+      "firstHalf": 295,
+      "secondHalf": 132,
+      "type": "social",
+      "share": 21.4,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 2,
+      "domain": "vnexpress.net",
+      "answers": 382,
+      "engines": 3,
+      "engineList": [
+        "Claude",
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 9,
+      "firstHalf": 192,
+      "secondHalf": 190,
+      "type": "news",
+      "share": 19.2,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 3,
+      "domain": "scribd.com",
+      "answers": 315,
+      "engines": 3,
+      "engineList": [
+        "Claude",
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 9,
+      "firstHalf": 119,
+      "secondHalf": 196,
+      "type": "documents",
+      "share": 15.8,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 4,
+      "domain": "wikipedia.org",
+      "answers": 284,
+      "engines": 3,
+      "engineList": [
+        "Claude",
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 9,
+      "firstHalf": 55,
+      "secondHalf": 229,
+      "type": "reference",
+      "share": 14.3,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 5,
+      "domain": "brandsvietnam.com",
+      "answers": 241,
+      "engines": 2,
+      "engineList": [
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 5,
+      "firstHalf": 152,
+      "secondHalf": 89,
+      "type": "industry media",
+      "share": 12.1,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 6,
+      "domain": "vietnam.vn",
+      "answers": 226,
+      "engines": 3,
+      "engineList": [
+        "Claude",
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 8,
+      "firstHalf": 59,
+      "secondHalf": 167,
+      "type": "news",
+      "share": 11.3,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 7,
+      "domain": "cafef.vn",
+      "answers": 208,
+      "engines": 2,
+      "engineList": [
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 7,
+      "firstHalf": 109,
+      "secondHalf": 99,
+      "type": "news",
+      "share": 10.4,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 8,
+      "domain": "youtube.com",
+      "answers": 192,
+      "engines": 2,
+      "engineList": [
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 8,
+      "firstHalf": 164,
+      "secondHalf": 28,
+      "type": "social",
+      "share": 9.6,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 9,
+      "domain": "sites.google.com",
+      "answers": 173,
+      "engines": 2,
+      "engineList": [
+        "Claude",
+        "Perplexity"
+      ],
+      "projects": 6,
+      "firstHalf": 26,
+      "secondHalf": 147,
+      "type": "directory / listing",
+      "share": 8.7,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 10,
+      "domain": "mytour.vn",
+      "answers": 170,
+      "engines": 3,
+      "engineList": [
+        "Claude",
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 8,
+      "firstHalf": 44,
+      "secondHalf": 126,
+      "type": "directory / listing",
+      "share": 8.5,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 11,
+      "domain": "linkedin.com",
+      "answers": 161,
+      "engines": 3,
+      "engineList": [
+        "Claude",
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 7,
+      "firstHalf": 112,
+      "secondHalf": 49,
+      "type": "social",
+      "share": 8.1,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 12,
+      "domain": "reddit.com",
+      "answers": 157,
+      "engines": 2,
+      "engineList": [
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 8,
+      "firstHalf": 40,
+      "secondHalf": 117,
+      "type": "community",
+      "share": 7.9,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 13,
+      "domain": "vietnamnet.vn",
+      "answers": 149,
+      "engines": 3,
+      "engineList": [
+        "Claude",
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 7,
+      "firstHalf": 69,
+      "secondHalf": 80,
+      "type": "news",
+      "share": 7.5,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 14,
+      "domain": "voz.vn",
+      "answers": 134,
+      "engines": 2,
+      "engineList": [
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 7,
+      "firstHalf": 40,
+      "secondHalf": 94,
+      "type": "community",
+      "share": 6.7,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 15,
+      "domain": "kenh14.vn",
+      "answers": 132,
+      "engines": 3,
+      "engineList": [
+        "Claude",
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 7,
+      "firstHalf": 26,
+      "secondHalf": 106,
+      "type": "news",
+      "share": 6.6,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 16,
+      "domain": "google.com",
+      "answers": 131,
+      "engines": 3,
+      "engineList": [
+        "Claude",
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 8,
+      "firstHalf": 42,
+      "secondHalf": 89,
+      "type": "platform",
+      "share": 6.6,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 17,
+      "domain": "slideshare.net",
+      "answers": 130,
+      "engines": 3,
+      "engineList": [
+        "Claude",
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 8,
+      "firstHalf": 77,
+      "secondHalf": 53,
+      "type": "documents",
+      "share": 6.5,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 18,
+      "domain": "vov.vn",
+      "answers": 126,
+      "engines": 2,
+      "engineList": [
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 6,
+      "firstHalf": 94,
+      "secondHalf": 32,
+      "type": "news",
+      "share": 6.3,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 19,
+      "domain": "amazon.com",
+      "answers": 114,
+      "engines": 2,
+      "engineList": [
+        "Claude",
+        "Perplexity"
+      ],
+      "projects": 6,
+      "firstHalf": 31,
+      "secondHalf": 83,
+      "type": "platform",
+      "share": 5.7,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 20,
+      "domain": "studocu.vn",
+      "answers": 107,
+      "engines": 2,
+      "engineList": [
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 5,
+      "firstHalf": 46,
+      "secondHalf": 61,
+      "type": "documents",
+      "share": 5.4,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 21,
+      "domain": "congthuong.vn",
+      "answers": 101,
+      "engines": 2,
+      "engineList": [
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 6,
+      "firstHalf": 67,
+      "secondHalf": 34,
+      "type": "news",
+      "share": 5.1,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 22,
+      "domain": "baomoi.com",
+      "answers": 100,
+      "engines": 3,
+      "engineList": [
+        "Claude",
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 9,
+      "firstHalf": 37,
+      "secondHalf": 63,
+      "type": "news",
+      "share": 5,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 23,
+      "domain": "topcv.vn",
+      "answers": 82,
+      "engines": 3,
+      "engineList": [
+        "Claude",
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 6,
+      "firstHalf": 40,
+      "secondHalf": 42,
+      "type": "website",
+      "share": 4.1,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 24,
+      "domain": "thanhnien.vn",
+      "answers": 76,
+      "engines": 3,
+      "engineList": [
+        "Claude",
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 8,
+      "firstHalf": 27,
+      "secondHalf": 49,
+      "type": "news",
+      "share": 3.8,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 25,
+      "domain": "tuoitre.vn",
+      "answers": 66,
+      "engines": 3,
+      "engineList": [
+        "Claude",
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 6,
+      "firstHalf": 28,
+      "secondHalf": 38,
+      "type": "news",
+      "share": 3.3,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 26,
+      "domain": "lemon8-app.com",
+      "answers": 62,
+      "engines": 3,
+      "engineList": [
+        "Claude",
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 5,
+      "firstHalf": 12,
+      "secondHalf": 50,
+      "type": "social",
+      "share": 3.1,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 27,
+      "domain": "toplist.vn",
+      "answers": 60,
+      "engines": 1,
+      "engineList": [
+        "Perplexity"
+      ],
+      "projects": 6,
+      "firstHalf": 20,
+      "secondHalf": 40,
+      "type": "website",
+      "share": 3,
+      "tests": {
+        "volume": true,
+        "engines": false,
+        "stability": true
+      },
+      "tier": "T2"
+    },
+    {
+      "rank": 28,
+      "domain": "tinhte.vn",
+      "answers": 57,
+      "engines": 3,
+      "engineList": [
+        "Claude",
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 6,
+      "firstHalf": 14,
+      "secondHalf": 43,
+      "type": "community",
+      "share": 2.9,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 29,
+      "domain": "dantri.com.vn",
+      "answers": 56,
+      "engines": 2,
+      "engineList": [
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 6,
+      "firstHalf": 14,
+      "secondHalf": 42,
+      "type": "news",
+      "share": 2.8,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 30,
+      "domain": "shopee.vn",
+      "answers": 52,
+      "engines": 3,
+      "engineList": [
+        "Claude",
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 5,
+      "firstHalf": 17,
+      "secondHalf": 35,
+      "type": "platform",
+      "share": 2.6,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 31,
+      "domain": "fptshop.com.vn",
+      "answers": 44,
+      "engines": 3,
+      "engineList": [
+        "Claude",
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 5,
+      "firstHalf": 4,
+      "secondHalf": 40,
+      "type": "website",
+      "share": 2.2,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": false
+      },
+      "tier": "T2"
+    },
+    {
+      "rank": 32,
+      "domain": "znews.vn",
+      "answers": 43,
+      "engines": 2,
+      "engineList": [
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 5,
+      "firstHalf": 15,
+      "secondHalf": 28,
+      "type": "news",
+      "share": 2.2,
+      "tests": {
+        "volume": true,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T1"
+    },
+    {
+      "rank": 33,
+      "domain": "sggp.org.vn",
+      "answers": 37,
+      "engines": 3,
+      "engineList": [
+        "Claude",
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 6,
+      "firstHalf": 17,
+      "secondHalf": 20,
+      "type": "website",
+      "share": 1.9,
+      "tests": {
+        "volume": false,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T2"
+    },
+    {
+      "rank": 34,
+      "domain": "apple.com",
+      "answers": 27,
+      "engines": 3,
+      "engineList": [
+        "Claude",
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 7,
+      "firstHalf": 6,
+      "secondHalf": 21,
+      "type": "platform",
+      "share": 1.4,
+      "tests": {
+        "volume": false,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T2"
+    },
+    {
+      "rank": 35,
+      "domain": "baotintuc.vn",
+      "answers": 27,
+      "engines": 3,
+      "engineList": [
+        "Claude",
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 5,
+      "firstHalf": 12,
+      "secondHalf": 15,
+      "type": "website",
+      "share": 1.4,
+      "tests": {
+        "volume": false,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T2"
+    },
+    {
+      "rank": 36,
+      "domain": "tiktok.com",
+      "answers": 17,
+      "engines": 2,
+      "engineList": [
+        "Claude",
+        "Google AI Overview"
+      ],
+      "projects": 6,
+      "firstHalf": 5,
+      "secondHalf": 12,
+      "type": "social",
+      "share": 0.9,
+      "tests": {
+        "volume": false,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T2"
+    },
+    {
+      "rank": 37,
+      "domain": "maisonoffice.vn",
+      "answers": 12,
+      "engines": 3,
+      "engineList": [
+        "Claude",
+        "Google AI Overview",
+        "Perplexity"
+      ],
+      "projects": 5,
+      "firstHalf": 6,
+      "secondHalf": 6,
+      "type": "website",
+      "share": 0.6,
+      "tests": {
+        "volume": false,
+        "engines": true,
+        "stability": true
+      },
+      "tier": "T2"
+    }
+  ]
+}
