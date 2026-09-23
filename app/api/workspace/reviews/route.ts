@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { serviceClient } from '@/lib/commerce';
+import { loadEdits, applyProfileEdits } from '@/lib/edits';
 import { sendReviewEmail } from '@/lib/email';
 
 export const runtime = 'nodejs';
@@ -41,7 +42,11 @@ async function buildSnapshot(sb: ReturnType<typeof serviceClient>, projectId: st
   try {
     const parsed = JSON.parse(data.content);
     if (kind === 'brand_profile') {
-      const { definition, description, category, services, differentiators, facts, nap, audience } = parsed;
+      // The client reviews the profile IN FORCE — generated values with the
+      // user's edits applied last — not a raw generation that a re-run may
+      // have produced since the last correction.
+      const merged = applyProfileEdits(parsed, await loadEdits(sb, projectId, 'brand_profile'));
+      const { definition, description, category, services, differentiators, facts, nap, audience } = merged;
       return { definition, description, category, services, differentiators, facts, nap, audience };
     }
     return { promptSet: parsed.promptSet ?? [], keyPrompts: parsed.keyPrompts ?? [] };

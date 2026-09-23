@@ -38,7 +38,7 @@ export interface AgentRun {
   project_id: string;
   agent_id: string;
   triggered_by: string | null;
-  trigger_method: 'chat' | 'schedule' | 'api' | 'cascade';
+  trigger_method: 'chat' | 'schedule' | 'api' | 'cascade' | 'preview' | 'diagnostic';
   input_prompt: string | null;
   status: 'queued' | 'running' | 'completed' | 'failed' | 'canceled';
   progress_pct: number;
@@ -144,19 +144,8 @@ export async function getRecentRuns(projectId: string, limit = 20): Promise<Agen
 // ─── Scan history (closed loop) ─────────────────────────────────────────────
 // Every Monitor / Full-Scan run already persists its scorecard in
 // agent_runs.output, so the trend over time is derivable without a new table.
-export interface ScanPoint {
-  runId: string;
-  ts: string;
-  aigvr: number | null;
-  presence: number | null;
-  rank: number | null;
-  gaps: number;
-  prominence: number | null;
-  sentiment: number | null;
-  citation: number | null;
-  competitive: number | null;
-  topOfMind: number | null;
-}
+export type { ScanPoint } from './trend';
+import { trendExtras, type ScanPoint } from './trend';
 
 export async function getScanHistory(projectId: string): Promise<ScanPoint[]> {
   const supabase = createClient();
@@ -166,6 +155,7 @@ export async function getScanHistory(projectId: string): Promise<ScanPoint[]> {
     .eq('project_id', projectId)
     .in('agent_id', ['monitor', 'full_scan'])
     .eq('status', 'completed')
+    .neq('trigger_method', 'diagnostic') // partial engine sets never enter the trend
     .order('created_at', { ascending: true });
   return ((data as { id: string; created_at: string; output: Record<string, any> | null }[]) ?? [])
     .map((r) => {
@@ -184,6 +174,7 @@ export async function getScanHistory(projectId: string): Promise<ScanPoint[]> {
         citation: d.citation ?? null,
         competitive: d.competitiveShare ?? null,
         topOfMind: sc.topOfMind?.overallRate ?? d.topOfMindRate ?? null,
+        ...trendExtras(sc),
       };
     })
     .filter((p) => p.aigvr != null);

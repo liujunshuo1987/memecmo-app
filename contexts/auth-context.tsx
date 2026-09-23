@@ -55,23 +55,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
-  const fetchSubscription = async (userId: string) => {
-    const { data } = await supabase
-      .from('subscriptions')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
-    setSubscription(data);
-  };
-
-  const fetchQuotas = async (userId: string) => {
-    const { data } = await supabase
-      .from('usage_quotas')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
-    setQuotas(data);
-  };
+  // Billing is ORG-level (org_subscriptions, credit_ledger — see lib/billing.ts
+  // and /api/workspace/billing). The per-user `subscriptions` / `usage_quotas`
+  // tables this context was written for never existed in this schema, so every
+  // page load 404'd twice. Kept as null for the consumers that still read them.
+  const fetchSubscription = async (_userId: string) => { setSubscription(null); };
+  const fetchQuotas = async (_userId: string) => { setQuotas(null); };
 
   const refreshSubscription = async () => {
     if (user) {

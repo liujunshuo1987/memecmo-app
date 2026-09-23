@@ -40,3 +40,7 @@ next-env.d.ts
 # Local env snapshots — contain live keys, never commit
 .env.local.backup-*
 .env*.backup*
+
+# Claude desktop app session files (keep only the dev-server launch config)
+.claude/*
+!.claude/launch.json

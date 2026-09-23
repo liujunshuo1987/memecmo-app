@@ -62,6 +62,8 @@
   --ink: #2A2024; --dim: #6E625F; --faint: #9C8E8A;
   --brand: #C76B7A; --on-brand: #FFFFFF; --brand-soft: rgba(199,107,122,0.10);
   --gold: #B6863A; --sage: #5E9E76; --garnet: #C0455C;
+  /* VI document system (00_品牌VI文书模版): structural wine + rose-tinted rule */
+  --brand-deep: #7A3B46; --on-brand-deep: #EFD9DD; --edge-rose: #E0C8CD;
 }
 @theme inline {
   --color-canvas: var(--canvas);
@@ -78,6 +80,9 @@
   --color-gold: var(--gold);
   --color-sage: var(--sage);
   --color-garnet: var(--garnet);
+  --color-brand-deep: var(--brand-deep);
+  --color-on-brand-deep: var(--on-brand-deep);
+  --color-edge-rose: var(--edge-rose);
 }
 
 body {

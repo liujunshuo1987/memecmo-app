@@ -6,7 +6,8 @@
 // then pulls these canonical facts so deliverables stay consistent instead of
 // each agent independently inventing brand facts. The foundation of the suite.
 
-import { poeChat, parseJsonFromLLM, DEFAULT_MODEL } from '@/lib/llm/poe';
+import { poeChat, parseJsonFromLLM, DEFAULT_MODEL, assertComplete } from '@/lib/llm/poe';
+import { outputTokenBudget } from '@/lib/markets';
 import { fetchSite, type FetchedSite } from './site';
 
 type EventEmitter = (event: {
@@ -100,7 +101,7 @@ export async function runProfileAgent(
       { role: 'system', content: system },
       { role: 'user', content: user },
     ],
-    maxTokens: 2500,
+    maxTokens: outputTokenBudget(2500, input.targetLanguage),
     temperature: 0.3,
   });
 
@@ -109,6 +110,7 @@ export async function runProfileAgent(
 
   let p: BrandProfile;
   try {
+    assertComplete(res, 'Brand profile');
     p = parseJsonFromLLM<BrandProfile>(res.content);
   } catch (e) {
     throw new Error(`Profile model returned unparseable output: ${e instanceof Error ? e.message : String(e)}`);

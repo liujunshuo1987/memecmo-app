@@ -8,7 +8,8 @@
 // the realistic path — build coverage first (PR), and get mentioned in EXISTING
 // relevant articles meanwhile.
 
-import { poeChat, parseJsonFromLLM, DEFAULT_MODEL } from '@/lib/llm/poe';
+import { poeChat, parseJsonFromLLM, DEFAULT_MODEL, assertComplete } from '@/lib/llm/poe';
+import { outputTokenBudget } from '@/lib/markets';
 import { brandProfileBlock } from './brand-facts';
 import { stateFrameBlock } from './state-frames';
 import { scanUnverifiedClaims } from './compliance';
@@ -109,7 +110,7 @@ export async function runEncyclopediaAgent(
       { role: 'system', content: system },
       { role: 'user', content: user },
     ],
-    maxTokens: 7000,
+    maxTokens: outputTokenBudget(7000, input.targetLanguage),
     temperature: 0.4,
   });
 
@@ -118,6 +119,7 @@ export async function runEncyclopediaAgent(
 
   let parsed: EncyclopediaJson;
   try {
+    assertComplete(res, 'Encyclopedia draft');
     parsed = parseJsonFromLLM<EncyclopediaJson>(res.content);
   } catch (e) {
     throw new Error(`Encyclopedia model returned unparseable output: ${e instanceof Error ? e.message : String(e)}`);

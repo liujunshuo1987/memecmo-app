@@ -95,6 +95,11 @@ export default async function WorkspacePage({ params }: PageProps) {
 
   return (
     <WorkspaceClient
+      // Keyed by project: React keeps a same-typed page component mounted across
+      // navigations between two /workspace/[org]/[project] URLs, so state seeded
+      // from props (runs, history, open editors) would show the PREVIOUS
+      // project's data until a hard reload. The key forces a fresh instance.
+      key={projectAndOrg.project.id}
       project={projectAndOrg.project}
       organization={projectAndOrg.organization}
       initialRuns={recentRuns}

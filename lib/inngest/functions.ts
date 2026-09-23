@@ -7,6 +7,10 @@ import { recordUsage, isMeteredKind } from '@/lib/commerce';
 import { sendProjectDigest, maybeSendScanAlert } from '@/lib/reports/digest';
 import { applyMonthlyGrant, applyPlanAllowance } from '@/lib/credits';
 import { sendEmail } from '@/lib/email';
+import { runEnginePatrol } from '@/lib/engines/health';
+import { dueUrls, fetchBatch, chunk, type DueUrl } from '@/lib/pages/queue';
+import { discoverSitePages, registerSitePages } from '@/lib/pages/sitemap';
+import { verifyIntervention, verifyDueInterventions } from '@/lib/pages/verify';
 import { previewReadyEmail, nurtureD1Email, nurtureD3Email, nurtureD7Email, TrialEmailCtx } from '@/lib/emails/trial';
 
 function svc() {
@@ -109,7 +113,23 @@ export const runAgent = inngest.createFunction(
     //    (full_scan) checkpoint each phase as its own Inngest step → each runs
     //    in a separate, short Vercel invocation and resumes durably, instead of
     //    one long invocation that hits the function-duration ceiling and stalls.
-    await executeAgentRun(runId, agentId, project, async () => {}, step);
+    //
+    //    The cascade (full_scan) checkpoints its phases as steps INSIDE
+    //    executeAgentRun. A standalone agent has no phases, so it must be one
+    //    step HERE — otherwise its body sits outside every step and Inngest
+    //    re-executes it on each replay triggered by the steps below. Measured
+    //    2026-09-07: every standalone Monitor ran FOUR times ("Monitor
+    //    started" ×4, 20 engine.query calls), re-billing the engines after the
+    //    run row already said completed — ~38% of the month's Poe spend, and
+    //    the source of completed runs showing 33% progress.
+    if (agentId === 'full_scan') {
+      await executeAgentRun(runId, agentId, project, async () => {}, step);
+    } else {
+      await step.run('execute-agent', async () => {
+        await executeAgentRun(runId, agentId, project, async () => {});
+        return true;
+      });
+    }
 
     // 4. Event-triggered client alert: a completed scan that shows a big score
     //    drop or an engine collapse emails the client immediately instead of
@@ -340,4 +360,62 @@ export const scheduledTrialNurture = inngest.createFunction(
   },
 );
 
-export const functions = [runAgent, scheduledWeekly, scheduledMonthly, scheduledDigest, scheduledTrialNurture];
+// Daily engine liveness patrol — 01:30 UTC, thirty minutes before the scan
+// hour. Probes every primary and fallback model, the provider's model list and
+// the SerpAPI quota; persists to engine_health_checks; alerts the operator only
+// on conditions that would make tonight's scans fail or change methodology.
+export const engineHealthPatrol = inngest.createFunction(
+  { id: 'engine-health-patrol', name: 'Daily engine liveness patrol', triggers: [{ cron: '30 1 * * *' }] },
+  async ({ step }) => step.run('patrol', () => runEnginePatrol(svc())),
+);
+
+// Cited-page fetcher: reads the pages the engines cited (features, not
+// copies) so "what gets cited" becomes a dataset. Runs after every indexed
+// monitor scan (event) and nightly for re-reads/backlog (cron). One batch per
+// step so each batch fits a single serverless invocation; concurrency 1 so we
+// are never more than one polite crawler on anyone's site.
+export const pagesFetch = inngest.createFunction(
+  { id: 'pages-fetch', name: 'Cited-page fetcher', concurrency: { limit: 1 }, triggers: [{ event: 'geo/pages.fetch' }, { cron: '0 2 * * *' }] },
+  async ({ event, step }) => {
+    const data: any = (event as any)?.data ?? {};
+    const projectId: string | null = typeof data.projectId === 'string' ? data.projectId : null;
+    const limit = Math.min(1000, Math.max(1, Number(data.limit ?? 120)));
+    // Phase 2: the client's own pages join the queue (sitemap discovery, ≤60 per project).
+    const discovered = projectId
+      ? await step.run('site-discover', async () => {
+          const sb = svc();
+          const { data: proj } = await sb.from('projects').select('brand_url').eq('id', projectId).maybeSingle();
+          if (!proj?.brand_url) return 0;
+          return registerSitePages(sb, projectId, await discoverSitePages(String(proj.brand_url), 60));
+        })
+      : 0;
+    // step.run returns a JSON-ified shape (all props optional); the RPC rows are complete.
+    const due = (await step.run('queue', () => dueUrls(svc(), projectId, limit))) as DueUrl[];
+    const batches = chunk(due, 12); // 12 urls per step, ≤4 hosts in parallel — well inside one invocation
+    const totals = { fetched: 0, ok: 0, blocked: 0, skipped: 0, failed: 0 };
+    for (let i = 0; i < batches.length; i++) {
+      const r = await step.run(`fetch-${i}`, () => fetchBatch(svc(), batches[i]));
+      totals.fetched += r.fetched; totals.ok += r.ok; totals.blocked += r.blocked; totals.skipped += r.skipped; totals.failed += r.failed;
+    }
+    // Phase 2: re-verify logged actions (new ones, then weekly).
+    const verified = await step.run('verify-interventions', () => verifyDueInterventions(svc(), { projectId, limit: 30 }));
+    return { projectId, discovered, queued: due.length, ...totals, verified };
+  },
+);
+
+// One intervention, right after it is logged: is the page live, how long, hash.
+export const interventionVerify = inngest.createFunction(
+  { id: 'intervention-verify', name: 'Verify a logged action', triggers: [{ event: 'geo/intervention.verify' }] },
+  async ({ event, step }) => {
+    const id = String((event as any)?.data?.interventionId ?? '');
+    if (!id) return { skipped: 'no id' };
+    return step.run('verify', async () => {
+      const sb = svc();
+      const { data: iv } = await sb.from('interventions').select('id, url, text_hash').eq('id', id).maybeSingle();
+      if (!iv?.url) return { skipped: 'no url' };
+      return verifyIntervention(sb, iv as { id: string; url: string; text_hash: string | null });
+    });
+  },
+);
+
+export const functions = [runAgent, scheduledWeekly, scheduledMonthly, scheduledDigest, scheduledTrialNurture, engineHealthPatrol, pagesFetch, interventionVerify];

@@ -69,6 +69,7 @@ export default async function RollupPage({ params }: PageProps) {
         .select('agent_id, output, completed_at')
         .eq('project_id', p.id)
         .in('agent_id', ['monitor', 'full_scan'])
+        .neq('trigger_method', 'diagnostic')
         .eq('status', 'completed')
         .order('completed_at', { ascending: false })
         .limit(3);

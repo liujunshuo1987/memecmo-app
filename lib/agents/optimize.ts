@@ -6,7 +6,8 @@
 // JSON-LD (FAQPage) schema. This is the agent that MAKES the content that moves
 // GEO — the step beyond measure/recommend.
 
-import { poeChat, parseJsonFromLLM, DEFAULT_MODEL } from '@/lib/llm/poe';
+import { poeChat, parseJsonFromLLM, DEFAULT_MODEL, assertComplete } from '@/lib/llm/poe';
+import { outputTokenBudget } from '@/lib/markets';
 import { brandProfileBlock } from './brand-facts';
 import { stateFrameBlock } from './state-frames';
 
@@ -30,6 +31,7 @@ interface OptimizeInput {
   industry?: string | null;
   target: { query: string; stage: string; competitors?: string[] };
   brandProfile?: any;
+  citationBrief?: string; // lib/pages/profile — measured on pages the engines cited here
 }
 
 const LANGUAGE_NAMES: Record<string, string> = {
@@ -90,6 +92,7 @@ export async function runOptimizeAgent(
     `Write everything in ${languageName}.`,
     input.target.competitors?.length ? `Competitors currently winning this query: ${input.target.competitors.join(', ')}.` : null,
     (brandProfileBlock(input.brandProfile) + stateFrameBlock(input.targetCountry, input.industry)) || null,
+    input.citationBrief ? '\n' + input.citationBrief + '\n' : null,
     '',
     `Target buyer query to win (write the page that should rank/be-cited for it):`,
     `"${query}"`,
@@ -115,7 +118,7 @@ export async function runOptimizeAgent(
       { role: 'system', content: system },
       { role: 'user', content: user },
     ],
-    maxTokens: 4500,
+    maxTokens: outputTokenBudget(4500, input.targetLanguage),
     temperature: 0.6,
   });
 
@@ -125,6 +128,7 @@ export async function runOptimizeAgent(
   let parsed: ContentJson;
   try {
     try {
+      assertComplete(res, 'Content draft');
       parsed = parseJsonFromLLM<ContentJson>(res.content);
     } catch (e) {
       // One retry: truncated / malformed JSON is nondeterministic — a fresh
@@ -137,6 +141,7 @@ export async function runOptimizeAgent(
           { role: 'user', content: user + '\n\nIMPORTANT: Respond with ONLY the JSON object. No markdown fences, no commentary. Ensure the JSON is complete and valid.' },
         ],
       });
+      assertComplete(retry, 'Content draft');
       parsed = parseJsonFromLLM<ContentJson>(retry.content);
     }
   } catch (e) {

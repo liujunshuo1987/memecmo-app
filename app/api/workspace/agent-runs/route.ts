@@ -35,7 +35,11 @@ interface CreateRunBody {
   projectId: string;
   agentId: string;
   inputPrompt?: string;
-  triggerMethod?: 'chat' | 'schedule' | 'api' | 'cascade';
+  // Caller-settable kinds only: 'chat' (default) or 'diagnostic' (manual
+  // monitor on a chosen/available engine subset, labelled partial, excluded
+  // from the trend). System kinds are never accepted from a request body.
+  triggerMethod?: 'chat' | 'diagnostic';
+  engineKeys?: string[];
 }
 
 export async function POST(req: NextRequest) {
@@ -116,7 +120,14 @@ export async function POST(req: NextRequest) {
       project_id: body.projectId,
       agent_id: body.agentId,
       triggered_by: user.id,
-      trigger_method: body.triggerMethod ?? 'chat',
+      // Only two caller-settable kinds. 'diagnostic' = manual scan on a
+      // chosen/available engine subset, labelled partial, excluded from the
+      // trend. Everything else ('schedule', 'preview', 'cascade') is set by
+      // the system, never by a request body.
+      trigger_method: body.triggerMethod === 'diagnostic' && body.agentId === 'monitor' ? 'diagnostic' : 'chat',
+      options: body.triggerMethod === 'diagnostic' && Array.isArray(body.engineKeys)
+        ? { engineKeys: body.engineKeys.filter((k: unknown) => typeof k === 'string').slice(0, 8) }
+        : null,
       input_prompt: body.inputPrompt ?? null,
       status: 'queued',
     })

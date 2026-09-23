@@ -30,7 +30,7 @@ export async function GET(
   // RLS gates visibility to runs in projects the user can see
   const { data: run, error: runError } = await supabase
     .from('agent_runs')
-    .select('id, agent_id, status, progress_pct, summary, output, error_message, created_at, completed_at')
+    .select('id, agent_id, status, progress_pct, summary, output, error_message, created_at, completed_at, trigger_method')
     .eq('id', runId)
     .maybeSingle();
   if (runError || !run) {

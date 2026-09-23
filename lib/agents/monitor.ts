@@ -10,7 +10,7 @@
 // the high-intent gap list (queries where competitors appear and the brand
 // doesn't). This is the measurement that turns prompts into a deliverable.
 
-import { poeChat, parseJsonFromLLM } from '@/lib/llm/poe';
+import { poeChat, parseJsonFromLLM, EngineCapacityError, EngineOutageError, isCapacityError } from '@/lib/llm/poe';
 import { fetchGoogleAio, localeFor } from './serp';
 import { classifyIntent, type PromptIntent } from './intent';
 
@@ -49,6 +49,13 @@ interface MonitorInput {
   // Engine subset (billing lever / trial preview). Keys from ENGINES +
   // 'google_aio'; omitted → all available engines.
   engineKeys?: string[];
+  // Resolved by resolveEngineModels() in the run preflight — a live primary
+  // or fallback per engine key. Absent → the static primary.
+  engineModels?: Record<string, string>;
+  // Diagnostic mode: a missing engine does not fail the scan. The scorecard is
+  // marked partial (with the missing engines and their causes) and callers
+  // must keep it out of the trend line. Never set for scheduled runs.
+  allowPartial?: boolean;
   // Standard answers library (B2) — enables the answer-accuracy pass: is what
   // AI actually says CORRECT vs the canonical answer? (support-cost signal)
   standardAnswers?: { prompt: string; local?: string; en?: string }[];
@@ -68,13 +75,61 @@ const COMPETITOR_SET_TTL_MS = 30 * 24 * 3600 * 1000;
 // Google AI Overview engine (kind 'serp') is the REAL Google surface — added at
 // runtime only when SERPAPI_KEY is configured.
 type EngineKind = 'poe' | 'serp';
-interface Engine { key: string; label: string; model: string; kind: EngineKind }
-const ENGINES: Engine[] = [
+// `fallbacks` are bots verified live on Poe that can stand in when the primary
+// is retired or down. The engine LABEL (what the client sees, what the trend
+// line is keyed on) never changes; the model behind it is recorded on every
+// scorecard so a model change is visible as a methodology note, never hidden.
+export interface Engine { key: string; label: string; model: string; kind: EngineKind; fallbacks?: string[] }
+export const ENGINES: Engine[] = [
   { key: 'chatgpt', label: 'ChatGPT', model: 'GPT-4o', kind: 'poe' },
-  { key: 'gemini', label: 'Gemini', model: 'Gemini-2.5-Pro', kind: 'poe' },
+  // Gemini-2.5-Pro was retired by Poe between 2026-09-14 and 2026-09-16 (500
+  // "Server got itself in trouble", absent from /v1/models). 3.1-Pro is the
+  // only Pro-class Gemini left; 3.5-Flash is the verified cheaper stand-in.
+  { key: 'gemini', label: 'Gemini', model: 'Gemini-3.1-Pro', kind: 'poe', fallbacks: ['Gemini-3.5-Flash'] },
   { key: 'perplexity', label: 'Perplexity', model: 'Perplexity-Sonar', kind: 'poe' },
   { key: 'claude', label: 'Claude', model: 'Claude-Sonnet-4.5', kind: 'poe' },
 ];
+
+// Minimum share of sampled prompts an engine must actually answer for its
+// cell to be scored. Below this the engine is treated as down — a 60%-answered
+// engine is not the same measurement as last week's 100%.
+const ENGINE_MIN_ANSWER_RATE = 0.8;
+
+/** One-token liveness probe of every Poe engine we are about to spend on.
+ *  Returns the model to use per engine key (primary or a live fallback) and
+ *  throws EngineOutageError — non-retriable — if any engine has no live
+ *  model. Costs ~4 tokens; saves a 5-engine, 3-attempt, $15 dead run. */
+export async function resolveEngineModels(
+  engineKeys?: string[],
+  opts: { tolerateDead?: boolean } = {},
+): Promise<{ models: Record<string, string>; substituted: string[]; dead: string[] }> {
+  const wanted = ENGINES.filter((e) => !engineKeys?.length || engineKeys.includes(e.key));
+  const models: Record<string, string> = {};
+  const substituted: string[] = [];
+  const dead: string[] = [];
+  await Promise.all(wanted.map(async (e) => {
+    for (const candidate of [e.model, ...(e.fallbacks ?? [])]) {
+      try {
+        await poeChat({ model: candidate, messages: [{ role: 'user', content: 'ping' }], maxTokens: 1, retries: 0 });
+        models[e.key] = candidate;
+        if (candidate !== e.model) substituted.push(`${e.label}: ${e.model} → ${candidate}`);
+        return;
+      } catch (err) {
+        if (isCapacityError(err)) throw err;           // account-level — surface as capacity
+        // 5xx / 404 / network: try the next candidate
+      }
+    }
+    dead.push(`${e.label} (${[e.model, ...(e.fallbacks ?? [])].join(', ')})`);
+  }));
+  if (dead.length && !opts.tolerateDead) {
+    throw new EngineOutageError(
+      `Engine unavailable upstream: ${dead.join('; ')}. No live model for this engine — the scan was not started so nothing was spent. ` +
+      'This usually means the provider retired the model; update the engine table.',
+      dead,
+    );
+  }
+  return { models, substituted, dead: dead.map((d) => d.split(' (')[0]) };
+}
 const AIO_ENGINE: Engine = { key: 'google_aio', label: 'Google AI Overview', model: 'serpapi', kind: 'serp' };
 
 // Sample size balances rigor (more n per stage×engine cell = less noisy %)
@@ -421,7 +476,8 @@ export async function runMonitorAgent(
   const enginePool: Engine[] = serpKey ? [...ENGINES, AIO_ENGINE] : [...ENGINES];
   const engines: Engine[] = input.engineKeys?.length
     ? enginePool.filter((e) => input.engineKeys!.includes(e.key))
-    : enginePool;
+    : enginePool
+    .map((e) => (input.engineModels?.[e.key] && input.engineModels[e.key] !== e.model ? { ...e, model: input.engineModels[e.key] } : e));
   const kindByLabel = new Map(engines.map((e) => [e.label, e.kind]));
   const loc = localeFor(targetCountry, input.targetLanguage);
 
@@ -449,12 +505,18 @@ export async function runMonitorAgent(
 
   // 2. Query engines — collect raw answers (full text in-memory only).
   const rawByEngine = new Map<string, RawAnswer[]>();
+  const engineErrors = new Map<string, unknown>();
   const totalQueries = sampled.length * engines.length;
   let done = 0;
 
   // Engines run CONCURRENTLY (was sequential — that serialized ~250s of queries
   // and pushed a single-invocation Monitor past the Vercel function-duration
   // ceiling). Each engine still bounds its own internal concurrency.
+  // Fail fast: the moment one engine is declared down, every other engine's
+  // remaining queries are cancelled. Before this, a Gemini batch that died at
+  // second 1 let the other four engines run for two minutes and pay for the
+  // judge pass, only for the coverage guard to reject the scan at the end.
+  const abort = new AbortController();
   await Promise.all(engines.map(async (engine) => {
     await emit({
       event_type: 'tool_call',
@@ -462,7 +524,10 @@ export async function runMonitorAgent(
     });
     try {
       const conc = engine.kind === 'serp' ? SERP_CONCURRENCY : QUERY_CONCURRENCY;
+      let failed = 0;
+      let lastErr: unknown = null;
       const answers = await mapLimit(sampled, conc, async (s) => {
+        if (abort.signal.aborted) return null;
         let text = '';
         let citations: string[];
         if (engine.kind === 'serp') {
@@ -477,17 +542,29 @@ export async function runMonitorAgent(
             citations = [];
           }
         } else {
-          const resp = await poeChat({
-            model: engine.model,
-            messages: [{ role: 'user', content: s.prompt }],
-            maxTokens: 900,
-            // temperature 0 → deterministic model sampling, so the measurement is
-            // reproducible (residual variance is from web-retrieval engines only).
-            temperature: 0,
-            retries: 1,
-          });
-          text = resp.content || '';
-          citations = extractUrls(text);
+          // Per-query resilience for Poe engines too (the AIO path always had
+          // it): one failed prompt is dropped from the sample, not counted as
+          // "brand absent", and must not sink the other 23. The engine is
+          // declared down only when its answer rate falls below the floor.
+          try {
+            const resp = await poeChat({
+              model: engine.model,
+              messages: [{ role: 'user', content: s.prompt }],
+              maxTokens: 900,
+              // temperature 0 → deterministic model sampling, so the measurement is
+              // reproducible (residual variance is from web-retrieval engines only).
+              temperature: 0,
+              retries: 1,
+              signal: AbortSignal.any([abort.signal, AbortSignal.timeout(90_000)]),
+            });
+            text = resp.content || '';
+            citations = extractUrls(text);
+          } catch (err) {
+            if (isCapacityError(err)) throw err;
+            failed++;
+            lastErr = err;
+            return null;
+          }
         }
         const a: RawAnswer = {
           engine: engine.label,
@@ -506,12 +583,21 @@ export async function runMonitorAgent(
         }
         return a;
       });
-      rawByEngine.set(engine.label, answers);
+      const ok = answers.filter((a): a is RawAnswer => a != null);
+      if (abort.signal.aborted && ok.length < sampled.length) return; // another engine failed the run
+      if (ok.length < Math.ceil(sampled.length * ENGINE_MIN_ANSWER_RATE)) {
+        const cause = lastErr instanceof Error ? lastErr.message : String(lastErr ?? 'no answers');
+        throw new EngineOutageError(`${engine.label} answered ${ok.length}/${sampled.length} prompts (${cause})`, [engine.label]);
+      }
+      if (failed) await emit({ event_type: 'log', payload: { text: `${engine.label}: ${failed} of ${sampled.length} queries failed and were dropped from the sample.` } });
+      rawByEngine.set(engine.label, ok);
       await emit({
         event_type: 'tool_result',
-        payload: { tool: 'engine.query', engine: engine.label, brandSoVPct: pct(answers.filter((a) => a.brandPresentStr).length, answers.length) },
+        payload: { tool: 'engine.query', engine: engine.label, brandSoVPct: pct(ok.filter((a) => a.brandPresentStr).length, ok.length), answered: ok.length },
       });
     } catch (err) {
+      engineErrors.set(engine.label, err);
+      abort.abort(); // stop paying for the other engines — this scan cannot be scored
       await emit({
         event_type: 'log',
         payload: { text: `${engine.label} unavailable: ${err instanceof Error ? err.message : String(err)}` },
@@ -519,8 +605,41 @@ export async function runMonitorAgent(
     }
   }));
 
+  // Coverage guard. A scorecard is a promise of comparability: "AIGVR across
+  // these N engines, same set as last time". On 2026-09-07 four of five
+  // engines failed on capacity, the loop carried on, and Monitor produced
+  // "AIGVR 46 · confidence: high" from ONE engine and 20 queries — a number
+  // that would have been written into the trend line against 5-engine,
+  // 100-query baselines. Any missing engine now fails the scan loudly; nothing
+  // partial is ever scored. A capacity cause is deterministic (non-retriable);
+  // anything else is left retriable for the durable executor.
+  const missing = engines.filter((e) => !rawByEngine.has(e.label)).map((e) => e.label);
+  const engineIssues = missing.map((l) => { const e = engineErrors.get(l); return { engine: l, error: e instanceof Error ? e.message : 'no answers' }; });
+  // "Partial" is judged against the project's FULL engine pool, not the
+  // subset this run asked for: a diagnostic that deliberately excluded Gemini
+  // is still a 4-of-5 number and must carry the label (first verification run
+  // on 2026-09-17 came back partial:false because the excluded engine was not
+  // "missing" from the requested set).
+  const poolLabels = enginePool.map((e) => e.label);
+  const notMeasured = poolLabels.filter((l) => !rawByEngine.has(l));
+  const partial = !!input.allowPartial && notMeasured.length > 0 && rawByEngine.size >= 2 && !Array.from(engineErrors.values()).some(isCapacityError);
+  if (partial) {
+    await emit({ event_type: 'log', payload: { text: `Diagnostic scan: ${rawByEngine.size} of ${poolLabels.length} engines measured (not measured: ${notMeasured.join(', ')}). This result is labelled partial and is not recorded in the trend.` } });
+  }
+  if (missing.length && !partial) {
+    const causes = Array.from(engineErrors.values());
+    const why = missing
+      .map((l) => { const e = engineErrors.get(l); return `${l}: ${e instanceof Error ? e.message : 'no answers'}`; })
+      .join(' · ');
+    const msg =
+      `Scan incomplete — ${missing.length} of ${engines.length} engines could not be measured (${why}). ` +
+      'A partial engine set is not comparable to previous scans, so no score was recorded and nothing was charged.';
+    // Both causes are deterministic within this run: a retry would re-query
+    // every engine again for the same result (measured 2026-09-16: 3 × 5
+    // engines, 2.8M tokens, for one retired Gemini bot).
+    throw causes.some(isCapacityError) ? new EngineCapacityError(msg) : new EngineOutageError(msg, missing);
+  }
   const allRaw = Array.from(rawByEngine.values()).flat();
-  if (allRaw.length === 0) throw new Error('All engines failed — no measurements collected.');
 
   // 3. Competitor set — frozen for 30 days for score stability (re-identifying
   //    every scan was a major source of AIGVR volatility). Variants of the
@@ -596,6 +715,10 @@ export async function runMonitorAgent(
   await emit({ event_type: 'milestone', payload: { label: 'Scoring prominence & sentiment', step: 4, totalSteps: 5 } });
   const samples: Sample[] = [];
   let judgedEngines = 0;
+  // Full answer text + the judge's verdict, for the golden evaluation set.
+  // Carried out of the agent on the output as `_goldenCandidates`; the runner
+  // persists it to golden_pool and strips it before storing the run output.
+  const goldenCandidates: Record<string, unknown>[] = [];
 
   // Answer-accuracy pool: brand-present answers to KEY prompts that have a
   // canonical answer in the standard library. Judged after the engine loop.
@@ -672,6 +795,11 @@ export async function runMonitorAgent(
         brandCited: a.brandCited,
         snippet: a.text.slice(0, 400),
       });
+      goldenCandidates.push({
+        engine: a.engine, stage: a.stage, intent: a.intent, prompt: a.prompt, key: a.key, text: a.text,
+        machine: { brandMentioned: brandPresent, prominence: v ? v.prominence : null, sentiment: v ? v.sentiment : null, competitors: competitorsPresent, judged: !!v },
+        tracked: competitors,
+      });
     });
   }));
 
@@ -737,7 +865,10 @@ export async function runMonitorAgent(
         };
         await emit({
           event_type: 'log',
-          payload: { text: `Answer accuracy vs the standard library: ${accuracy.rate}% across ${accuracy.checked} brand-present key answers (${wrong} wrong, ${partial} partial) — wrong answers are support-cost leaks.` },
+          // Named for what it is: closeness to AI-drafted standard answers,
+          // judged by an AI. It becomes "accuracy" only once the yardstick is
+          // client-verified facts (fact-ledger plan).
+          payload: { text: `Alignment with the standard-answer library (not client-verified): ${accuracy.rate}% — ${accurate} aligned, ${partial} partial, ${wrong} divergent of ${accuracy.checked} judged brand-present key answers.` },
         });
       }
     } catch { /* accuracy is additive — the scorecard ships without it */ }
@@ -765,6 +896,18 @@ export async function runMonitorAgent(
   });
   bench.push({ name: brandName, hits: overall.brandHits, sovPct: overall.presence, isBrand: true });
   bench.sort((a, b) => b.sovPct - a.sovPct || b.hits - a.hits);
+  // Naming audit (FMVN / Cốc Cốc BOD, 2026-09-17). `sovPct` was always a
+  // PRESENCE rate — hits ÷ all answers, non-additive across brands — never a
+  // share; the field name and the chart title it produced misled a client
+  // analyst into checking whether the rows summed to 100%. Stored scorecards
+  // keep `sovPct` for compatibility; new ones also carry the honest names:
+  //   presencePct = hits ÷ answers                (one answer can name many brands)
+  //   sharePct    = hits ÷ Σ hits of all tracked brands   (sums to 100%)
+  const brandMentionsTotal = bench.reduce((a, b) => a + b.hits, 0);
+  for (const b of bench as any[]) {
+    b.presencePct = b.sovPct;
+    b.sharePct = brandMentionsTotal ? Math.round((b.hits / brandMentionsTotal) * 1000) / 10 : 0;
+  }
   const brandRank = bench.findIndex((b) => b.isBrand) + 1;
 
   const brandCitedCount = samples.filter((s) => s.brandCited).length;
@@ -820,10 +963,18 @@ export async function runMonitorAgent(
     competitorSet: { groups: competitorGroups, refreshedAt: competitorSetRefreshedAt },
     competitorSetRefreshed,
     engines: enginesUsed,
+    engineModels: Object.fromEntries(engines.map((e) => [e.label, e.kind === 'serp' ? 'Google AI Overview' : e.model])),
+    // Diagnostic provenance: readers MUST treat partial scorecards as
+    // non-comparable (excluded from trend, digest, rollup, citation index).
+    partial,
+    plannedEngines: poolLabels,
+    missingEngines: partial ? notMeasured : missing,
+    engineIssues,
     surfaces: { realSurfaces: serpKey ? ['Google AI Overview'] : [], proxySurfaces: ENGINES.map((e) => e.label) },
     sampled: { total: totalPrompts, used: sampled.length, queries: samples.length, keyUsed, keyTotal: keyPrompts.length },
     metrics: { overall, perEngine, perStage, perIntent, keySet },
     competitorBenchmark: bench,
+    brandMentionsTotal, // Σ hits across the tracked set — the Share-of-Voice denominator
     // Entities tracked but excluded from SoV by relationship tag (partner /
     // directory) — surfaced so the UI can show WHY they aren't in the column.
     partners,
@@ -832,11 +983,13 @@ export async function runMonitorAgent(
     gaps,
     educationalTopics,
     rawSamples: samples,
+    _goldenCandidates: goldenCandidates,
     accuracy,
     generatedBy: engines.map((e) => (e.kind === 'serp' ? 'Google AI Overview' : e.model)).join(' + '),
   };
 
   const summary =
+    (partial ? `DIAGNOSTIC (${rawByEngine.size}/${poolLabels.length} engines — ${notMeasured.join(', ')} not measured; not recorded in trend) · ` : '') +
     `${brandName} — AIGVR ${overall.aigvr}/100 (across ${samples.length} AI queries). ` +
     `Appears in ${overall.presence}% of answers (rank #${brandRank} of ${bench.length}); ` +
     `top-of-mind ${overall.topOfMindRate}%${keySet ? ` (key prompts ${keySet.topOfMindRate}%)` : ''}; ` +

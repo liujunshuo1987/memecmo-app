@@ -12,7 +12,68 @@
 // locally but works fine on Vercel (no poisoning there). Don't "fix" that by
 // hard-coding IPs.
 
+import { AsyncLocalStorage } from 'node:async_hooks';
+
 const POE_URL = 'https://api.poe.com/v1/chat/completions';
+
+// Thrown when the upstream account is out of capacity (HTTP 402 /
+// insufficient_quota). This is a DETERMINISTIC failure — nothing about a
+// retry changes it — so callers running under a durable executor must convert
+// it to a non-retriable failure. On 2026-09-07 the same 402 was retried at the
+// step level three times per run, holding clients at 75% for eight minutes.
+export class EngineCapacityError extends Error {
+  readonly nonRetriable = true as const;
+  constructor(message: string) {
+    super(message);
+    this.name = 'EngineCapacityError';
+  }
+}
+export const isCapacityError = (e: unknown): e is EngineCapacityError => e instanceof EngineCapacityError;
+
+// An engine is unreachable for reasons a retry cannot fix inside this run:
+// the upstream bot is retired (2026-09-16: Poe removed Gemini-2.5-Pro — every
+// scan on every project failed, and full_scan re-ran all five engines three
+// times before giving up), or it answers 5xx for the whole batch. Fail fast,
+// once, with the cause named.
+export class EngineOutageError extends Error {
+  readonly nonRetriable = true as const;
+  constructor(message: string, readonly engines: string[] = []) {
+    super(message);
+    this.name = 'EngineOutageError';
+  }
+}
+// The model stopped because it hit max_tokens: the JSON is cut mid-string and
+// a retry would produce the same cut, so this is deterministic (no replay,
+// no triple billing). Raise the caller's budget instead — see
+// outputTokenBudget() in lib/markets.ts for the per-language sizing.
+export class TruncatedOutputError extends Error {
+  nonRetriable = true;
+  constructor(purpose: string) {
+    super(`${purpose}: the AI model hit its output limit and the result is truncated. The operator has been notified; re-run after the budget is raised.`);
+    this.name = 'TruncatedOutputError';
+  }
+}
+export function assertComplete(res: PoeResult, purpose: string): void {
+  if (res.finishReason === 'length') {
+    console.error(`[engine-adapter] ${purpose}: finish_reason=length (output truncated, ${res.usage?.completion ?? '?'} completion tokens)`);
+    throw new TruncatedOutputError(purpose);
+  }
+}
+
+export const isNonRetriable = (e: unknown): boolean =>
+  typeof e === 'object' && e !== null && (e as any).nonRetriable === true;
+
+// Per-run token meter. agent_runs has carried tokens_in / tokens_out columns
+// since June and NOTHING wrote them — 0 of 49 runs in Aug–Sep had a token
+// count, which is why the September capacity exhaustion arrived with no
+// warning: there was no consumption signal to alarm on. Every poeChat call
+// inside `runMeter.run(meter, fn)` accumulates here without per-agent plumbing.
+// byModel matters for cost: the four bots we run are priced very differently
+// (Claude output is ~15x Perplexity's), so a single total cannot be costed.
+export interface ModelUsage { promptTokens: number; completionTokens: number; calls: number }
+export interface UsageMeter extends ModelUsage { byModel: Record<string, ModelUsage> }
+export const runMeter = new AsyncLocalStorage<UsageMeter>();
+export const newMeter = (): UsageMeter => ({ promptTokens: 0, completionTokens: 0, calls: 0, byModel: {} });
 
 export type PoeRole = 'system' | 'user' | 'assistant';
 export interface PoeMessage {
@@ -25,6 +86,8 @@ export interface PoeResult {
   model: string;
   usage?: { prompt: number; completion: number; total: number };
   latencyMs: number;
+  /** OpenAI-style finish reason from the upstream ('stop' | 'length' | …). */
+  finishReason?: string;
 }
 
 export interface PoeChatOptions {
@@ -34,6 +97,21 @@ export interface PoeChatOptions {
   temperature?: number;
   retries?: number;
   signal?: AbortSignal;
+  /** Per-attempt ceiling. Default scales with maxTokens (see poeChat). */
+  timeoutMs?: number;
+}
+
+// Vercel kills the function at 300s (app/api/inngest maxDuration), so the
+// whole call — every attempt plus backoff — must finish inside this budget.
+const CALL_BUDGET_MS = 285_000;
+
+// A fixed 90s ceiling was right for judge calls (≤1.8k tokens) and wrong for
+// long deliverables: a Chinese report at maxTokens 6000 needs ~2 min of
+// generation, so it timed out three times in a row (2026-09-23, 284s total,
+// tokens billed thrice). Scale the ceiling with the output the caller asked
+// for: ~35ms per token + 30s overhead, floor 90s, cap 250s.
+function defaultTimeoutMs(maxTokens: number): number {
+  return Math.min(250_000, Math.max(90_000, 30_000 + maxTokens * 35));
 }
 
 export const DEFAULT_MODEL = 'Claude-Sonnet-4.5';
@@ -53,9 +131,10 @@ export async function poeChat(opts: PoeChatOptions): Promise<PoeResult> {
   let lastErr: unknown;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
-    // Fresh 90s ceiling per attempt so a hung Poe request can't stall the run
+    // Fresh ceiling per attempt so a hung Poe request can't stall the run
     // forever. Caller-supplied signal takes precedence if given.
-    const signal = opts.signal ?? AbortSignal.timeout(90_000);
+    const timeoutMs = opts.timeoutMs ?? defaultTimeoutMs(opts.maxTokens ?? 2048);
+    const signal = opts.signal ?? AbortSignal.timeout(timeoutMs);
     try {
       const res = await fetch(POE_URL, {
         method: 'POST',
@@ -84,17 +163,27 @@ export async function poeChat(opts: PoeChatOptions): Promise<PoeResult> {
         // provider (subprocessor hygiene).
         console.error(`[engine-adapter] upstream ${res.status}: ${body.slice(0, 300)}`);
         if (res.status === 402 || body.includes('insufficient_quota')) {
-          throw new Error('AI engine capacity exhausted for this billing period — the operator has been notified. Please retry later.');
+          throw new EngineCapacityError('AI engine capacity exhausted for this billing period — the operator has been notified. Please retry later.');
         }
-        throw new Error(`AI engine request failed (${res.status}). Please retry; if it persists, contact support.`);
+        const e: any = new Error(`AI engine request failed (${res.status}). Please retry; if it persists, contact support.`);
+        e.status = res.status;
+        throw e;
       }
 
       const json: any = await res.json();
       const content: string = json?.choices?.[0]?.message?.content ?? '';
       const u = json?.usage;
+      const meter = runMeter.getStore();
+      if (meter) {
+        const pin = Number(u?.prompt_tokens ?? 0), pout = Number(u?.completion_tokens ?? 0);
+        meter.calls += 1; meter.promptTokens += pin; meter.completionTokens += pout;
+        const m = (meter.byModel[model] ??= { promptTokens: 0, completionTokens: 0, calls: 0 });
+        m.calls += 1; m.promptTokens += pin; m.completionTokens += pout;
+      }
       return {
         content,
         model,
+        finishReason: json?.choices?.[0]?.finish_reason ?? undefined,
         latencyMs: Date.now() - started,
         usage: u
           ? { prompt: u.prompt_tokens, completion: u.completion_tokens, total: u.total_tokens }
@@ -102,9 +191,14 @@ export async function poeChat(opts: PoeChatOptions): Promise<PoeResult> {
       };
     } catch (err) {
       lastErr = err;
-      // Network errors / aborts: retry a couple times, then surface.
-      if (attempt < retries) {
-        await sleep(2 ** attempt * 800 + Math.floor(Math.random() * 400));
+      if (isNonRetriable(err)) throw err; // deterministic — never retry
+      // Network errors / aborts: retry a couple times, then surface — but only
+      // while another full attempt still fits in the function's time budget;
+      // otherwise the platform kills the invocation mid-retry and the step is
+      // replayed from scratch anyway.
+      const backoff = 2 ** attempt * 800 + Math.floor(Math.random() * 400);
+      if (attempt < retries && Date.now() - started + backoff + timeoutMs <= CALL_BUDGET_MS) {
+        await sleep(backoff);
         continue;
       }
       throw err;

@@ -7,7 +7,8 @@
 // content-structure edits, and an AEO checklist. The "主页修改代理": the brand
 // doesn't learn SEO tools — the agent hands back exactly what to change.
 
-import { poeChat, parseJsonFromLLM, DEFAULT_MODEL } from '@/lib/llm/poe';
+import { poeChat, parseJsonFromLLM, DEFAULT_MODEL, assertComplete } from '@/lib/llm/poe';
+import { outputTokenBudget } from '@/lib/markets';
 import { brandProfileBlock } from './brand-facts';
 import { stateFrameBlock } from './state-frames';
 
@@ -23,6 +24,7 @@ interface SiteInput {
   targetLanguage?: string | null;
   industry?: string | null;
   brandProfile?: any;
+  citationBrief?: string; // lib/pages/profile — measured on pages the engines cited here
 }
 
 const LANGUAGE_NAMES: Record<string, string> = {
@@ -124,6 +126,7 @@ export async function runSiteAgent(
     siteBlock,
     '',
     brandProfileBlock(input.brandProfile) + stateFrameBlock(input.targetCountry, input.industry),
+    input.citationBrief ? '\n' + input.citationBrief + '\n' : null,
     '',
     'Produce an AEO upgrade as JSON of this shape:',
     '{',
@@ -146,7 +149,7 @@ export async function runSiteAgent(
       { role: 'system', content: system },
       { role: 'user', content: user },
     ],
-    maxTokens: 8000,
+    maxTokens: outputTokenBudget(8000, input.targetLanguage),
     temperature: 0.4,
   });
 
@@ -155,6 +158,7 @@ export async function runSiteAgent(
 
   let parsed: SiteAuditJson;
   try {
+    assertComplete(res, 'Site audit');
     parsed = parseJsonFromLLM<SiteAuditJson>(res.content);
   } catch (e) {
     throw new Error(`Site model returned unparseable output: ${e instanceof Error ? e.message : String(e)}`);

@@ -8,7 +8,8 @@
 // the brand can get featured/cited where it currently isn't. Measure → Report
 // → Optimize (own content) → Distribute (third-party citations).
 
-import { poeChat, parseJsonFromLLM, DEFAULT_MODEL } from '@/lib/llm/poe';
+import { poeChat, parseJsonFromLLM, DEFAULT_MODEL, assertComplete } from '@/lib/llm/poe';
+import { outputTokenBudget } from '@/lib/markets';
 import { brandProfileBlock } from './brand-facts';
 import { stateFrameBlock } from './state-frames';
 import { scanUnverifiedClaims, FAKE_USER_RE, COMMUNITY_RE } from './compliance';
@@ -170,7 +171,7 @@ export async function runDistributeAgent(
       { role: 'system', content: system },
       { role: 'user', content: user },
     ],
-    maxTokens: 5000,
+    maxTokens: outputTokenBudget(5000, input.targetLanguage),
     temperature: 0.5,
   });
 
@@ -179,6 +180,7 @@ export async function runDistributeAgent(
 
   let parsed: { targets: Target[] };
   try {
+    assertComplete(res, 'Distribution targets');
     parsed = parseJsonFromLLM<{ targets: Target[] }>(res.content);
   } catch (e) {
     throw new Error(`Distribute model returned unparseable output: ${e instanceof Error ? e.message : String(e)}`);

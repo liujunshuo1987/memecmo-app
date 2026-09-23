@@ -7,7 +7,8 @@
 // Optimize / Site / Distribute steer real AI answers toward, and the yardstick
 // the brand is measured against.
 
-import { poeChat, parseJsonFromLLM, DEFAULT_MODEL } from '@/lib/llm/poe';
+import { poeChat, parseJsonFromLLM, DEFAULT_MODEL, assertComplete } from '@/lib/llm/poe';
+import { outputTokenBudget } from '@/lib/markets';
 import { brandProfileBlock } from './brand-facts';
 import { stateFrameBlock } from './state-frames';
 
@@ -117,10 +118,11 @@ export async function runStandardAnswersAgent(
               model: DEFAULT_MODEL,
               messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
               // Generous: bilingual structured JSON truncates easily at low caps.
-              maxTokens: 3500,
+              maxTokens: outputTokenBudget(3500, input.targetLanguage),
               temperature: 0.4,
               retries: 1,
             });
+            assertComplete(res, 'Standard answers');
             const parsed = parseJsonFromLLM<any>(res.content);
             const list: any[] = Array.isArray(parsed) ? parsed : (parsed?.answers || []);
             // Map by index back to the batch prompts — the model may omit/alter the

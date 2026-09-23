@@ -8,11 +8,15 @@
 // Sending a chat with /discovery (or default to discovery on first message)
 // spawns a run; the activity panel subscribes to its SSE stream.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { useEdits, EditableUnit, answerUnitKey } from './editable';
+import { ActionsPanel, MarkPublished } from './actions';
+import { MonitorViews } from './monitor-views';
 import { AGENTS } from '@/lib/agents/registry';
 import { Icon } from '@/components/icons';
 import type { AgentRun, Organization, Project, ScanPoint } from '@/lib/workspace';
+import { trendExtras } from '@/lib/trend';
 
 interface Props {
   project: Project;
@@ -38,6 +42,7 @@ function pointFromOutput(runId: string, ts: string, output: any): ScanPoint | nu
     gaps: (sc.gaps || []).length, prominence: d.prominence ?? null, sentiment: d.sentiment ?? null,
     citation: d.citation ?? null, competitive: d.competitiveShare ?? null,
     topOfMind: sc.topOfMind?.overallRate ?? d.topOfMindRate ?? null,
+    ...trendExtras(sc),
   };
 }
 
@@ -107,9 +112,9 @@ const GLOSSARY: Record<string, { en: string; zh: string; vi: string }> = {
     vi: 'Giọng điệu AI khi mô tả thương hiệu, chỉ tính các câu trả lời có bạn xuất hiện.',
   },
   citation: {
-    en: 'Citation Rate — how often AI cites sources (links) that belong to or favor you when answering. The AEO signal: whose website earns the reference.',
-    zh: '引用率——AI 回答时引用属于你/有利于你的信源(链接)的频率。这是 AEO 信号:谁的网站赢得了引用。',
-    vi: 'Citation Rate — tần suất AI trích dẫn nguồn thuộc về bạn khi trả lời.',
+    en: 'Citation rate — share of answers whose cited sources (links) include a page on YOUR OWN domain. Different from Presence: an answer can name you without linking to you. Engines that return no links always score 0 here.',
+    zh: '引用率——回答所引用的信源链接中,包含你自有域名页面的回答占比。与出现率不同:回答可以提到你却不链接到你。不返回链接的引擎在此项恒为 0。',
+    vi: 'Tỷ lệ trích dẫn — tỷ lệ câu trả lời có nguồn trích dẫn (liên kết) là trang trên TÊN MIỀN CỦA BẠN. Khác với tỷ lệ xuất hiện: câu trả lời có thể nhắc tên bạn mà không dẫn liên kết. Engine không trả liên kết luôn bằng 0 ở chỉ số này.',
   },
   gaps: {
     en: 'High-intent buyer questions (who/best/price/compare) where competitors are recommended and you are absent — the exact queries losing you customers.',
@@ -127,9 +132,9 @@ const GLOSSARY: Record<string, { en: string; zh: string; vi: string }> = {
     vi: 'Đo trên trang Google AI Overview thật (định vị khu vực), không phải API proxy.',
   },
   accuracy: {
-    en: 'Answer Accuracy — of AI answers that mention you on key questions, the share consistent with your verified standard answers. Wrong answers are support-cost leaks: users acting on bad AI info call support.',
-    zh: '答案准确率——关键问题中提到你的 AI 回答里,与你核准的标准答案一致的比例。答错的回答是客服成本漏洞:用户按错误信息操作后会找售后。',
-    vi: 'Answer Accuracy — tỷ lệ câu trả lời AI nhất quán với câu trả lời chuẩn đã xác minh của bạn.',
+    en: 'Alignment with standard answers — of the AI answers judged (those naming you on key questions), how closely they match the standard answers in your library: (aligned + 0.5 × partial) ÷ judged. The standard answers are AI-drafted and NOT yet verified by you, and an AI judge does the comparison, so this measures closeness to our intended message, not factual accuracy. "Partial" usually means the answer left out points we want included, not that it said something false.',
+    zh: '与标准答案一致度——在被评判的 AI 回答(关键问题中提到你的回答)里,与题库标准答案的接近程度:(一致 + 0.5 × 部分)÷ 评判条数。标准答案由 AI 起草、尚未经你核实,比对也由 AI 判官完成,因此它衡量的是"与我们期望口径的接近程度",不是事实准确率。"部分"通常指回答漏掉了我们希望包含的要点,而不是说了错话。',
+    vi: 'Mức khớp với câu trả lời chuẩn — trong số câu trả lời AI được chấm (có nhắc đến bạn ở câu hỏi trọng điểm), mức độ khớp với câu trả lời chuẩn trong thư viện: (khớp + 0,5 × khớp một phần) ÷ số câu được chấm. Câu trả lời chuẩn do AI soạn và CHƯA được bạn xác minh, việc so sánh cũng do AI thực hiện, nên chỉ số này đo độ gần với thông điệp mong muốn, không phải độ chính xác về dữ kiện. "Khớp một phần" thường nghĩa là thiếu ý ta muốn có, không phải nói sai.',
   },
   topofmind: {
     en: 'The share of answers where your brand is the FIRST one AI names — the strongest recommendation position.',
@@ -155,6 +160,12 @@ function TermTip({ term, children }: { term: string; children?: any }) {
 }
 const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
   zh: {
+    'Site coverage': '站点覆盖', 'vacuum': '空白', 'covered': '已覆盖', 'AI answers that contradict the site': '与站点矛盾的 AI 回答', 'AI': 'AI', 'The client\'s own pages were not read yet, so site coverage and contradictions are not assessed in this report.': '客户自有页面尚未读取,本报告未评估站点覆盖与矛盾。', 'What the engines cite here': '引擎在这里引用什么样的页面', 'pages read': '个已读页面', 'all': '全部', '3+ cites': '被引 3+ 次', '1–2': '1–2 次', 'updated < 6 mo': '6 个月内更新', 'median words': '中位字数', 'brand-owned': '品牌自有', 'verifying…': '验证中…', 'live': '已上线', 'changed': '内容变更', 'checked': '检查于', 'not reachable': '无法访问', 'cited since publish': '发布后被引用', 'not cited yet since publish': '发布后尚未被引用',
+    'Pages': '页面', 'read': '已读', 'not read yet': '尚未读取', 'updated': '更新', 'dated': '有日期', 'words': '词',
+    'Collapse': '收起', 'Expand all': '全部展开', 'Collapse all': '全部收起',
+    'Presence over time': '出现率走势', 'scans': '次扫描', 'Engine view shows your brand only; competitor lines are whole-scan.': '引擎视图只显示本品牌;竞品曲线为全量扫描口径。', 'biggest mover': '变动最大', 'Share of voice, this scan': '本次扫描的声量份额',
+    // Monitor dashboard views (2026-09-23)
+    'Brand': '品牌', 'Mentions': '提及数', 'Presence rate': '出现率', 'Sentiment': '情感', 'Brand visibility': '品牌可见度', 'Show all': '显示全部', 'Presence rates are per answer and do not add up; share of voice does.': '出现率按回答计算、各行不可相加;声量份额合计 100%。', 'Others': '其他', 'Presence by engine': '各引擎出现率', 'vs top 4 brands': '对比出现率最高的 4 个品牌', 'Domain': '域名', 'Type': '类型', 'This scan': '本次扫描', 'Engines': '引擎数', 'All scans': '全部扫描累计', 'Brand-owned': '品牌自有', 'Third-party': '第三方', 'Sources AI cites': 'AI 引用的来源', 'domains': '个域名', 'Question': '买家问题', 'Stage': '阶段', 'Present on': '出现', 'Read the answer': '查看回答', 'Presence by question': '各提问出现率', 'featured': '重点推荐', 'listed': '多个选项之一', 'passing': '顺带提及', 'absent': '未出现', 'high intent': '高意向', 'Brand named': '提到品牌', 'yes': '是', 'no': '否', 'Prominence': '显著度', 'Competitors named': '提到的竞争者', 'First 400 characters of the answer as recorded at scan time.': '扫描时记录的回答前 400 字。', 'Sources cited': '引用的来源',
     'Run full GEO scan': '运行完整 GEO 扫描', '…focus the agents': '…给智能体一个方向',
     Setup: '准备', Measure: '测量', 'Act — build AEO presence': '执行 · 建设 AEO 存在',
     ready: '就绪', run: '运行', 'running…': '运行中…', 'Re-run': '重跑', Copy: '复制', Edit: '编辑', Done: '完成',
@@ -165,8 +176,8 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     Recommendations: '建议', 'Quick wins': '速赢', 'AEO checklist': 'AEO 清单', 'Homepage edits': '主页修改',
     'Citation plan': '引用计划', 'Evidence needed to qualify': '达标所需证据', 'Get mentioned in existing articles': '进入已有词条被提及',
     'Latest scan': '最近扫描', 'Presence': '出现率', 'Share of Voice': '声量份额', 'Brand rank': '品牌排名', 'High-intent gaps': '高意图缺口',
-    'index score': '指数得分', 'actual share': '实际占比',
-    'All engines': '全部引擎', 'Answer accuracy': '答案准确率', 'Since this report': '本报告之后', recommendations: '条建议', 'deliverables completed after it': '项执行交付已完成', 'No execution deliverables completed since this report yet — run them, and the next scan shows the movement here.': '本报告后尚无新的执行交付——完成执行后,下一次扫描的分数变化会显示在这里。', 'Answer accuracy issues': '答案错误清单', wrong: '答错', partial: '部分正确', 'Benchmark and gaps remain whole-scan.': '竞对对标与缺口仍为全量扫描口径。',
+    'index score': '指数得分', 'actual share': '实际占比', 'Brand presence rate': '品牌出现率(逐条回答)', 'mentioned in': '出现于', 'of answers': '的回答中', 'Each row = answers naming that brand ÷ all answers. One answer can name several brands, so rows are not additive. The share that sums to 100% is Share of Voice above: brand mentions ÷ all tracked-brand mentions.': '口径:每行 = 提及该品牌的回答数 ÷ 全部回答数;一条回答可同时提及多个品牌,各行不可相加。合计 100% 的结构性份额是上方的〔声量份额〕= 该品牌被提及次数 ÷ 全部被追踪品牌的提及总次数。', 'brand mentions': '次品牌提及', Actions: '行动', 'Log an action': '记一条行动', 'Nothing logged yet — log what the brand publishes and the next scans show what moved.': '还没有记录 —— 记下品牌发布了什么,后续扫描会显示什么变了。', 'URL where it went live': '上线的 URL', 'Note (optional)': '备注(可选)', Targets: '目标问题', Log: '记录', 'scans before': '次发布前扫描', after: '次发布后', 'awaiting the next scan': '等待下一次扫描', cited: '被引用', Published: '已发布', 'Mark published': '标记为已发布', 'Edited · kept on re-run': '已编辑 · 重跑保留', 'Revert to generated': '恢复为生成值', 'The generated value has changed since your edit': '你编辑之后,生成值已发生变化', 'Cancel': '取消', 'One item per line': '每行一项', 'One fact per line — Label: value': '每行一条事实 —— 标签: 值', 'your edits are kept when the agent re-runs': '你的编辑在重跑时保留', 'edited': '已编辑', 'Saved — a re-run will not overwrite this': '已保存 —— 重跑不会覆盖',
+    'All engines': '全部引擎', 'Alignment with standard answers': '与标准答案一致度', 'not client-verified': '未经客户核实', 'judged': '条已评', 'brand-present': '条提到品牌', aligned: '一致', 'Since this report': '本报告之后', recommendations: '条建议', 'deliverables completed after it': '项执行交付已完成', 'No execution deliverables completed since this report yet — run them, and the next scan shows the movement here.': '本报告后尚无新的执行交付——完成执行后,下一次扫描的分数变化会显示在这里。', 'Answers diverging from the standard answers': '与标准答案不符的回答', wrong: '不符', partial: '部分一致', 'Benchmark and gaps remain whole-scan.': '竞对对标与缺口仍为全量扫描口径。',
     'Cited sources': '被引来源', Deliverables: '交付物', 'Structured view': '结构化视图', Refine: '改写', Ask: '问',
     'Ask about this result…': '问这份结果…', 'Which gap should we attack first?': '哪个缺口最该先打?',
     'Why is my visibility low on some engines?': '为什么某些引擎上我可见度低?', 'What should we do first?': '最该先做哪件事?',
@@ -184,6 +195,13 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     Sets: '竞对与提示词', 'Competitor set': '竞对集', 'Prompt library': '提示词库', 'Relationship': '关系',
     'Not counted in SoV': '不计入声量份额', 'Add competitor': '添加竞对', 'Add prompts (one per line)': '新增提示词(每行一条)',
     'Click a prompt to exclude / restore it. Changes apply from the next run.': '点击提示词可排除/恢复;修改自下次运行起生效。',
+    'Click a prompt to exclude / restore it. Use ✎ to reword it into natural local phrasing. Changes apply from the next scan.': '点击提示词可排除/恢复;点 ✎ 可改写为更地道的本地问法。修改自下次扫描起生效。',
+    'Core benchmark — frozen; changes require bilateral written sign-off.': 'Core 基准 · 已冻结——修改需双方书面确认。',
+    'core prompts unchanged (bilateral sign-off required)': '条 Core 提示词未改动(需双方书面确认)',
+    'reworded': '已改写', 'Reword': '改写措辞', 'Original': '原文', 'Apply': '应用', 'Restore original': '恢复原文',
+    'Why this change? (optional — trains the model)': '为什么这样改?(选填——沉淀为训练数据)',
+    'Added prompts — each joins a group': '新增提示词——每条归入一个分组', 'Add prompt': '新增提示词', 'custom': '自定义',
+    'New prompt — write it the way a real customer asks': '新提示词——按真实客户的问法来写', 'Load failed': '加载失败',
     'Save': '保存', 'Saved': '已保存', 'excluded': '已排除', 'competitor': '竞对', 'partner': '合作伙伴', 'directory': '目录平台', 'self': '自身',
     'Position when present': '出现时位置', 'Sentiment when present': '出现时情感', 'Citation strength': '引用强度',
     'Top-of-mind': '首位推荐', key: '重点', Rank: '排名', answers: '条回答', 'queries competitors win': '竞品占优的问题',
@@ -203,8 +221,14 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
 
   },
   vi: {
+    'Site coverage': 'Độ phủ của website', 'vacuum': 'trống', 'covered': 'đã có', 'AI answers that contradict the site': 'Câu trả lời AI mâu thuẫn với website', 'AI': 'AI', 'The client\'s own pages were not read yet, so site coverage and contradictions are not assessed in this report.': 'Chưa đọc các trang của khách hàng nên báo cáo này chưa đánh giá độ phủ và mâu thuẫn.', 'What the engines cite here': 'Engine trích dẫn kiểu trang nào ở đây', 'pages read': 'trang đã đọc', 'all': 'tất cả', '3+ cites': '≥3 lần', '1–2': '1–2 lần', 'updated < 6 mo': 'cập nhật < 6 tháng', 'median words': 'số từ trung vị', 'brand-owned': 'của thương hiệu', 'verifying…': 'đang kiểm tra…', 'live': 'đang hoạt động', 'changed': 'đã thay đổi', 'checked': 'kiểm tra', 'not reachable': 'không truy cập được', 'cited since publish': 'được trích sau khi đăng', 'not cited yet since publish': 'chưa được trích sau khi đăng',
+    'Pages': 'Trang', 'read': 'đã đọc', 'not read yet': 'chưa đọc', 'updated': 'cập nhật', 'dated': 'có ngày', 'words': 'từ',
+    'Collapse': 'Thu gọn', 'Expand all': 'Mở rộng tất cả', 'Collapse all': 'Thu gọn tất cả',
+    'Presence over time': 'Tỷ lệ xuất hiện theo thời gian', 'scans': 'lần quét', 'Engine view shows your brand only; competitor lines are whole-scan.': 'Chế độ theo engine chỉ hiển thị thương hiệu của bạn; đường đối thủ theo toàn bộ lần quét.', 'biggest mover': 'biến động lớn nhất', 'Share of voice, this scan': 'Thị phần tiếng nói, lần quét này',
+    // Monitor dashboard views (2026-09-23)
+    'Brand': 'Thương hiệu', 'Mentions': 'Lượt nhắc', 'Presence rate': 'Tỷ lệ xuất hiện', 'Sentiment': 'Cảm xúc', 'Brand visibility': 'Mức hiện diện thương hiệu', 'Show all': 'Hiện tất cả', 'Presence rates are per answer and do not add up; share of voice does.': 'Tỷ lệ xuất hiện tính theo câu trả lời và không cộng dồn; thị phần tiếng nói thì có.', 'Others': 'Khác', 'Presence by engine': 'Tỷ lệ xuất hiện theo engine', 'vs top 4 brands': 'so với 4 thương hiệu dẫn đầu', 'Domain': 'Tên miền', 'Type': 'Loại', 'This scan': 'Lần quét này', 'Engines': 'Số engine', 'All scans': 'Mọi lần quét', 'Brand-owned': 'Thuộc thương hiệu', 'Third-party': 'Bên thứ ba', 'Sources AI cites': 'Nguồn AI trích dẫn', 'domains': 'tên miền', 'Question': 'Câu hỏi', 'Stage': 'Giai đoạn', 'Present on': 'Xuất hiện', 'Read the answer': 'Đọc câu trả lời', 'Presence by question': 'Tỷ lệ xuất hiện theo câu hỏi', 'featured': 'nổi bật', 'listed': 'một trong nhiều', 'passing': 'thoáng qua', 'absent': 'vắng mặt', 'high intent': 'ý định cao', 'Brand named': 'Nhắc thương hiệu', 'yes': 'có', 'no': 'không', 'Prominence': 'Mức nổi bật', 'Competitors named': 'Đối thủ được nhắc', 'First 400 characters of the answer as recorded at scan time.': '400 ký tự đầu của câu trả lời được ghi lại lúc quét.', 'Sources cited': 'Nguồn được trích dẫn',
 
-    'All engines': 'Tất cả engine', 'Answer accuracy': 'Độ chính xác câu trả lời', 'Since this report': 'Sau báo cáo này', recommendations: 'khuyến nghị', 'deliverables completed after it': 'bàn giao đã hoàn thành sau đó', 'No execution deliverables completed since this report yet — run them, and the next scan shows the movement here.': 'Chưa có bàn giao thực thi nào sau báo cáo này — hoàn thành chúng và lần quét tiếp theo sẽ hiển thị thay đổi tại đây.', 'Answer accuracy issues': 'Danh sách câu trả lời sai', wrong: 'sai', partial: 'đúng một phần', 'Benchmark and gaps remain whole-scan.': 'So sánh đối thủ và khoảng trống vẫn theo toàn bộ lần quét.',    'Run full GEO scan': 'Chạy quét GEO đầy đủ', '…focus the agents': '…định hướng cho agent',
+    'All engines': 'Tất cả engine', 'Alignment with standard answers': 'Mức khớp với câu trả lời chuẩn', 'not client-verified': 'chưa được khách hàng xác minh', 'judged': 'câu đã chấm', 'brand-present': 'câu có nhắc thương hiệu', aligned: 'khớp', 'Since this report': 'Sau báo cáo này', recommendations: 'khuyến nghị', 'deliverables completed after it': 'bàn giao đã hoàn thành sau đó', 'No execution deliverables completed since this report yet — run them, and the next scan shows the movement here.': 'Chưa có bàn giao thực thi nào sau báo cáo này — hoàn thành chúng và lần quét tiếp theo sẽ hiển thị thay đổi tại đây.', 'Answers diverging from the standard answers': 'Câu trả lời lệch so với câu trả lời chuẩn', wrong: 'lệch', partial: 'khớp một phần', 'Benchmark and gaps remain whole-scan.': 'So sánh đối thủ và khoảng trống vẫn theo toàn bộ lần quét.',    'Run full GEO scan': 'Chạy quét GEO đầy đủ', '…focus the agents': '…định hướng cho agent',
     Setup: 'Chuẩn bị', Measure: 'Đo lường', 'Act — build AEO presence': 'Hành động · xây dựng AEO',
     ready: 'sẵn sàng', run: 'chạy', 'running…': 'đang chạy…', 'Re-run': 'Chạy lại', Copy: 'Sao chép', Edit: 'Sửa', Done: 'Xong',
     Result: 'Kết quả', 'Pick a deliverable on the left, or run a full GEO scan.': 'Chọn một mục bên trái, hoặc chạy quét GEO đầy đủ.',
@@ -214,7 +238,7 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Why is my visibility low on some engines?': 'Vì sao độ hiển thị thấp trên một số engine?',
     'What should we do first?': 'Nên làm việc gì trước tiên?',
     'By engine': 'Theo engine', 'Funnel-stage visibility': 'Hiển thị theo giai đoạn phễu', 'Share of voice': 'Thị phần tiếng nói',
-    'index score': 'điểm chỉ số', 'actual share': 'tỷ lệ thực',
+    'index score': 'điểm chỉ số', 'actual share': 'tỷ lệ thực', 'Brand presence rate': 'Tỷ lệ xuất hiện theo thương hiệu', 'mentioned in': 'xuất hiện trong', 'of answers': 'số câu trả lời', 'Each row = answers naming that brand ÷ all answers. One answer can name several brands, so rows are not additive. The share that sums to 100% is Share of Voice above: brand mentions ÷ all tracked-brand mentions.': 'Chuẩn đo: mỗi dòng = số câu trả lời có nhắc thương hiệu đó ÷ tổng số câu trả lời; một câu trả lời có thể nhắc nhiều thương hiệu nên các dòng KHÔNG cộng dồn. Thị phần có tổng 100% là Share of Voice ở ô phía trên = số lần nhắc thương hiệu ÷ tổng số lần nhắc của mọi thương hiệu được theo dõi.', 'brand mentions': 'lượt nhắc thương hiệu', Actions: 'Hành động', 'Log an action': 'Ghi một hành động', 'Nothing logged yet — log what the brand publishes and the next scans show what moved.': 'Chưa có ghi nhận — ghi lại những gì thương hiệu đã đăng, các lần quét sau sẽ cho thấy điều gì thay đổi.', 'URL where it went live': 'URL đã đăng', 'Note (optional)': 'Ghi chú (tùy chọn)', Targets: 'Câu hỏi mục tiêu', Log: 'Ghi', 'scans before': 'lần quét trước', after: 'lần sau', 'awaiting the next scan': 'chờ lần quét tiếp theo', cited: 'được trích dẫn', Published: 'Đã đăng', 'Mark published': 'Đánh dấu đã đăng', 'Edited · kept on re-run': 'Đã chỉnh sửa · giữ nguyên khi chạy lại', 'Revert to generated': 'Khôi phục giá trị tạo tự động', 'The generated value has changed since your edit': 'Giá trị tạo tự động đã thay đổi sau khi bạn chỉnh sửa', 'Save': 'Lưu', 'Cancel': 'Hủy', 'One item per line': 'Mỗi dòng một mục', 'One fact per line — Label: value': 'Mỗi dòng một dữ kiện — Nhãn: giá trị', 'your edits are kept when the agent re-runs': 'chỉnh sửa của bạn được giữ khi chạy lại', 'edited': 'đã chỉnh sửa', 'Saved — a re-run will not overwrite this': 'Đã lưu — chạy lại sẽ không ghi đè',
     'Key findings': 'Phát hiện chính', Recommendations: 'Khuyến nghị', 'Quick wins': 'Việc cần làm', Deliverables: 'Sản phẩm',
     'Full Scan': 'Quét đầy đủ', Profile: 'Hồ sơ', Discovery: 'Khám phá', Monitor: 'Giám sát', Report: 'Báo cáo',
     Optimize: 'Nội dung', Site: 'Trang chủ', Distribute: 'Phân phối', Encyclopedia: 'Bách khoa',
@@ -232,6 +256,16 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Getting started…': 'Đang khởi động…', 'Technical trace': 'Nhật ký kỹ thuật', 'This takes a few minutes — the run continues on the server, so you can leave this page and come back.': 'Mất vài phút — tác vụ chạy trên máy chủ, bạn có thể rời trang và quay lại sau.',
     'Phase 1/3 · Discovery': 'Giai đoạn 1/3 · Xây bộ câu hỏi', 'Phase 2/3 · Monitor': 'Giai đoạn 2/3 · Hỏi các công cụ AI và chấm điểm', 'Phase 3/3 · Report': 'Giai đoạn 3/3 · Viết báo cáo',
     'Identifying competitors': 'Nhận diện đối thủ', 'Scoring prominence & sentiment': 'Chấm điểm từng câu trả lời', 'Computing AIGVR scorecard': 'Tổng hợp bảng điểm', 'AIGVR scorecard ready': 'Bảng điểm sẵn sàng',
+    Sets: 'Đối thủ & prompt', 'Competitor set': 'Bộ đối thủ', 'Prompt library': 'Thư viện prompt', 'Relationship': 'Quan hệ',
+    'Not counted in SoV': 'Không tính vào Share of Voice', 'Add competitor': 'Thêm đối thủ', 'Add prompts (one per line)': 'Thêm prompt (mỗi dòng một câu)',
+    'Click a prompt to exclude / restore it. Use ✎ to reword it into natural local phrasing. Changes apply from the next scan.': 'Nhấp vào prompt để loại / khôi phục. Nhấn ✎ để sửa lại theo cách người Việt thật sự hỏi. Thay đổi có hiệu lực từ lần quét tiếp theo.',
+    'Core benchmark — frozen; changes require bilateral written sign-off.': 'Bộ Core — đã khóa; thay đổi cần xác nhận bằng văn bản của hai bên.',
+    'core prompts unchanged (bilateral sign-off required)': 'prompt Core không đổi (cần hai bên ký xác nhận)',
+    'reworded': 'đã sửa chữ', 'Reword': 'Sửa câu chữ', 'Original': 'Bản gốc', 'Apply': 'Áp dụng', 'Restore original': 'Khôi phục bản gốc',
+    'Why this change? (optional — trains the model)': 'Vì sao sửa? (tùy chọn — dùng làm dữ liệu huấn luyện)',
+    'Added prompts — each joins a group': 'Prompt thêm mới — mỗi câu vào một nhóm', 'Add prompt': 'Thêm prompt', 'custom': 'tùy chỉnh',
+    'New prompt — write it the way a real customer asks': 'Prompt mới — viết đúng cách khách hàng thật sự hỏi', 'Load failed': 'Tải thất bại',
+    'Saved': 'Đã lưu', 'excluded': 'đã loại', 'competitor': 'đối thủ', 'partner': 'đối tác', 'directory': 'trang danh bạ', 'self': 'chính mình',
 
   },
 };
@@ -321,7 +355,17 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
     } catch (e) { setWalletError(e instanceof Error ? e.message : String(e)); setWalletBusy(null); }
   };
   useEffect(() => {
-    try { const l = localStorage.getItem('memecmo-uilang'); if (l === 'zh' || l === 'vi' || l === 'en') setUiLang(l); } catch { /* ignore */ }
+    // Stored choice wins; otherwise default to the PROJECT's language so a
+    // Vietnamese operating team lands on a Vietnamese UI (FMVN 9-23 feedback),
+    // not on whatever the last demo machine had.
+    try {
+      const l = localStorage.getItem('memecmo-uilang');
+      if (l === 'zh' || l === 'vi' || l === 'en') setUiLang(l);
+      else {
+        const tl = (project.target_language || '').slice(0, 2).toLowerCase();
+        if (tl === 'vi' || tl === 'zh') setUiLang(tl as UiLang);
+      }
+    } catch { /* ignore */ }
   }, []);
   const changeUiLang = (l: UiLang) => { setUiLang(l); try { localStorage.setItem('memecmo-uilang', l); } catch { /* ignore */ } };
   // Sandbox version stacks survive navigation within the session (keyed by runId).
@@ -334,6 +378,8 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
     summary: string | null;
     agentId?: string;
     output?: Record<string, any> | null;
+    createdAt?: string | null;
+    trigger?: string | null;
   } | null>(null);
   const [sending, setSending] = useState(false);
   const activityEndRef = useRef<HTMLDivElement>(null);
@@ -345,9 +391,20 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
 
   const isTerminal = !!runStatus && ['completed', 'failed', 'canceled'].includes(runStatus.status);
 
-  // Headline AIGVR — from the most recent monitor / full_scan run.
-  const scoreRun = [runsByAgent['monitor'], runsByAgent['full_scan']]
-    .filter((r) => r && r.output?.aigvrScore != null)
+  // Headline AIGVR — from the most recent COMPARABLE monitor / full_scan run.
+  // A diagnostic (partial engine set) is still openable from the agent list
+  // with its DIAGNOSTIC banner, but it must never become the headline index or
+  // the "Latest scan" panel: on 2026-09-17 a 2-engine diagnostic showed as
+  // NeuronSpark's headline 53 while the trend (correctly) excluded it.
+  const isPartialRun = (r?: LatestRun) => !!(r?.output?.partial || r?.output?.scorecard?.partial);
+  const lastComparable = useMemo<LatestRun | undefined>(() => {
+    const r = initialRuns.find((x) =>
+      x.status === 'completed' && (x.agent_id === 'monitor' || x.agent_id === 'full_scan') &&
+      (x.output as any)?.aigvrScore != null && !(x.output as any)?.partial && x.trigger_method !== 'diagnostic');
+    return r ? { runId: r.id, summary: r.summary, status: r.status, output: r.output, createdAt: r.created_at } as LatestRun : undefined;
+  }, [initialRuns]);
+  const scoreRun = [runsByAgent['monitor'], runsByAgent['full_scan'], lastComparable]
+    .filter((r) => r && r.output?.aigvrScore != null && !isPartialRun(r))
     .sort((a, b) => (b!.createdAt || '').localeCompare(a!.createdAt || ''))[0];
   const headlineAigvr: number | null = scoreRun?.output?.aigvrScore ?? null;
 
@@ -413,6 +470,8 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
               summary: data.run.summary,
               agentId: data.run.agent_id,
               output: data.run.output ?? null,
+              createdAt: data.run.created_at ?? null,
+              trigger: data.run.trigger_method ?? null,
             });
           }
           if (data.terminal) {
@@ -461,8 +520,16 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
   const autoOpened = useRef(false);
   useEffect(() => {
     if (autoOpened.current || activeRunId || runStatus) return;
-    const prefer = ['full_scan', 'monitor', 'report'];
-    const preferred = prefer.map((a) => ({ a, r: runsByAgent[a] })).find((x) => x.r?.status === 'completed');
+    // Recency beats agent type: with weekly scheduled monitors, the newest
+    // monitor is the current official scorecard — preferring full_scan by TYPE
+    // once surfaced a 3-week-old manual full_scan (61) over the latest auto
+    // monitor (63) and read as a version conflict to the client (FMVN round 4 Q1).
+    const scanAgents = ['full_scan', 'monitor'];
+    const preferred = scanAgents
+      .map((a) => ({ a, r: runsByAgent[a] }))
+      .filter((x) => x.r?.status === 'completed')
+      .sort((x, y) => (y.r!.createdAt || '').localeCompare(x.r!.createdAt || ''))[0]
+      ?? (runsByAgent['report']?.status === 'completed' ? { a: 'report', r: runsByAgent['report'] } : undefined);
     const fallback = Object.entries(runsByAgent)
       .map(([a, r]) => ({ a, r }))
       .filter((x) => x.r?.status === 'completed')
@@ -482,7 +549,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
       maxPctRef.current = 100;
       setActivity([]);
       setActiveRunId(null);
-      setRunStatus({ status: 'completed', progress_pct: 100, summary: entry.summary, agentId, output: entry.output });
+      setRunStatus({ status: 'completed', progress_pct: 100, summary: entry.summary, agentId, output: entry.output, createdAt: entry.createdAt ?? null });
       return;
     }
     if (runId === activeRunId) return;
@@ -645,7 +712,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
           </div>
         </div>
       )}
-      {setsOpen && <SetsEditorModal projectId={project.id} onClose={() => setSetsOpen(false)} />}
+      {setsOpen && <SetsEditorModal projectId={project.id} brandName={project.brand_name} onClose={() => setSetsOpen(false)} />}
 
       {demoMode && (
         <div className="border-b border-gold/40 bg-gold/10 px-4 py-2.5 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-center">
@@ -786,8 +853,19 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
                   {runStatus.summary && (
                     <div className="p-3 rounded border border-sage/35 bg-sage/10 text-sm text-sage leading-relaxed">{runStatus.summary}</div>
                   )}
-                  {uiLang === 'zh' && (
+                  {/* Reviewer translation only when the deliverable is not already in
+                      the reviewer's language (reports carry output.language since
+                      2026-09-23; older outputs have none and are treated as English). */}
+                  {uiLang === 'zh' && !String(runStatus.output?.language ?? '').toLowerCase().startsWith('zh') && (
                     <TranslatedView agentId={runStatus.agentId} output={runStatus.output} summary={runStatus.summary} to="zh" />
+                  )}
+                  {(runStatus.agentId === 'monitor' || runStatus.agentId === 'full_scan') && (
+                    <ProvenanceStrip
+                      o={runStatus.agentId === 'full_scan' ? (runStatus.output.scorecard ?? runStatus.output) : runStatus.output}
+                      runId={activeRunId}
+                      createdAt={runStatus.createdAt}
+                      trigger={runStatus.trigger}
+                    />
                   )}
                   <RunResult
                     trialMode={trialMode}
@@ -800,6 +878,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
                     onVersions={(v) => { if (activeRunId) setSandboxVersions((m) => ({ ...m, [activeRunId]: v })); }}
                     onDispatch={demoMode ? undefined : dispatchAgent}
                     loop={{ runsByAgent, currentScore: headlineAigvr }}
+                    history={history}
                   />
                   <details className="print-hide rounded border border-edge bg-surface">
                     <summary className="cursor-pointer px-3 py-2 text-[11px] uppercase tracking-widest text-faint select-none hover:text-dim">Process log · {activity.length} steps</summary>
@@ -826,7 +905,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
         {/* RIGHT — at-a-glance context */}
         <aside className="hidden lg:block lg:border-l border-edge lg:overflow-y-auto px-4 py-4 space-y-4 lg:min-h-0">
           <TrendPanel history={history} />
-          <ContextPanel headlineAigvr={headlineAigvr} scoreRun={scoreRun} runsByAgent={runsByAgent} totalAgents={DELIVERABLE_GROUPS.reduce((n, g) => n + g.items.length, 0)} />
+          <ContextPanel headlineAigvr={headlineAigvr} scoreRun={scoreRun} runsByAgent={runsByAgent} totalAgents={DELIVERABLE_GROUPS.reduce((n, g) => n + g.items.length, 0)} projectId={demoMode ? undefined : project.id} />
         </aside>
       </div>
     </div>
@@ -914,11 +993,15 @@ function TranslatedView({ agentId, output, summary, to }: { agentId?: string; ou
   );
 }
 
-function ContextMetric({ label, value, tip }: { label: string; value: string; tip?: string }) {
+function ContextMetric({ label, value, tip, sub }: { label: string; value: string; tip?: string; sub?: string }) {
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="text-[11px] text-dim">{tip ? <TermTip term={tip}>{label}</TermTip> : label}</span>
-      <span className="text-[11px] font-semibold text-ink tabular-nums">{value}</span>
+      <span className="text-[11px] font-semibold text-ink tabular-nums">
+        {/* Every rate carries its fraction so the reader can check it. */}
+        {sub && <span className="mr-1.5 font-normal text-faint">{sub}</span>}
+        {value}
+      </span>
     </div>
   );
 }
@@ -1014,11 +1097,12 @@ function MonthlyTrend({ history, arrow, dColor }: {
   );
 }
 
-function ContextPanel({ headlineAigvr, scoreRun, runsByAgent, totalAgents }: {
+function ContextPanel({ headlineAigvr, scoreRun, runsByAgent, totalAgents, projectId }: {
   headlineAigvr: number | null;
   scoreRun?: LatestRun;
   runsByAgent: Record<string, LatestRun>;
   totalAgents: number;
+  projectId?: string;
 }) {
   const sc = scoreRun?.output?.scorecard ?? scoreRun?.output;
   // Count only the deliverables listed in the nav groups — full_scan is a
@@ -1034,22 +1118,30 @@ function ContextPanel({ headlineAigvr, scoreRun, runsByAgent, totalAgents }: {
   const sov = sc?.dimensions?.competitiveShare;
   const cite = sc?.dimensions?.citation;
   const senti = sc?.dimensions?.sentiment;
+  const ov = sc?.metrics?.overall ?? {};
+  const nAnswers: number | undefined = ov.queries ?? sc?.sampled?.queries;
+  const totalMentions: number = sc?.brandMentionsTotal ?? (sc?.competitorBenchmark || []).reduce((a: number, b: any) => a + (b.hits ?? 0), 0);
+  const frac = (n: unknown, dn: unknown) => (typeof n === 'number' && typeof dn === 'number' && dn > 0 ? `${n}/${dn}` : undefined);
   return (
     <div className="space-y-4">
       {/* Standard metrics lead (SVP feedback); composite is a summary dial. */}
       {sc && (
         <div className="rounded-lg border border-edge bg-surface p-3 space-y-2">
           <div className="text-[10px] uppercase tracking-widest text-faint">{t('Latest scan')}</div>
-          <ContextMetric tip="presence" label="Presence" value={presence != null ? `${presence}%` : '—'} />
-          <ContextMetric tip="sov" label={`Share of Voice · ${t('index score')}`} value={sov != null ? String(Math.round(sov)) : '—'} />
-          <ContextMetric tip="citation" label="Citation rate" value={cite != null ? `${Math.round(cite)}%` : '—'} />
+          <ContextMetric tip="presence" label="Presence" value={presence != null ? `${presence}%` : '—'} sub={frac(ov.brandHits, nAnswers)} />
+          <ContextMetric tip="sov" label="Share of Voice" value={sov != null ? `${Math.round(sov)}%` : '—'} sub={frac(ov.brandHits, totalMentions)} />
+          <ContextMetric tip="citation" label="Citation rate" value={cite != null ? `${Math.round(cite)}%` : '—'} sub={frac(sc?.citations?.brandCitedCount, nAnswers)} />
           <ContextMetric tip="sentiment" label="AI sentiment" value={senti != null ? String(Math.round(senti)) : '—'} />
-          {sc?.accuracy?.rate != null && <ContextMetric tip="accuracy" label="Answer accuracy" value={`${sc.accuracy.rate}%`} />}
-          {topOfMind != null && <ContextMetric tip="topofmind" label="Top-of-mind rate" value={`${topOfMind}%`} />}
+          {sc?.accuracy?.rate != null && <ContextMetric tip="accuracy" label="Alignment with standard answers" value={`${sc.accuracy.rate}%`} sub={sc.accuracy.checked ? `${sc.accuracy.accurate ?? '—'}+${sc.accuracy.partial ?? 0}½/${sc.accuracy.checked}` : undefined} />}
+          {topOfMind != null && <ContextMetric tip="topofmind" label="Top-of-mind rate" value={`${topOfMind}%`} sub={frac(ov.topOfMind, nAnswers)} />}
           <ContextMetric label="Brand rank" value={rank ? `#${rank} of ${benchN}` : '—'} />
           <ContextMetric tip="gaps" label="High-intent gaps" value={String(gaps)} />
           <ContextMetric label="Cited sources" value={String(sources)} />
         </div>
+      )}
+      {/* What the brand DID, and what the engines did after — the loop. */}
+      {projectId && (
+        <ActionsPanel projectId={projectId} lang={UI_LANG} t={t} />
       )}
       {SCORE_DISPLAY !== 'enterprise' && (
         <div className="rounded-lg border border-edge bg-surface p-4 text-center">
@@ -1438,10 +1530,11 @@ function TrialSiteTeaser({ site, upgradeHref }: { site: any; upgradeHref?: strin
   );
 }
 
-function RunResult({ agentId, output, projectId, runId, versions, onVersions, onDispatch, loop, trialMode, upgradeHref }: {
+function RunResult({ agentId, output, projectId, runId, versions, onVersions, onDispatch, loop, trialMode, upgradeHref, history }: {
   agentId?: string;
   output: Record<string, any>;
   projectId?: string;
+  history?: ScanPoint[];
   runId?: string;
   versions?: { label: string; content: string }[];
   onVersions?: (v: { label: string; content: string }[]) => void;
@@ -1460,13 +1553,13 @@ function RunResult({ agentId, output, projectId, runId, versions, onVersions, on
       {agentId === 'full_scan' ? (
         <>
           {trialMode && output.scorecard && <PreviewVerdict sc={output.scorecard} brand={output.scorecard.brand || ''} upgradeHref={upgradeHref} />}
-          {output.scorecard && <MonitorResult o={output.scorecard} />}
+          {output.scorecard && <MonitorResult o={output.scorecard} projectId={projectId} history={history} />}
           {trialMode && output.site && <TrialSiteTeaser site={output.site} upgradeHref={upgradeHref} />}
           {output.report && <ReportResult o={output.report} />}
           {output.report && loop && <ClosedLoop o={output.report} loop={loop} anchorAgent="full_scan" />}
         </>
       ) : agentId === 'monitor' ? (
-        <MonitorResult o={output} />
+        <MonitorResult o={output} projectId={projectId} history={history} />
       ) : agentId === 'report' ? (
         <>
           <ReportResult o={output} />
@@ -1497,11 +1590,11 @@ function RunResult({ agentId, output, projectId, runId, versions, onVersions, on
           quick={['更中立客观', '补充可靠引用', '精简篇幅', '强调显著性证据']}
           structured={<EncyclopediaResult o={output} />} />
       ) : agentId === 'profile' ? (
-        <ProfileResult o={output} />
+        <ProfileResult o={output} projectId={projectId} />
       ) : agentId === 'discovery' ? (
         <DiscoveryResult o={output} />
       ) : agentId === 'answers' ? (
-        <StandardAnswersResult o={output} />
+        <StandardAnswersResult o={output} projectId={projectId} />
       ) : null}
       {advisory && projectId && agentId && (
         <AdvisoryChat projectId={projectId} agentId={agentId} output={output} onDispatch={onDispatch} />
@@ -1518,7 +1611,7 @@ function scorecardText(sc: any): string {
   if (sc.aigvrScore != null) L.push(`AIGVR ${sc.aigvrScore}/100`);
   if (sc.dimensions) L.push('Dimensions: ' + Object.entries(sc.dimensions).map(([k, v]) => `${k} ${v}`).join(', '));
   if (sc.metrics?.perStage?.length) L.push('By funnel stage: ' + sc.metrics.perStage.map((s: any) => `${s.stage} ${s.presence}% (n=${s.queries})`).join('; '));
-  if (sc.competitorBenchmark?.length) L.push('Share of voice: ' + sc.competitorBenchmark.map((b: any) => `${b.name} ${b.sovPct}%`).join('; '));
+  if (sc.competitorBenchmark?.length) L.push('Brand presence rate (non-additive): ' + sc.competitorBenchmark.map((b: any) => `${b.name} ${b.sovPct}%`).join('; '));
   if (sc.gaps?.length) L.push('High-intent gaps:\n' + sc.gaps.map((g: any) => `- [${g.engine}/${g.stage}] ${g.prompt} → ${(g.competitorsPresent || []).join(', ')}`).join('\n'));
   if (sc.sourceAuthority?.ranking?.length) L.push('Sources AI engines cite: ' + sc.sourceAuthority.ranking.slice(0, 10).map((d: any) => `${d.domain} (${d.citations}x)`).join(', '));
   return L.join('\n');
@@ -1623,6 +1716,29 @@ function ArtifactSandbox({ o, projectId, runId, versions: extVersions, onVersion
   const [err, setErr] = useState<string | null>(null);
   const current = versions[active];
 
+  // Hand edits used to live only in React state — gone on reload. They are now
+  // saved per run (asset_edits 'doc:<runId>') and restored as their own version.
+  const docEdits = useEdits(runId ? projectId : undefined, artifactType);
+  const docKey = runId ? `doc:${runId}` : null;
+  const [savedNote, setSavedNote] = useState<string | null>(null);
+  const restored = useRef(false);
+  useEffect(() => {
+    const row = docKey ? docEdits.edits[docKey] : undefined;
+    if (!row || restored.current) return;
+    restored.current = true;
+    const content = String(row.value?.content ?? '');
+    if (!content || versions.some((v) => v.content === content)) return;
+    const next = [...versions, { label: `v${versions.length + 1} · ${t('edited')}`, content }];
+    setLocalVersions(next); onVersions?.(next); setActive(next.length - 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docEdits.edits, docKey]);
+  const finishEditing = async () => {
+    setEditing(false);
+    if (!docKey || current.content === initial) return;
+    const e = await docEdits.save(docKey, { content: current.content }, { content: initial });
+    setSavedNote(e ? e : t('Saved — a re-run will not overwrite this'));
+  };
+
   const refineWith = async (instruction: string) => {
     if (!instruction.trim() || busy || !projectId) return;
     setBusy(true); setErr(null);
@@ -1650,7 +1766,9 @@ function ArtifactSandbox({ o, projectId, runId, versions: extVersions, onVersion
           {subtitle && <p className="text-[11px] text-faint mt-0.5">{subtitle}</p>}
         </div>
         <div className="flex gap-2 shrink-0">
-          <button onClick={() => setEditing((e) => !e)} className="text-[11px] px-2 py-0.5 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition">{editing ? t('Done') : t('Edit')}</button>
+          {savedNote && <span className="self-center text-[10px] text-gold">{savedNote}</span>}
+          <MarkPublished projectId={projectId} runId={runId} artifactType={artifactType} title={o.title} targetPrompts={o.targetQuery ? [String(o.targetQuery)] : undefined} lang={UI_LANG} t={t} />
+          <button onClick={() => (editing ? finishEditing() : setEditing(true))} className="text-[11px] px-2 py-0.5 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition">{editing ? t('Done') : t('Edit')}</button>
           <button onClick={() => navigator.clipboard?.writeText(current.content).catch(() => {})} className="text-[11px] px-2 py-0.5 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition">{t('Copy')}</button>
         </div>
       </div>
@@ -1755,34 +1873,53 @@ function ContentResult({ o }: { o: Record<string, any> }) {
   );
 }
 
-function ProfileResult({ o }: { o: Record<string, any> }) {
-  const facts: any[] = o.facts || [];
-  const nap = o.nap || {};
-  const napEntries = Object.entries(nap).filter(([, v]) => v);
+function ProfileResult({ o, projectId }: { o: Record<string, any>; projectId?: string }) {
+  // Generated values come from the run output `o`; the user's edits (kept in
+  // asset_edits, applied last by every agent) are overlaid here. A re-run
+  // replaces `o`, never the edits.
+  const { edits, save, revert } = useEdits(projectId, 'brand_profile');
+  const gen = (k: string) => (k.startsWith('nap.') ? o.nap?.[k.slice(4)] : o[k]);
+  const val = (k: string) => (edits[k] ? edits[k].value : gen(k));
+  const unit = (k: string) => ({ unitKey: k, generated: gen(k), row: edits[k], save, revert, t });
+  const facts: any[] = val('facts') || [];
+  const services: string[] = val('services') || [];
+  const diffs: string[] = val('differentiators') || [];
+  const NAP_KEYS = ['name', 'address', 'phone', 'email', 'website'];
+  const napShown = NAP_KEYS.filter((k) => val(`nap.${k}`));
   return (
     <div className="rounded-xl border border-edge bg-surface p-5 space-y-3">
       <div>
         <h3 className="text-sm font-semibold text-ink">Canonical brand profile</h3>
-        <p className="text-[11px] text-faint mt-0.5">{o.sourcedFromHomepage ? 'verified against homepage' : 'from brand knowledge'} · reused by all execution agents</p>
+        <p className="text-[11px] text-faint mt-0.5">{o.sourcedFromHomepage ? 'verified against homepage' : 'from brand knowledge'} · reused by all execution agents · {t('your edits are kept when the agent re-runs')}</p>
       </div>
-      {o.definition && <div className="text-[13px] text-ink font-medium leading-snug">{o.definition}</div>}
-      {o.description && <div className="text-[12px] text-dim leading-relaxed">{o.description}</div>}
+      {val('definition') && <EditableUnit {...unit('definition')} rows={2}><div className="text-[13px] text-ink font-medium leading-snug">{val('definition')}</div></EditableUnit>}
+      {val('description') && <EditableUnit {...unit('description')} rows={4}><div className="text-[12px] text-dim leading-relaxed">{val('description')}</div></EditableUnit>}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
-        {(o.services || []).length > 0 && (
-          <div><SectionLabel>Services</SectionLabel><div className="flex flex-wrap gap-1">{o.services.map((s: string, i: number) => <span key={i} className="text-[11px] px-1.5 py-0.5 rounded bg-raised border border-edge text-dim">{s}</span>)}</div></div>
+        {services.length > 0 && (
+          <div><SectionLabel>Services</SectionLabel>
+            <EditableUnit {...unit('services')} kind="lines" rows={6}><div className="flex flex-wrap gap-1">{services.map((x: string, i: number) => <span key={i} className="text-[11px] px-1.5 py-0.5 rounded bg-raised border border-edge text-dim">{x}</span>)}</div></EditableUnit>
+          </div>
         )}
-        {(o.differentiators || []).length > 0 && (
-          <div><SectionLabel>Differentiators</SectionLabel><ul className="space-y-0.5">{o.differentiators.map((d: string, i: number) => <li key={i} className="text-[11px] text-dim">· {d}</li>)}</ul></div>
+        {diffs.length > 0 && (
+          <div><SectionLabel>Differentiators</SectionLabel>
+            <EditableUnit {...unit('differentiators')} kind="lines" rows={6}><ul className="space-y-0.5">{diffs.map((d: string, i: number) => <li key={i} className="text-[11px] text-dim">· {d}</li>)}</ul></EditableUnit>
+          </div>
         )}
       </div>
       {facts.length > 0 && (
         <div><SectionLabel>Facts</SectionLabel>
-          <div className="space-y-0.5">{facts.map((f, i) => <div key={i} className="text-[12px]"><span className="text-faint">{f.label}: </span><span className="text-ink">{f.value}</span></div>)}</div>
+          <EditableUnit {...unit('facts')} kind="facts" rows={Math.min(12, facts.length + 1)}>
+            <div className="space-y-0.5">{facts.map((f, i) => <div key={i} className="text-[12px]"><span className="text-faint">{f.label}: </span><span className="text-ink">{f.value}</span></div>)}</div>
+          </EditableUnit>
         </div>
       )}
-      {napEntries.length > 0 && (
+      {napShown.length > 0 && (
         <div><SectionLabel>NAP</SectionLabel>
-          <div className="text-[11px] text-dim">{napEntries.map(([k, v]) => `${k}: ${v}`).join('  ·  ')}</div>
+          <div className="space-y-0.5">
+            {napShown.map((k) => (
+              <EditableUnit key={k} {...unit(`nap.${k}`)} rows={1}><div className="text-[11px] text-dim"><span className="text-faint">{k}: </span>{String(val(`nap.${k}`))}</div></EditableUnit>
+            ))}
+          </div>
         </div>
       )}
       {o.confidence && <div className="text-[10px] text-faint pt-1 border-t border-edge">{o.confidence}</div>}
@@ -2025,15 +2162,28 @@ function DiscoveryResult({ o }: { o: Record<string, any> }) {
   );
 }
 
-function StandardAnswersResult({ o }: { o: Record<string, any> }) {
+function StandardAnswersResult({ o, projectId }: { o: Record<string, any>; projectId?: string }) {
   const answers: any[] = o.answers || [];
   const localName = o.localLangName || 'Local';
+  // Edits are keyed by a hash of the PROMPT, so they follow an answer through
+  // regeneration and reordering; the accuracy judge reads the same overlay.
+  const { edits, save, revert } = useEdits(projectId, 'standard_answers');
+  const [keys, setKeys] = useState<Record<string, { local: string; en: string }>>({});
+  useEffect(() => {
+    let off = false;
+    Promise.all(answers.map(async (a) => [a.prompt, { local: await answerUnitKey(a.prompt, 'local'), en: await answerUnitKey(a.prompt, 'en') }] as const))
+      .then((pairs) => { if (!off) setKeys(Object.fromEntries(pairs)); });
+    return () => { off = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [answers.length]);
   // English-market (or legacy duplicated) outputs collapse to one block —
   // local===en used to render every answer twice.
   const blocksOf = (a: any) => {
-    const out: { lab: string; val: string }[] = [];
-    if (a.local && a.local !== a.en) out.push({ lab: localName, val: a.local });
-    if (a.en) out.push({ lab: 'English', val: a.en });
+    const k = keys[a.prompt];
+    const inForce = (lang: 'local' | 'en') => (k && edits[k[lang]] ? String(edits[k[lang]].value) : a[lang]);
+    const out: { lab: string; val: string; lang: 'local' | 'en'; gen: string }[] = [];
+    if (a.local && a.local !== a.en) out.push({ lab: localName, val: inForce('local'), lang: 'local', gen: a.local });
+    if (a.en) out.push({ lab: 'English', val: inForce('en'), lang: 'en', gen: a.en });
     return out;
   };
   const bilingual = answers.some((a) => blocksOf(a).length > 1);
@@ -2071,7 +2221,13 @@ function StandardAnswersResult({ o }: { o: Record<string, any> }) {
                     <span className="text-[10px] uppercase tracking-wider text-faint">{blk.lab}</span>
                     <button onClick={() => copy(blk.val)} className="text-[10px] text-faint hover:text-brand transition">{t('Copy')}</button>
                   </div>
-                  <p className="text-[12px] text-dim leading-relaxed">{blk.val}</p>
+                  {keys[a.prompt] ? (
+                    <EditableUnit unitKey={keys[a.prompt][blk.lang]} generated={blk.gen} row={edits[keys[a.prompt][blk.lang]]} save={save} revert={revert} t={t} rows={5}>
+                      <p className="text-[12px] text-dim leading-relaxed">{blk.val}</p>
+                    </EditableUnit>
+                  ) : (
+                    <p className="text-[12px] text-dim leading-relaxed">{blk.val}</p>
+                  )}
                 </div>
               ))}
             </div>
@@ -2230,6 +2386,29 @@ function VerificationBar({ projectId, kind }: { projectId: string; kind: string 
   );
 }
 
+// Fixed provenance strip on every scan scorecard (FMVN round-4 §1): scan
+// date · id · auto/manual · n · panel · competitor-set version. Kills the
+// "which number is official" class of dispute — printable, never hidden.
+function ProvenanceStrip({ o, runId, createdAt, trigger }: { o: Record<string, any>; runId?: string | null; createdAt?: string | null; trigger?: string | null }) {
+  const s = o.sampled || {};
+  const csAt = (o.competitorSet?.refreshedAt || '').slice(0, 10);
+  const bits = [
+    createdAt ? `${t('Scan')} ${createdAt.slice(0, 10)}` : null,
+    runId ? `#${runId.slice(0, 8)}` : null,
+    trigger ? (trigger === 'schedule' ? t('auto') : t('manual')) : null,
+    s.queries != null ? `n=${s.queries}` : null,
+    s.used != null ? `${t('panel')} ${s.used}/${s.total}` : null,
+    s.keyUsed != null ? `Core ${s.keyUsed}/${s.keyTotal}` : null,
+    csAt ? `${t('competitor set')} v${csAt}` : null,
+  ].filter(Boolean);
+  if (!bits.length) return null;
+  return (
+    <div className="rounded-lg border border-edge bg-raised px-3 py-1.5 font-mono text-[10.5px] text-dim tracking-tight">
+      {bits.join(' · ')}
+    </div>
+  );
+}
+
 function KpiTile({ label, value, sub, accent, tip }: { label: string; value: string | number; sub?: string; accent?: boolean; tip?: string }) {
   return (
     <div className={`rounded-lg border px-3 py-2 ${accent ? 'border-brand/40 bg-brand-soft/40' : 'border-edge bg-surface'}`}>
@@ -2240,7 +2419,7 @@ function KpiTile({ label, value, sub, accent, tip }: { label: string; value: str
   );
 }
 
-function MonitorResult({ o }: { o: Record<string, any> }) {
+function MonitorResult({ o, projectId, history }: { o: Record<string, any>; projectId?: string; history?: ScanPoint[] }) {
   // Per-engine view (SVP feedback: each LLM matters differently) — slicing is
   // display-level; benchmark and gaps stay whole-scan.
   const [engineView, setEngineView] = useState<string | null>(null);
@@ -2264,7 +2443,8 @@ function MonitorResult({ o }: { o: Record<string, any> }) {
   const stages: any[] = o.metrics?.perStage || [];
   const engines: any[] = o.metrics?.perEngine || [];
   const bench: any[] = o.competitorBenchmark || [];
-  const maxSov = Math.max(1, ...bench.map((b) => b.sovPct || 0));
+  const totalMentions: number = o.brandMentionsTotal ?? bench.reduce((a, b) => a + (b.hits ?? 0), 0);
+  const nAnswers: number | undefined = o.metrics?.overall?.queries ?? o.sampled?.queries;
   const gaps: any[] = o.gaps || [];
   const score = engSel ? (engSel.aigvr ?? 0) : (o.aigvrScore ?? 0);
   const tom = o.topOfMind || {};
@@ -2314,25 +2494,35 @@ function MonitorResult({ o }: { o: Record<string, any> }) {
         {/* Counts follow the engine slice; whole-scan-only footnotes drop out
             in engine view instead of showing mismatched numbers. */}
         <KpiTile tip="presence" label={t('Presence')} value={`${Math.round(d.presence ?? 0)}%`} sub={`${(engSel ?? o.metrics?.overall)?.brandHits ?? '—'}/${(engSel ?? o.metrics?.overall)?.queries ?? o.sampled?.queries ?? '—'} ${t('answers')}`} />
-        <KpiTile tip="sov" label={`${t('Share of Voice')} · ${t('index score')}`} value={Math.round(d.competitiveShare ?? 0)} sub={engSel ? undefined : `${t('actual share')} ${bench.find((b: any) => b.isBrand)?.sovPct ?? '—'}% · ${t('Rank')} #${o.brandRank ?? '—'} / ${bench.length || '—'}`} />
+        <KpiTile tip="sov" label={t('Share of Voice')} value={`${Math.round(d.competitiveShare ?? 0)}%`} sub={engSel ? undefined : `${bench.find((b: any) => b.isBrand)?.hits ?? '—'}/${totalMentions || '—'} ${t('brand mentions')} · ${t('Rank')} #${o.brandRank ?? '—'} / ${bench.length || '—'}`} />
         <KpiTile tip="position" label={t('Position when present')} value={Math.round(d.prominence ?? 0)} sub={engSel ? (engSel.topOfMindRate != null ? `${t('Top-of-mind')} ${engSel.topOfMindRate}%` : undefined) : hasTom ? `${t('Top-of-mind')} ${tom.overallRate}% · ${t('key')} ${tom.keyRate ?? '—'}%` : undefined} accent />
         <KpiTile tip="sentiment" label={t('Sentiment when present')} value={Math.round(d.sentiment ?? 0)} />
         <KpiTile tip="citation" label={t('Citation strength')} value={`${Math.round(d.citation ?? 0)}%`} />
         <KpiTile tip="gaps" label={t('High-intent gaps')} value={gaps.length} sub={t('queries competitors win')} accent={gaps.length > 0} />
         {o.accuracy && !engSel && (
-          <KpiTile tip="accuracy" label={t('Answer accuracy')} value={`${o.accuracy.rate}%`} sub={`${o.accuracy.wrong} ${t('wrong')} · ${o.accuracy.partial} ${t('partial')} / ${o.accuracy.checked}`} accent={o.accuracy.wrong > 0} />
+          <KpiTile tip="accuracy" label={`${t('Alignment with standard answers')} · ${t('not client-verified')}`} value={`${o.accuracy.rate}%`} sub={`${o.accuracy.accurate ?? '—'} ${t('aligned')} · ${o.accuracy.partial} ${t('partial')} · ${o.accuracy.wrong} ${UI_LANG === 'en' ? 'divergent' : t('wrong')} / ${o.accuracy.checked} ${t('judged')} (${o.metrics?.overall?.brandHits ?? '—'} ${t('brand-present')})`} />
         )}
       </div>
 
-      {/* Wrong/partial answers — each one is a support-cost leak with a fix path */}
+      {/* Reader-order dashboard (Javvo/Olivia layout, MemeCMO definitions):
+          brand table + share-of-voice donut → presence by engine → sources the
+          engines cite → presence by question with the answer behind each
+          cell. Computed from rawSamples, so every figure has its fraction and
+          the single-engine view re-slices all of it. */}
+      <MonitorViews o={o} engineView={engineView} lang={UI_LANG} t={t} projectId={projectId} history={history} />
+
+      {/* Answers that diverge from the (AI-drafted, not yet client-verified)
+          standard answers. "wrong"/"partial" are the judge's stored verdicts;
+          the labels shown are "divergent"/"partially aligned" — until a client
+          verifies the facts this is a messaging-gap list, not an error list. */}
       {o.accuracy && o.accuracy.issues?.length > 0 && (
         <div>
-          <SectionLabel>{t('Answer accuracy issues')}</SectionLabel>
+          <SectionLabel>{t('Answers diverging from the standard answers')}</SectionLabel>
           <div className="space-y-1.5">
             {o.accuracy.issues.map((iss: any, i: number) => (
               <div key={i} className="rounded-lg border border-edge bg-canvas px-3 py-2">
                 <div className="flex items-center gap-2 text-[11px]">
-                  <span className={`px-1.5 py-0.5 rounded uppercase tracking-wider text-[9px] font-semibold ${iss.verdict === 'wrong' ? 'bg-garnet/15 text-garnet' : 'bg-gold/15 text-gold'}`}>{iss.verdict === 'wrong' ? t('wrong') : t('partial')}</span>
+                  <span className={`px-1.5 py-0.5 rounded uppercase tracking-wider text-[9px] font-semibold ${iss.verdict === 'wrong' ? 'bg-garnet/15 text-garnet' : 'bg-gold/15 text-gold'}`}>{iss.verdict === 'wrong' ? (UI_LANG === 'en' ? 'divergent' : t('wrong')) : t('partial')}</span>
                   <span className="text-faint">{iss.engine}</span>
                   <span className="text-dim truncate">{iss.prompt}</span>
                 </div>
@@ -2420,37 +2610,6 @@ function MonitorResult({ o }: { o: Record<string, any> }) {
         </div>
       )}
 
-      {/* Competitive share-of-voice bar chart */}
-      {bench.length > 0 && (
-        <div>
-          <SectionLabel>Share of voice</SectionLabel>
-          <div className="space-y-1">
-            {bench.map((b, i) => (
-              <div
-                key={i}
-                className={`flex items-center gap-2.5 rounded-md px-2 py-1 ${b.isBrand ? 'bg-gold/12 ring-1 ring-gold/40' : ''}`}
-              >
-                <span className={`w-28 shrink-0 truncate text-[11px] ${b.isBrand ? 'text-gold font-semibold' : 'text-dim'}`}>
-                  {b.isBrand && <span className="mr-0.5">★</span>}{b.name}
-                </span>
-                <div className="flex-1 h-2.5 bg-raised rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full ${b.isBrand ? 'bg-gold' : 'bg-brand/60'} transition-all duration-500`}
-                    style={{ width: `${((b.sovPct || 0) / maxSov) * 100}%` }}
-                  />
-                </div>
-                <span className={`w-9 text-right text-[11px] tabular-nums ${b.isBrand ? 'text-gold font-semibold' : 'text-dim'}`}>{b.sovPct}%</span>
-              </div>
-            ))}
-          </div>
-          {Array.isArray(o.partners) && o.partners.length > 0 && (
-            <p className="text-[10px] text-faint mt-1.5">
-              {t('Not counted in SoV')}: {o.partners.map((p: any) => `${p.name} (${t(p.relationship)})`).join(' · ')}
-            </p>
-          )}
-        </div>
-      )}
-
       {/* High-intent gaps */}
       {gaps.length > 0 && (
         <div>
@@ -2469,29 +2628,6 @@ function MonitorResult({ o }: { o: Record<string, any> }) {
               </li>
             ))}
           </ul>
-        </div>
-      )}
-
-      {/* Source-Authority Index — which domains the engines actually cite */}
-      {o.sourceAuthority?.ranking?.length > 0 && (
-        <div>
-          <SectionLabel>Sources AI engines cite · AEO targets</SectionLabel>
-          <p className="text-[10px] text-faint mb-1.5">
-            {o.sourceAuthority.totalCitations} citations indexed across this project&apos;s scans — get featured on these.
-          </p>
-          <div className="space-y-1">
-            {o.sourceAuthority.ranking.slice(0, 10).map((d: any, i: number) => (
-              <div key={i} className={`flex items-center gap-2.5 rounded-md px-2 py-1 ${d.isBrand ? 'bg-gold/12 ring-1 ring-gold/40' : ''}`}>
-                <span className="w-4 text-[10px] text-faint tabular-nums">{i + 1}</span>
-                <span className={`flex-1 truncate text-[11px] ${d.isBrand ? 'text-gold font-semibold' : 'text-dim'}`}>
-                  {d.isBrand && <span className="mr-0.5">★</span>}{d.domain}
-                  {d.isBrand && <span className="ml-1 text-[9px] text-gold/70 uppercase">you</span>}
-                </span>
-                <span className="text-[10px] text-faint">{d.engines} eng</span>
-                <span className="w-9 text-right text-[11px] tabular-nums text-dim font-medium">{d.citations}×</span>
-              </div>
-            ))}
-          </div>
         </div>
       )}
 
@@ -2526,6 +2662,13 @@ function ReportResult({ o }: { o: Record<string, any> }) {
   const copyMarkdown = () => {
     if (o.markdown) navigator.clipboard?.writeText(o.markdown).catch(() => {});
   };
+  // Converged by default (founder, 2026-09-23): the summary and the first
+  // findings are read at a glance; each recommendation opens on demand.
+  const [showAllFindings, setShowAllFindings] = useState(false);
+  const [openRecs, setOpenRecs] = useState<Set<number>>(new Set());
+  const toggleRec = (i: number) => setOpenRecs((prev) => { const n = new Set(prev); if (n.has(i)) n.delete(i); else n.add(i); return n; });
+  const allOpen = recs.length > 0 && openRecs.size === recs.length;
+  const visibleFindings = showAllFindings || findings.length <= 3 ? findings : findings.slice(0, 3);
   return (
     <div className="rounded-xl border border-edge bg-surface p-5 space-y-5">
       <div className="flex items-start justify-between gap-3">
@@ -2559,7 +2702,7 @@ function ReportResult({ o }: { o: Record<string, any> }) {
         <div>
           <SectionLabel>Key findings</SectionLabel>
           <ul className="space-y-2.5">
-            {findings.map((f, i) => (
+            {visibleFindings.map((f, i) => (
               <li key={i} className="flex gap-2.5">
                 <span className="mt-0.5 flex-none w-5 h-5 rounded-full bg-raised border border-edge text-[10px] font-semibold text-dim flex items-center justify-center tabular-nums">{i + 1}</span>
                 <div className="min-w-0">
@@ -2569,41 +2712,93 @@ function ReportResult({ o }: { o: Record<string, any> }) {
               </li>
             ))}
           </ul>
+          {findings.length > 3 && (
+            <button type="button" onClick={() => setShowAllFindings((v) => !v)} className="mt-1.5 text-[10px] text-faint hover:text-brand underline decoration-dotted">
+              {showAllFindings ? t('Collapse') : `${t('Show all')} · ${findings.length}`}
+            </button>
+          )}
         </div>
       )}
 
       {recs.length > 0 && (
         <div>
-          <SectionLabel>Recommendations</SectionLabel>
-          <div className="space-y-2.5">
-            {recs.map((rec, i) => (
-              <div key={i} className={`rounded-lg border border-edge border-l-[3px] ${PRIORITY_RAIL[rec.priority] || PRIORITY_RAIL.P2} bg-surface p-3.5`}>
-                <div className="flex items-center gap-2 mb-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <SectionLabel>Recommendations · {recs.length}</SectionLabel>
+            <button type="button" onClick={() => setOpenRecs(allOpen ? new Set() : new Set(recs.map((_, i) => i)))} className="text-[10px] text-faint hover:text-brand underline decoration-dotted mb-2">
+              {allOpen ? t('Collapse all') : t('Expand all')}
+            </button>
+          </div>
+          <div className="space-y-2">
+            {recs.map((rec, i) => { const isOpen = openRecs.has(i); return (
+              <div key={i} className={`rounded-lg border border-edge border-l-[3px] ${PRIORITY_RAIL[rec.priority] || PRIORITY_RAIL.P2} bg-surface ${isOpen ? 'p-3.5' : 'px-3.5 py-2.5'}`}>
+                <button type="button" onClick={() => toggleRec(i)} aria-expanded={isOpen} className="w-full text-left flex items-center gap-2">
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${PRIORITY_STYLE[rec.priority] || PRIORITY_STYLE.P2}`}>{rec.priority}</span>
                   <span className="text-[13px] font-semibold text-ink leading-tight">{rec.title}</span>
                   {rec.targetStage && <span className="ml-auto shrink-0 text-[10px] text-dim px-1.5 py-0.5 rounded bg-raised capitalize">{rec.targetStage}</span>}
-                </div>
-                {rec.rationale && <p className="text-[12px] text-dim leading-snug mb-2">{rec.rationale}</p>}
-                {Array.isArray(rec.actions) && rec.actions.length > 0 && (
-                  <ul className="space-y-1 mb-2">
-                    {rec.actions.map((a: string, j: number) => (
-                      <li key={j} className="flex gap-2 text-[12px] text-dim leading-snug">
-                        <span className="text-sage/70 flex-none">▸</span>
-                        <span>{a}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {rec.expectedImpact && (
-                  <div className="text-[11px] text-sage/90 flex items-center gap-1.5">
-                    <span aria-hidden>↗</span>
-                    <span>{rec.expectedImpact}</span>
+                  <span className={`shrink-0 text-[11px] text-faint transition-transform ${isOpen ? 'rotate-90' : ''} ${rec.targetStage ? '' : 'ml-auto'}`} aria-hidden>▸</span>
+                </button>
+                {isOpen && (
+                  <div className="mt-2">
+                    {rec.rationale && <p className="text-[12px] text-dim leading-snug mb-2">{rec.rationale}</p>}
+                    {Array.isArray(rec.actions) && rec.actions.length > 0 && (
+                      <ul className="space-y-1 mb-2">
+                        {rec.actions.map((a: string, j: number) => (
+                          <li key={j} className="flex gap-2 text-[12px] text-dim leading-snug">
+                            <span className="text-sage/70 flex-none">▸</span>
+                            <span>{a}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {rec.expectedImpact && (
+                      <div className="text-[11px] text-sage/90 flex items-center gap-1.5">
+                        <span aria-hidden>↗</span>
+                        <span>{rec.expectedImpact}</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            ))}
+            ); })}
           </div>
         </div>
+      )}
+
+      {/* Phase 2 (cited-page fetcher): the client's own pages were read, so the
+          report can say what the site covers and where AI contradicts it. */}
+      {Array.isArray(o.siteCoverage) && o.siteCoverage.length > 0 && (() => {
+        const vac = o.siteCoverage.filter((c: any) => c.status === 'vacuum');
+        const cov = o.siteCoverage.filter((c: any) => c.status !== 'vacuum');
+        return (
+          <details className="group">
+            <summary className="cursor-pointer select-none list-none flex items-center gap-2"><SectionLabel>{t('Site coverage')} · {vac.length} {t('vacuum')} / {o.siteCoverage.length}</SectionLabel><span className="text-[10px] text-faint group-open:hidden">▸</span></summary>
+            <ul className="space-y-1 mt-1">
+              {[...vac, ...cov].map((c: any, i: number) => (
+                <li key={i} className="flex gap-2 text-[11.5px] leading-snug">
+                  <span className={`shrink-0 text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wider font-semibold ${c.status === 'vacuum' ? 'bg-garnet/15 text-garnet' : 'bg-sage/15 text-sage'}`}>{c.status === 'vacuum' ? t('vacuum') : t('covered')}</span>
+                  <span className="min-w-0"><span className="text-ink">{c.prompt}</span>{c.page && <> · <a href={c.page} target="_blank" rel="noreferrer" className="text-brand hover:underline break-all">{String(c.page).replace(/^https?:\/\/(www\.)?/, '').slice(0, 60)}</a></>}{c.note && <span className="text-faint"> — {c.note}</span>}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        );
+      })()}
+      {Array.isArray(o.contradictions) && o.contradictions.length > 0 && (
+        <details className="group">
+          <summary className="cursor-pointer select-none list-none flex items-center gap-2"><SectionLabel>{t('AI answers that contradict the site')} · {o.contradictions.length}</SectionLabel><span className="text-[10px] text-faint group-open:hidden">▸</span></summary>
+          <ul className="space-y-1.5 mt-1">
+            {o.contradictions.map((c: any, i: number) => (
+              <li key={i} className="rounded-md border border-edge border-l-2 border-l-garnet/50 bg-garnet/5 px-2.5 py-1.5 text-[11.5px] leading-snug">
+                <div className="text-faint text-[10px]">{c.engine} · {c.prompt}</div>
+                <div><span className="text-garnet">{t('AI')}:</span> <span className="text-ink">{c.aiClaim}</span></div>
+                <div><span className="text-sage">{t('Site')}:</span> <span className="text-ink">{c.siteFact}</span>{c.sitePage && <> · <a href={c.sitePage} target="_blank" rel="noreferrer" className="text-brand hover:underline break-all">{String(c.sitePage).replace(/^https?:\/\/(www\.)?/, '').slice(0, 50)}</a></>}</div>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {o.siteCorpusSize === 0 && Array.isArray(o.siteCoverage) && (
+        <p className="text-[10px] text-faint">{t('The client\'s own pages were not read yet, so site coverage and contradictions are not assessed in this report.')}</p>
       )}
 
       {quickWins.length > 0 && (
@@ -2626,29 +2821,48 @@ function ReportResult({ o }: { o: Record<string, any> }) {
 // ── Sets editor — competitor set & prompt library (Javvo spec: manual
 // correction first). Edits live on projects.metadata; the Discovery asset and
 // scan history are never touched, and the competitor-set freeze date is kept.
-function SetsEditorModal({ projectId, onClose }: { projectId: string; onClose: () => void }) {
+function SetsEditorModal({ projectId, brandName, onClose }: { projectId: string; brandName?: string; onClose: () => void }) {
   const [tab, setTab] = useState<'competitors' | 'prompts'>('competitors');
   const [groups, setGroups] = useState<{ canonical: string; aliases: string[]; relationship?: string }[]>([]);
-  const [library, setLibrary] = useState<{ label: string; prompts: string[] }[]>([]);
+  const [library, setLibrary] = useState<{ category: string; label: string; prompts: string[] }[]>([]);
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
-  const [added, setAdded] = useState('');
+  // Added prompts each carry the funnel group they join (stage-balanced
+  // sampling depends on it); legacy bare strings load as 'custom'.
+  const [addedItems, setAddedItems] = useState<{ text: string; category: string }[]>([]);
+  // Rewrites keyed by norm(original) — the FMVN localization loop. `editing`
+  // is the prompt whose inline reword editor is open.
+  const [rewrites, setRewrites] = useState<Map<string, { from: string; to: string; note?: string }>>(new Map());
+  const [editing, setEditing] = useState<{ p: string; draft: string; note: string } | null>(null);
+  const [core, setCore] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const norm = (s: string) => s.trim().toLowerCase();
+  // Matches the server's core normalization (diacritic/punctuation-insensitive).
+  const normCore = (s: string) =>
+    s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[?？.!,\s]+/g, ' ').trim();
 
   useEffect(() => {
     fetch(`/api/workspace/project-sets?projectId=${projectId}`)
-      .then((r) => r.json())
+      .then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
       .then((d) => {
         setGroups(d.competitorSet?.groups ?? []);
-        setLibrary((d.promptLibrary ?? []).map((c: any) => ({ label: c.label || c.category || 'general', prompts: c.prompts || [] })));
+        setLibrary((d.promptLibrary ?? []).map((c: any) => ({ category: c.category || 'general', label: c.label || c.category || 'general', prompts: c.prompts || [] })));
         setExcluded(new Set((d.promptEdits?.excluded ?? []).map((s: string) => s.trim().toLowerCase())));
-        setAdded((d.promptEdits?.added ?? []).join('\n'));
+        setAddedItems(((d.promptEdits?.added ?? []) as (string | { text: string; category?: string })[])
+          .map((a) => (typeof a === 'string' ? { text: a, category: 'custom' } : { text: a.text ?? '', category: a.category || 'custom' }))
+          .filter((a) => a.text));
+        setRewrites(new Map(((d.promptEdits?.rewrites ?? []) as { from: string; to: string; note?: string }[])
+          .filter((r) => r?.from && r?.to)
+          .map((r) => [r.from.trim().toLowerCase(), r])));
+        setCore(new Set(((d.corePrompts ?? []) as string[]).map((s) =>
+          s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[?？.!,\s]+/g, ' ').trim())));
       })
-      .catch(() => setMsg('Load failed'))
+      .catch((e) => setMsg(`${t('Load failed')}${e?.message ? ` (${e.message})` : ''}`))
       .finally(() => setLoading(false));
   }, [projectId]);
+
+  const isCore = (p: string) => core.has(normCore(p));
 
   const togglePrompt = (p: string) =>
     setExcluded((prev) => {
@@ -2656,6 +2870,18 @@ function SetsEditorModal({ projectId, onClose }: { projectId: string; onClose: (
       if (n.has(norm(p))) n.delete(norm(p)); else n.add(norm(p));
       return n;
     });
+
+  const commitRewrite = () => {
+    if (!editing) return;
+    const to = editing.draft.trim();
+    setRewrites((prev) => {
+      const n = new Map(prev);
+      if (!to || norm(to) === norm(editing.p)) n.delete(norm(editing.p));
+      else n.set(norm(editing.p), { from: editing.p, to, ...(editing.note.trim() ? { note: editing.note.trim() } : {}) });
+      return n;
+    });
+    setEditing(null);
+  };
 
   const save = async () => {
     setBusy(true);
@@ -2667,11 +2893,19 @@ function SetsEditorModal({ projectId, onClose }: { projectId: string; onClose: (
         body: JSON.stringify({
           projectId,
           competitorGroups: groups.filter((g) => g.canonical.trim()),
-          promptEdits: { excluded: [...excluded], added: added.split('\n').map((s) => s.trim()).filter(Boolean) },
+          promptEdits: {
+            excluded: [...excluded],
+            added: addedItems.map((a) => ({ text: a.text.trim(), category: a.category })).filter((a) => a.text),
+            rewrites: [...rewrites.values()],
+          },
         }),
       });
       const d = await res.json();
-      setMsg(res.ok ? t('Saved') : d.error || 'Error');
+      setMsg(res.ok
+        ? d.blockedCore?.length
+          ? `${t('Saved')} · ${d.blockedCore.length} ${t('core prompts unchanged (bilateral sign-off required)')}`
+          : t('Saved')
+        : d.error || 'Error');
     } catch {
       setMsg('Network error');
     }
@@ -2684,7 +2918,8 @@ function SetsEditorModal({ projectId, onClose }: { projectId: string; onClose: (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-canvas border border-edge rounded-xl w-full max-w-2xl max-h-[82vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-edge">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            {brandName && <span className="text-xs font-semibold text-ink truncate max-w-[220px] mr-1" title={brandName}>{brandName}</span>}
             {(['competitors', 'prompts'] as const).map((tb) => (
               <button
                 key={tb}
@@ -2740,34 +2975,117 @@ function SetsEditorModal({ projectId, onClose }: { projectId: string; onClose: (
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-[11px] text-faint">{t('Click a prompt to exclude / restore it. Changes apply from the next run.')}</p>
+              <p className="text-[11px] text-faint">{t('Click a prompt to exclude / restore it. Use ✎ to reword it into natural local phrasing. Changes apply from the next scan.')}</p>
+              <p className="text-[11px] text-gold">★ {t('Core benchmark — frozen; changes require bilateral written sign-off.')}</p>
               {library.map((c) => (
                 <div key={c.label}>
                   <div className="text-[10px] uppercase tracking-widest text-faint mb-1">{c.label}</div>
                   <div className="space-y-0.5">
                     {c.prompts.map((p) => {
                       const off = excluded.has(norm(p));
+                      const rw = rewrites.get(norm(p));
+                      const locked = isCore(p);
+                      const isEditing = editing?.p === p;
                       return (
-                        <button
-                          key={p}
-                          onClick={() => togglePrompt(p)}
-                          className={`block w-full text-left text-[11px] px-2 py-1 rounded transition ${off ? 'line-through text-garnet/70 bg-garnet/5' : 'text-dim hover:bg-raised'}`}
-                        >
-                          {p}{off ? ` · ${t('excluded')}` : ''}
-                        </button>
+                        <div key={p}>
+                          <div className="flex items-start gap-1">
+                            {locked ? (
+                              <span className="flex-1 text-[11px] px-2 py-1 rounded text-dim bg-gold/8" title={t('Core benchmark — frozen; changes require bilateral written sign-off.')}>
+                                <span className="text-gold mr-1">★</span>{p}
+                              </span>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => togglePrompt(p)}
+                                  className={`flex-1 text-left text-[11px] px-2 py-1 rounded transition ${off ? 'line-through text-garnet/70 bg-garnet/5' : 'text-dim hover:bg-raised'}`}
+                                >
+                                  {rw ? rw.to : p}
+                                  {rw && <span className="ml-1.5 text-[9px] text-sage">✎ {t('reworded')}</span>}
+                                  {off ? ` · ${t('excluded')}` : ''}
+                                </button>
+                                <button
+                                  onClick={() => setEditing(isEditing ? null : { p, draft: rw?.to ?? p, note: rw?.note ?? '' })}
+                                  className={`flex-none text-[11px] px-1.5 py-1 rounded transition ${isEditing || rw ? 'text-sage' : 'text-faint hover:text-brand'}`}
+                                  aria-label="reword"
+                                  title={t('Reword')}
+                                >
+                                  ✎
+                                </button>
+                              </>
+                            )}
+                          </div>
+                          {isEditing && (
+                            <div className="ml-2 mt-1 mb-2 p-2 rounded-md border border-sage/40 bg-sage/5 space-y-1.5">
+                              <div className="text-[10px] text-faint">{t('Original')}: {p}</div>
+                              <textarea
+                                value={editing.draft}
+                                onChange={(e) => setEditing((s) => (s ? { ...s, draft: e.target.value } : s))}
+                                rows={2}
+                                className="w-full bg-surface border border-edge rounded-md px-2 py-1.5 text-[11px] focus:outline-none focus:border-sage/60"
+                              />
+                              <input
+                                value={editing.note}
+                                onChange={(e) => setEditing((s) => (s ? { ...s, note: e.target.value } : s))}
+                                placeholder={t('Why this change? (optional — trains the model)')}
+                                className="w-full bg-surface border border-edge rounded-md px-2 py-1.5 text-[10px] focus:outline-none focus:border-sage/60"
+                              />
+                              <div className="flex items-center gap-2">
+                                <button onClick={commitRewrite} className="text-[10px] px-2.5 py-1 rounded bg-sage/15 text-sage hover:bg-sage/25 transition">{t('Apply')}</button>
+                                {rw && (
+                                  <button
+                                    onClick={() => { setRewrites((prev) => { const n = new Map(prev); n.delete(norm(p)); return n; }); setEditing(null); }}
+                                    className="text-[10px] px-2.5 py-1 rounded text-faint hover:text-garnet transition"
+                                  >
+                                    {t('Restore original')}
+                                  </button>
+                                )}
+                                <button onClick={() => setEditing(null)} className="text-[10px] px-2 py-1 rounded text-faint hover:text-ink transition">{t('Cancel')}</button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
                 </div>
               ))}
               <div>
-                <div className="text-[10px] uppercase tracking-widest text-faint mb-1">{t('Add prompts (one per line)')}</div>
-                <textarea
-                  value={added}
-                  onChange={(e) => setAdded(e.target.value)}
-                  rows={4}
-                  className="w-full bg-surface border border-edge rounded-md px-2.5 py-2 text-xs focus:outline-none focus:border-brand/50"
-                />
+                <div className="text-[10px] uppercase tracking-widest text-faint mb-1">{t('Added prompts — each joins a group')}</div>
+                <div className="space-y-1.5">
+                  {addedItems.map((a, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <select
+                        value={a.category}
+                        onChange={(e) => setAddedItems((xs) => xs.map((x, k) => (k === i ? { ...x, category: e.target.value } : x)))}
+                        className="flex-none bg-surface border border-edge rounded-md px-2 py-1.5 text-[11px] text-dim focus:outline-none max-w-[11rem]"
+                      >
+                        {library.map((c) => (
+                          <option key={c.category} value={c.category} className="bg-surface">{c.label}</option>
+                        ))}
+                        <option value="custom" className="bg-surface">{t('custom')}</option>
+                      </select>
+                      <input
+                        value={a.text}
+                        onChange={(e) => setAddedItems((xs) => xs.map((x, k) => (k === i ? { ...x, text: e.target.value } : x)))}
+                        placeholder={t('New prompt — write it the way a real customer asks')}
+                        className="flex-1 bg-surface border border-edge rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-brand/50"
+                      />
+                      <button
+                        onClick={() => setAddedItems((xs) => xs.filter((_, k) => k !== i))}
+                        className="text-faint hover:text-garnet text-sm px-1"
+                        aria-label="remove"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => setAddedItems((xs) => [...xs, { text: '', category: library[0]?.category ?? 'custom' }])}
+                    className="text-[11px] px-2.5 py-1.5 rounded-md border border-edge text-dim hover:text-brand hover:border-brand/50 transition"
+                  >
+                    + {t('Add prompt')}
+                  </button>
+                </div>
               </div>
             </div>
           )}

@@ -43,6 +43,8 @@ const T: Record<Lang, any> = {
     subtitle: '系统怎么用 · 每个数字怎么算出来 · 出问题怎么办',
     updated: '与代码同源:本页所有常量取自实际实现,若与产品表现不符即为缺陷,请反馈。',
     backToDashboard: '返回工作台',
+    partnerCtaTitle: '渠道伙伴交付手册',
+    partnerCtaDesc: 'P1 测评 ⇄ P2 实操修改的完整交付方法论:五个标准工作包、90 天路线图与可复制模板库 · 中/英/越/泰/阿五语',
     sections: {
       quickstart: '快速上手',
       layout: '工作区布局',
@@ -166,6 +168,8 @@ const T: Record<Lang, any> = {
     subtitle: 'How to use the system · how every number is computed · what to do when something breaks',
     updated: 'Source-of-truth: every constant on this page is extracted from the implementation. If the product disagrees with this page, that is a bug — please report it.',
     backToDashboard: 'Back to dashboard',
+    partnerCtaTitle: 'Channel Partner Delivery Playbook',
+    partnerCtaDesc: 'The full delivery methodology — P1 Assessment ⇄ P2 Implementation, five standard work packages, the 90-day route and the replicable template library · ZH/EN/VI/TH/AR',
     sections: {
       quickstart: 'Quickstart',
       layout: 'Workspace layout',
@@ -289,6 +293,8 @@ const T: Record<Lang, any> = {
     subtitle: 'Cách dùng hệ thống · mỗi con số được tính thế nào · xử lý sự cố',
     updated: 'Đồng nguồn với mã: mọi hằng số trên trang này trích từ mã nguồn thực tế. Nếu sản phẩm khác với trang này, đó là lỗi — hãy báo cho chúng tôi.',
     backToDashboard: 'Về bảng điều khiển',
+    partnerCtaTitle: 'Sổ tay triển khai cho Đối tác kênh',
+    partnerCtaDesc: 'Phương pháp luận triển khai đầy đủ — P1 Đánh giá ⇄ P2 Thực thi, năm gói công việc chuẩn, lộ trình 90 ngày và thư viện mẫu nhân rộng · 5 ngôn ngữ',
     sections: {
       quickstart: 'Bắt đầu nhanh',
       layout: 'Bố cục không gian làm việc',
@@ -475,6 +481,11 @@ export default function GuideContent() {
           <h1 className="text-2xl font-bold">{t.title}</h1>
           <p className="text-sm text-dim">{t.subtitle}</p>
           <p className="text-[12px] text-faint border-l-2 border-brand/50 pl-3">{t.updated}</p>
+          <Link href={`/guide/partner/${lang === 'zh' ? 'zh' : lang}`}
+            className="block rounded-xl border border-brand/40 bg-brand-soft px-4 py-3 hover:border-brand/70 transition group">
+            <span className="text-sm font-semibold text-brand group-hover:brightness-110">{t.partnerCtaTitle} →</span>
+            <span className="block text-[12px] text-dim mt-0.5">{t.partnerCtaDesc}</span>
+          </Link>
           {/* TOC */}
           <nav className="flex flex-wrap gap-2 pt-2">
             {Object.entries(t.sections).map(([id, label]) => (

@@ -6,7 +6,8 @@
 // close the funnel-stage gaps. Emits structured JSON and assembles a clean
 // Markdown report (deterministically, in code) persisted as a geo_report asset.
 
-import { poeChat, parseJsonFromLLM, DEFAULT_MODEL } from '@/lib/llm/poe';
+import { poeChat, parseJsonFromLLM, DEFAULT_MODEL, assertComplete } from '@/lib/llm/poe';
+import { languageName, outputTokenBudget } from '@/lib/markets';
 
 type EventEmitter = (event: {
   event_type:
@@ -27,6 +28,9 @@ interface ReportInput {
   targetLanguage?: string | null;
   industry?: string | null;
   scorecard: any; // the Monitor output object
+  brandProfile?: any | null; // canonical facts incl. USAGE RULES — recommendations must obey them
+  citationBrief?: string;     // lib/pages/profile — what the engines cite in this market (measured)
+  siteCorpus?: { url: string; title: string | null; excerpt: string | null; date: string | null; words: number | null }[]; // the client's own read pages
 }
 
 interface Recommendation {
@@ -43,6 +47,10 @@ interface ReportJson {
   keyFindings: { finding: string; evidence: string }[];
   recommendations: Recommendation[];
   quickWins: string[];
+  // Phase 2 (only when the client's pages were read): what the site covers vs
+  // what buyers ask, and where AI answers contradict the client's own pages.
+  siteCoverage?: { prompt: string; status: 'covered' | 'vacuum'; page: string | null; note: string }[];
+  contradictions?: { prompt: string; engine: string; aiClaim: string; sitePage: string; siteFact: string }[];
 }
 
 // Compact digest of the scorecard for the LLM (omit bulky rawSamples).
@@ -52,9 +60,11 @@ function digest(sc: any) {
     dimensions: sc?.dimensions,
     perStage: (sc?.metrics?.perStage || []).map((s: any) => ({ stage: s.stage, presence: s.presence, aigvr: s.aigvr, brandHits: s.brandHits, queries: s.queries })),
     perEngine: (sc?.metrics?.perEngine || []).map((e: any) => ({ engine: e.engine, presence: e.presence, aigvr: e.aigvr })),
-    competitorBenchmark: (sc?.competitorBenchmark || []).map((b: any) => ({ name: b.name, sovPct: b.sovPct, isBrand: b.isBrand })),
+    competitorBenchmark: (sc?.competitorBenchmark || []).map((b: any) => ({ name: b.name, presencePct: b.sovPct, hits: b.hits, isBrand: b.isBrand })),
     citations: sc?.citations,
     gaps: (sc?.gaps || []).slice(0, 12).map((g: any) => ({ stage: g.stage, engine: g.engine, prompt: g.prompt, competitors: g.competitorsPresent })),
+    // Brand-present answer excerpts (≤300 chars) — what the engines actually SAY about the brand, for contradiction checks.
+    brandAnswerExcerpts: (sc?.rawSamples || []).filter((s: any) => s?.brandPresent && s?.snippet).slice(0, 20).map((s: any) => ({ engine: s.engine, prompt: s.prompt, excerpt: String(s.snippet).slice(0, 300) })),
     competitors: sc?.competitors,
   };
 }
@@ -80,11 +90,11 @@ function buildMarkdown(input: ReportInput, sc: any, r: ReportJson): string {
   lines.push('');
   lines.push('| Dimension | Score |');
   lines.push('|---|---|');
-  lines.push(`| Presence (Share of Voice) | ${d.presence ?? '—'} |`);
+  lines.push(`| Brand presence rate (answers naming the brand ÷ all answers) | ${d.presence ?? '—'}% |`);
   lines.push(`| Prominence | ${d.prominence ?? '—'} |`);
   lines.push(`| Sentiment | ${d.sentiment ?? '—'} |`);
   lines.push(`| Citation (AEO) | ${d.citation ?? '—'} |`);
-  lines.push(`| Competitive Share | ${d.competitiveShare ?? '—'} |`);
+  lines.push(`| Share of voice (brand mentions ÷ all tracked-brand mentions) | ${d.competitiveShare ?? '—'}% |`);
   lines.push('');
 
   const stages = sc?.metrics?.perStage || [];
@@ -101,9 +111,17 @@ function buildMarkdown(input: ReportInput, sc: any, r: ReportJson): string {
   if (bench.length) {
     lines.push('## Competitive Benchmark');
     lines.push('');
-    lines.push('| Brand | Share of Voice |');
-    lines.push('|---|---|');
-    for (const b of bench) lines.push(`| ${b.isBrand ? `**${b.name}**` : b.name} | ${b.sovPct}% |`);
+    // Two different denominators, shown side by side so neither is mistaken
+    // for the other: presence is per-answer (rows do not sum to 100%), share
+    // is per-mention (rows do).
+    const nAnswers = sc?.metrics?.overall?.queries ?? sc?.sampled?.queries ?? '—';
+    const totalMentions = bench.reduce((a: number, b: any) => a + (b.hits ?? 0), 0);
+    lines.push(`| Brand | Presence rate (of ${nAnswers} answers) | Share of voice (of ${totalMentions} brand mentions) |`);
+    lines.push('|---|---|---|');
+    for (const b of bench) {
+      const share = totalMentions ? Math.round(((b.hits ?? 0) / totalMentions) * 100) : 0;
+      lines.push(`| ${b.isBrand ? `**${b.name}**` : b.name} | ${b.sovPct}% (${b.hits ?? '—'}) | ${share}% |`);
+    }
     lines.push('');
   }
 
@@ -186,10 +204,42 @@ export async function runReportAgent(
     '  "quickWins": ["1-3 things doable this week"]',
     '}',
     '',
+    ...(input.brandProfile
+      ? [
+          '',
+          'BRAND GOVERNANCE (overrides generic GEO playbook — a recommendation that ' +
+            'violates a stated brand policy is a defective recommendation): the brand ' +
+            'profile below is the canonical fact source. Obey any USAGE RULES / ' +
+            'forbidden-items it states. In particular: if the brand does not publish ' +
+            'fixed prices, never recommend public price lists, price tiers or price ' +
+            'comparison content — recommend a price-LOGIC page (variables that drive ' +
+            'price + brief/contact CTA) instead. If a capability is marked as not a ' +
+            'current commercial product, do not recommend building content that markets ' +
+            'it as an offering; frame it as future-capability/thought-leadership at most.',
+          '```json',
+          JSON.stringify(input.brandProfile, null, 1).slice(0, 4000),
+          '```',
+          '',
+        ]
+      : []),
+    ...(input.citationBrief ? [input.citationBrief, ''] : []),
+    ...(input.siteCorpus && input.siteCorpus.length
+      ? [
+          'CLIENT\'S OWN PUBLIC PAGES (read by our fetcher — the fact source for coverage and contradictions; url · date · words · title — excerpt):',
+          ...input.siteCorpus.slice(0, 40).map((p) => `- ${p.url}${p.date ? ` · ${p.date}` : ''}${p.words ? ` · ${p.words}w` : ''}${p.title ? ` · ${p.title}` : ''}${p.excerpt ? ` — ${p.excerpt.slice(0, 350)}` : ''}`),
+          '',
+          'Because the client\'s pages are provided, ALSO return two more arrays in the JSON:',
+          '  "siteCoverage": [{ "prompt": "a buyer question from the gaps/key prompts", "status": "covered|vacuum", "page": "url of the page that answers it, or null", "note": "one sentence" }]  — one entry per gap query and key prompt (max 20). "vacuum" = no page on the client\'s site addresses it.',
+          '  "contradictions": [{ "prompt": "...", "engine": "...", "aiClaim": "what the AI answer states about the brand", "sitePage": "url", "siteFact": "what the client\'s page states" }]  — ONLY where an AI answer excerpt conflicts with a client page; empty array if none. Never infer facts that are not in the excerpts.',
+          '',
+        ]
+      : []),
     'Rules: 3-5 keyFindings, 4-6 recommendations ordered by priority (P0 first), ' +
       'each recommendation tied to a real gap or weak stage from the data. Keep each ' +
-      'rationale to 1-2 sentences and at most 4 actions. Write in clear professional ' +
-      'English. Be specific to this brand and market. ' +
+      'rationale to 1-2 sentences and at most 4 actions. Write all prose (executiveSummary, ' +
+      `findings, evidence, titles, rationale, actions, quickWins) in ${languageName(input.targetLanguage)}; ` +
+      'keep JSON keys, the priority codes P0/P1/P2 and any quoted buyer queries exactly as given. ' +
+      'Be specific to this brand and market. ' +
       'If review-site visibility is weak and the brand serves end customers, you may ' +
       'recommend a GENUINE review-solicitation program (invitation links sent to real ' +
       'customers after purchase/service, Birdeye-style) — review CONTENT must come from ' +
@@ -205,15 +255,21 @@ export async function runReportAgent(
       { role: 'system', content: system },
       { role: 'user', content: user },
     ],
-    maxTokens: 6000,
+    // Non-English deliverables (zh/vi/th) tokenize 1.5–2× heavier than English;
+    // 6000 truncated the first Chinese report mid-JSON (2026-09-23).
+    maxTokens: outputTokenBudget(10000, input.targetLanguage),
     temperature: 0.5,
   });
+  if (res.finishReason === 'length') {
+    throw new Error(`Report model hit the output limit (finish_reason=length) — the JSON is truncated; raise maxTokens or shorten the brief.`);
+  }
 
   await emit({ event_type: 'tool_result', payload: { tool: 'engine.chat', tokens: res.usage?.total ?? null, latencyMs: res.latencyMs } });
   await emit({ event_type: 'progress', payload: { pct: 65 } });
 
   let parsed: ReportJson;
   try {
+    assertComplete(res, 'GEO report');
     parsed = parseJsonFromLLM<ReportJson>(res.content);
   } catch (e) {
     throw new Error(`Report model returned unparseable output: ${e instanceof Error ? e.message : String(e)}`);
@@ -243,11 +299,15 @@ export async function runReportAgent(
   return {
     summary,
     output: {
+      language: input.targetLanguage ?? 'en', // deliverable language (lib/markets.ts) — the UI skips the reviewer translation when it matches
       brand: input.brandName,
       country: input.targetCountry,
       aigvrScore: sc?.aigvrScore ?? null,
       ...parsed,
       markdown,
+      siteCoverage: Array.isArray(parsed.siteCoverage) ? parsed.siteCoverage.slice(0, 30) : [],
+      contradictions: Array.isArray(parsed.contradictions) ? parsed.contradictions.slice(0, 20) : [],
+      siteCorpusSize: input.siteCorpus?.length ?? 0,
       generatedBy: `${res.model}`,
     },
   };

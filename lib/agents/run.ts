@@ -7,6 +7,9 @@
 // which Vercel freezes immediately).
 
 import { createClient as createServiceClient } from '@supabase/supabase-js';
+import { loadCitationProfile, citationBrief } from '@/lib/pages/profile';
+import { inngest } from '@/lib/inngest/client';
+import { deliverableLanguageFor, promptLanguageFor } from '@/lib/markets';
 import { createHash } from 'node:crypto';
 import { AGENTS } from './registry';
 import { runDiscoveryAgent } from './discovery';
@@ -20,6 +23,11 @@ import { runProfileAgent } from './profile';
 import { runStandardAnswersAgent } from './answers';
 import { planPolicyForProject } from '@/lib/commerce';
 import { refundFailedRun } from '@/lib/credits';
+import { NonRetriableError } from 'inngest';
+import { poeChat, DEFAULT_MODEL, isCapacityError, isNonRetriable, runMeter, newMeter, type UsageMeter } from '@/lib/llm/poe';
+import { resolveEngineModels } from '@/lib/agents/monitor';
+import { notifyOperator } from '@/lib/alerts';
+import { loadEdits, applyProfileEdits, applyAnswerEdits, unitHash } from '@/lib/edits';
 
 // Latest standard-answers library (B2) → the canonical answers the accuracy
 // pass judges real AI answers against. Null when the library hasn't been built.
@@ -36,7 +44,10 @@ async function loadStandardAnswers(sb: any, projectId: string): Promise<{ prompt
   try {
     const parsed = JSON.parse(data.content);
     const answers = (parsed?.answers || []).filter((a: any) => a?.prompt);
-    return answers.length ? answers : undefined;
+    // The user's edits win over whatever the latest generation produced —
+    // this is the yardstick the accuracy judge measures AI answers against.
+    const merged = applyAnswerEdits(answers, await loadEdits(sb, projectId, 'standard_answers'));
+    return merged.length ? merged : undefined;
   } catch { return undefined; }
 }
 
@@ -55,6 +66,10 @@ async function loadBrandProfile(sb: ReturnType<typeof svc>, projectId: string): 
   if (data?.content) {
     try { profile = JSON.parse(data.content); } catch { /* corrupted → docs-only below */ }
   }
+  // User-edited fields are applied last, so a Profile re-run (which inserts a
+  // newer asset) can never replace a fact a human corrected. Every execution
+  // agent grounds on this merged profile.
+  profile = applyProfileEdits(profile, await loadEdits(sb, projectId, 'brand_profile'));
 
   // Uploaded brand documents (guidelines / positioning) join the grounding —
   // budgeted excerpt so several docs fit without blowing the prompt.
@@ -99,6 +114,46 @@ interface ProjectLite {
   industry: string | null;
 }
 
+// Deliverable (report) language: projects.metadata.reportLanguage → market
+// default (lib/markets.ts) → target_language. Distinct from the PROMPT
+// language on purpose: a Hong Kong client reads Traditional Chinese even when
+// the panel was built in Simplified; changing the panel is a methodology
+// change (standard §11), changing the report language is not.
+async function loadDeliverableLanguage(sb: ReturnType<typeof svc>, project: ProjectLite): Promise<string> {
+  const { data } = await sb.from('projects').select('metadata').eq('id', project.id).maybeSingle();
+  return deliverableLanguageFor({ ...project, metadata: (data?.metadata as Record<string, any>) ?? null });
+}
+
+// After the citation index grows, read the newly cited pages (lib/pages).
+// Best-effort: a failed enqueue never fails the scan; the nightly cron
+// catches up.
+async function queuePageFetch(projectId: string, runId: string): Promise<void> {
+  try { await inngest.send({ name: 'geo/pages.fetch', data: { projectId, runId, limit: 150 } }); }
+  catch (e) { console.warn('[pages] enqueue failed:', e instanceof Error ? e.message : String(e)); }
+}
+
+// Phase 2 of the cited-page fetcher: a measured "what gets cited here" brief
+// for the content/site/report agents, and the client's own read pages as the
+// report's fact corpus. Both best-effort — an empty brief is a valid brief.
+async function loadCitationBriefSafe(sb: ReturnType<typeof svc>, projectId: string): Promise<string> {
+  try { return citationBrief(await loadCitationProfile(sb, projectId)); } catch (e) { console.warn('[pages] brief unavailable:', e instanceof Error ? e.message : String(e)); return ''; }
+}
+async function loadSiteCorpus(sb: ReturnType<typeof svc>, project: ProjectLite, limit = 40): Promise<{ url: string; title: string | null; excerpt: string | null; date: string | null; words: number | null }[]> {
+  try {
+    const brandDomains = await loadBrandDomains(sb, project);
+    const [{ data: own }, { data: cited }] = await Promise.all([
+      sb.from('project_pages').select('url').eq('project_id', project.id).limit(120),
+      sb.from('geo_citations').select('url').eq('project_id', project.id).eq('is_brand_domain', true).order('ts', { ascending: false }).limit(300),
+    ]);
+    const urls = Array.from(new Set([...(own ?? []).map((r: any) => String(r.url)), ...(cited ?? []).map((r: any) => String(r.url))]))
+      .filter((u) => { try { return brandDomains.size === 0 || brandDomains.has(new URL(u).hostname.replace(/^www\./, '').toLowerCase()); } catch { return false; } })
+      .slice(0, 400);
+    if (!urls.length) return [];
+    const { data: pages } = await sb.from('geo_pages').select('url, title, excerpt, published_at, modified_at, word_count').in('url', urls).eq('ok', true).order('word_count', { ascending: false }).limit(limit);
+    return (pages ?? []).map((p: any) => ({ url: p.url, title: p.title ?? null, excerpt: p.excerpt ?? null, date: (p.modified_at ?? p.published_at ?? null) && String(p.modified_at ?? p.published_at).slice(0, 10), words: p.word_count ?? null }));
+  } catch (e) { console.warn('[pages] corpus unavailable:', e instanceof Error ? e.message : String(e)); return []; }
+}
+
 // Frozen competitor set (score stability) lives on projects.metadata.
 async function loadCompetitorSet(sb: ReturnType<typeof svc>, projectId: string): Promise<any | null> {
   const { data } = await sb.from('projects').select('metadata').eq('id', projectId).maybeSingle();
@@ -135,31 +190,71 @@ function applyCoreLock(
   return { promptSet: ps, keyPrompts: core };
 }
 
-// Operator prompt edits (projects.metadata.promptEdits {excluded[], added[]}).
-// Applied at run assembly — the stored Discovery asset stays untouched, so
-// edits are reversible and never corrupt the source library.
+// Operator prompt edits (projects.metadata.promptEdits {excluded[], added[],
+// rewrites[]}). Applied at run assembly — the stored Discovery asset stays
+// untouched, so edits are reversible and never corrupt the source library.
+// `rewrites` is the FMVN localization loop (meeting 2026-09-23): the Vietnamese
+// team rewords AI-generated prompts to match real local search phrasing; each
+// pair {from, to} also doubles as labelled post-training data. Core-locked
+// prompts are protected downstream by applyCoreLock (runs after this).
 type PromptCat = { category: string; label: string; prompts: string[] };
-async function loadPromptEdits(sb: ReturnType<typeof svc>, projectId: string): Promise<{ excluded: string[]; added: string[] } | null> {
+// `added` entries carry the funnel category they belong to (stage-balanced
+// sampling depends on it); bare strings are legacy and land in 'custom'.
+type PromptEdits = {
+  excluded?: string[];
+  added?: (string | { text: string; category?: string })[];
+  rewrites?: { from: string; to: string; note?: string }[];
+};
+async function loadPromptEdits(sb: ReturnType<typeof svc>, projectId: string): Promise<PromptEdits | null> {
   const { data } = await sb.from('projects').select('metadata').eq('id', projectId).maybeSingle();
   return (data?.metadata as any)?.promptEdits ?? null;
 }
 function applyPromptEdits(
-  edits: { excluded?: string[]; added?: string[] } | null,
+  edits: PromptEdits | null,
   promptSet: PromptCat[],
   keyPrompts: string[],
 ): { promptSet: PromptCat[]; keyPrompts: string[] } {
   if (!edits) return { promptSet, keyPrompts };
   const norm = (s: string) => s.trim().toLowerCase();
+  const rewrite = new Map<string, string>();
+  for (const r of edits.rewrites ?? []) {
+    const from = norm(String(r?.from ?? ''));
+    const to = String(r?.to ?? '').trim();
+    if (from && to && from !== norm(to)) rewrite.set(from, to);
+  }
+  const rw = (p: string) => rewrite.get(norm(p)) ?? p;
+  // Exclusions match either the original or the reworded text, so a prompt
+  // excluded before a rewrite stays excluded after it.
   const excluded = new Set((edits.excluded ?? []).map(norm));
+  const drop = (p: string) => excluded.has(norm(p)) || excluded.has(norm(rw(p)));
+  // Two originals can reword to the same text — keep the first occurrence so
+  // the engines are never billed for a duplicate query.
+  const seen = new Set<string>();
   const ps = promptSet
-    .map((c) => ({ ...c, prompts: (c.prompts || []).filter((p) => !excluded.has(norm(p))) }))
+    .map((c) => ({
+      ...c,
+      prompts: (c.prompts || [])
+        .filter((p) => !drop(p))
+        .map(rw)
+        .filter((p) => (seen.has(norm(p)) ? false : (seen.add(norm(p)), true))),
+    }))
     .filter((c) => c.prompts.length);
-  const kp = keyPrompts.filter((p) => !excluded.has(norm(p)));
-  const existing = new Set(ps.flatMap((c) => c.prompts).map(norm));
-  const fresh = (edits.added ?? [])
-    .map((s) => String(s).trim())
-    .filter((p) => p && !excluded.has(norm(p)) && !existing.has(norm(p)));
-  if (fresh.length) ps.push({ category: 'custom', label: 'Operator-added', prompts: fresh });
+  const kp = keyPrompts.filter((p) => !drop(p)).map(rw);
+  // Added prompts join their chosen category (a category emptied by
+  // exclusions is revived with its original label); unknown → 'custom'.
+  const labelOf = new Map(promptSet.map((c) => [c.category, c.label]));
+  for (const a of edits.added ?? []) {
+    const text = (typeof a === 'string' ? a : String(a?.text ?? '')).trim();
+    const category = (typeof a === 'string' ? '' : String(a?.category ?? '').trim()) || 'custom';
+    if (!text || excluded.has(norm(text)) || seen.has(norm(text))) continue;
+    seen.add(norm(text));
+    let target = ps.find((c) => c.category === category);
+    if (!target) {
+      target = { category, label: labelOf.get(category) ?? 'Operator-added', prompts: [] };
+      ps.push(target);
+    }
+    target.prompts.push(text);
+  }
   return { promptSet: ps, keyPrompts: kp };
 }
 async function persistCompetitorSet(sb: ReturnType<typeof svc>, projectId: string, set: unknown): Promise<void> {
@@ -183,6 +278,31 @@ function domainOf(url: string): string {
   }
 }
 
+// Every domain that IS the brand. A brand often answers on more than one host
+// (FMVN's corporate site is goldsunfocusmedia.com.vn, not focusmedia.vn) —
+// counting those as third-party understates own-domain authority and, worse,
+// would list the client's own site among its "third-party carriers".
+// Extra hosts live on projects.metadata.brandDomains.
+export function brandDomainSet(brandUrl: string | null | undefined, extra: unknown): Set<string> {
+  const out = new Set<string>();
+  const primary = domainOf(brandUrl || '');
+  if (primary) out.add(primary);
+  if (Array.isArray(extra)) {
+    for (const d of extra) {
+      const norm = String(d).trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+      if (norm) out.add(norm);
+    }
+  }
+  return out;
+}
+
+// Same loader pattern as the competitor set / core prompts: read the extra
+// hosts off projects.metadata rather than requiring every caller to select it.
+async function loadBrandDomains(sb: ReturnType<typeof svc>, project: ProjectLite): Promise<Set<string>> {
+  const { data } = await sb.from('projects').select('metadata').eq('id', project.id).maybeSingle();
+  return brandDomainSet(project.brand_url, (data?.metadata as { brandDomains?: unknown } | null)?.brandDomains);
+}
+
 // Persist this scan's citations to the Source-Authority Index and return the
 // CROSS-SCAN ranking (which domains the engines cite most for this project,
 // across all scans so far). The compounding GEO-native authority signal.
@@ -199,9 +319,9 @@ async function recordCitationsAndIndex(
   sb: ReturnType<typeof svc>,
   projectId: string,
   agentRunId: string,
-  brandDomain: string,
+  brandDomains: Set<string>,
   rawSamples: { engine?: string; stage?: string; citations?: string[]; intent?: string; prompt?: string; brandPresent?: boolean; competitorsPresent?: string[] }[],
-): Promise<{ ranking: { domain: string; citations: number; engines: number; isBrand: boolean }[]; totalCitations: number }> {
+): Promise<{ ranking: { domain: string; citations: number; answers?: number; engines: number; isBrand: boolean }[]; totalCitations: number }> {
   const rows: Record<string, unknown>[] = [];
   for (const s of rawSamples || []) {
     for (const url of s.citations || []) {
@@ -214,7 +334,7 @@ async function recordCitationsAndIndex(
         stage: s.stage ?? null,
         domain: dom,
         url,
-        is_brand_domain: !!brandDomain && dom === brandDomain,
+        is_brand_domain: brandDomains.has(dom),
         intent: s.intent ?? null,
         prompt_hash: promptHash(s.prompt),
         brand_present: typeof s.brandPresent === 'boolean' ? s.brandPresent : null,
@@ -224,6 +344,21 @@ async function recordCitationsAndIndex(
   }
   if (rows.length) await sb.from('geo_citations').insert(rows);
 
+  // Aggregate in SQL (20260923_citation_ranking). The per-row select below is
+  // capped at 1000 rows by PostgREST, so once an index outgrew that (FMVN did
+  // months ago) the ranking came from an arbitrary prefix — the dashboard
+  // showed a domain cited 132× in one scan as 61× across all scans. The old
+  // path stays only as a fallback for a deploy that precedes the migration.
+  const [rpc, total] = await Promise.all([
+    sb.rpc('geo_citation_ranking', { p_project_id: projectId, p_limit: 20 }),
+    sb.from('geo_citations').select('id', { count: 'exact', head: true }).eq('project_id', projectId),
+  ]);
+  if (!rpc.error && Array.isArray(rpc.data)) {
+    const ranking = (rpc.data as { domain: string; citations: number | string; answers: number | string; engines: number | string; is_brand: boolean }[])
+      .map((r) => ({ domain: r.domain, citations: Number(r.citations), answers: Number(r.answers), engines: Number(r.engines), isBrand: !!r.is_brand }));
+    return { ranking, totalCitations: total.count ?? ranking.reduce((a, r) => a + r.citations, 0) };
+  }
+  console.warn('[source-index] geo_citation_ranking unavailable, using capped select:', rpc.error?.message);
   const { data } = await sb
     .from('geo_citations')
     .select('domain,engine,is_brand_domain')
@@ -262,6 +397,63 @@ export async function claimRun(runId: string): Promise<boolean> {
 // our agent outputs are plain JSON so the round-trip is lossless.
 type StepRunner = { run: (id: string, fn: () => Promise<any>) => Promise<any> };
 
+// Add a step's metered usage onto the run row. Steps execute sequentially
+// within a run, so read-modify-write is safe here; the columns had existed
+// unwritten since June.
+async function addRunTokens(sb: ReturnType<typeof svc>, runId: string, m: UsageMeter): Promise<void> {
+  if (!m.calls) return;
+  try {
+    const { data } = await sb.from('agent_runs').select('tokens_in, tokens_out, usage_by_model').eq('id', runId).maybeSingle();
+    const merged: Record<string, { promptTokens: number; completionTokens: number; calls: number }> = { ...(data?.usage_by_model ?? {}) };
+    for (const [model, u] of Object.entries(m.byModel)) {
+      const prev = merged[model] ?? { promptTokens: 0, completionTokens: 0, calls: 0 };
+      merged[model] = { promptTokens: prev.promptTokens + u.promptTokens, completionTokens: prev.completionTokens + u.completionTokens, calls: prev.calls + u.calls };
+    }
+    await sb
+      .from('agent_runs')
+      .update({
+        tokens_in: Number(data?.tokens_in ?? 0) + m.promptTokens,
+        tokens_out: Number(data?.tokens_out ?? 0) + m.completionTokens,
+        usage_by_model: merged,
+      })
+      .eq('id', runId);
+  } catch (e) {
+    console.error('[run] token accounting failed:', e);
+  }
+}
+
+// Deposit a comparable scan's judged answers (full text + machine labels) into
+// golden_pool and strip them from the run output. Diagnostic, partial and
+// preview scans are excluded: the golden set must mirror the distribution the
+// judge is measured on in production.
+async function persistGoldenPool(
+  sb: ReturnType<typeof svc>,
+  project: ProjectLite,
+  runId: string,
+  output: Record<string, unknown>,
+  skip: boolean,
+): Promise<number> {
+  const rows = (output as any)._goldenCandidates;
+  delete (output as any)._goldenCandidates;
+  if (skip || !Array.isArray(rows) || !rows.length) return 0;
+  const language = String(project.target_language || 'en').toLowerCase().split('-')[0];
+  const models: Record<string, string> = (output as any).engineModels ?? {};
+  const ins = rows
+    .filter((r: any) => r?.text && r?.prompt)
+    .map((r: any) => ({
+      project_id: project.id, agent_run_id: runId, language, engine: r.engine, model: models[r.engine] ?? null,
+      stage: r.stage ?? null, intent: r.intent ?? null, key_prompt: !!r.key, prompt: r.prompt, prompt_hash: unitHash(r.prompt) ?? '',
+      answer_text: String(r.text).slice(0, 12000), brand_name: project.brand_name, competitor_names: r.tracked ?? [], machine: r.machine ?? {},
+    }));
+  let n = 0;
+  for (let i = 0; i < ins.length; i += 60) {
+    const { error } = await sb.from('golden_pool').upsert(ins.slice(i, i + 60), { onConflict: 'agent_run_id,engine,prompt_hash', ignoreDuplicates: true });
+    if (error) { console.error('[golden] insert failed:', error.message); break; }
+    n += Math.min(60, ins.length - i);
+  }
+  return n;
+}
+
 // Run the agent end-to-end: emit events, finalize status, persist assets.
 export async function executeAgentRun(
   runId: string,
@@ -273,6 +465,10 @@ export async function executeAgentRun(
   const sb = svc();
 
   // The user's typed instruction (intent box / chat) — steers Discovery.
+  // Market default when the project has no explicit language (lib/markets.ts):
+  // a Hong Kong project with target_language NULL builds a zh-hk panel, not an
+  // English one. Explicit values are kept verbatim (never a silent panel change).
+  project = { ...project, target_language: promptLanguageFor(project) };
   const { data: runRow } = await sb.from('agent_runs').select('input_prompt').eq('id', runId).maybeSingle();
   const userPrompt: string | undefined = runRow?.input_prompt || undefined;
 
@@ -280,9 +476,25 @@ export async function executeAgentRun(
   // IMPORTANT: everything with a side effect inside a cascade must live INSIDE a
   // step — Inngest re-executes code OUTSIDE steps on every resume, which would
   // duplicate events/assets. A completed step is skipped (memoized) on resume.
+  // Every step body runs under a token meter (persisted per step, so the
+  // count survives Inngest's per-step invocations) and behind a capacity guard:
+  // an EngineCapacityError is deterministic, so it leaves the step as a
+  // NonRetriableError — the executor must not retry it. Before this, the same
+  // 402 was retried three times per run, holding clients at 75% for minutes.
+  const guarded = (fn: () => Promise<any>) => async () => {
+    const meter = newMeter();
+    try {
+      return await runMeter.run(meter, fn);
+    } catch (e) {
+      if (isNonRetriable(e)) throw new NonRetriableError(e instanceof Error ? e.message : String(e), { cause: e });
+      throw e;
+    } finally {
+      await addRunTokens(sb, runId, meter);
+    }
+  };
   const runStep: (id: string, fn: () => Promise<any>) => Promise<any> = step
-    ? (id, fn) => step.run(id, fn)
-    : (_id, fn) => fn();
+    ? (id, fn) => step.run(id, guarded(fn))
+    : (_id, fn) => guarded(fn)();
 
   // Combined emitter: persist to DB (for history/replay) + caller's emitter.
   const persistAndEmit: Emitter = async (event) => {
@@ -294,7 +506,10 @@ export async function executeAgentRun(
     // Mirror progress events onto the run row so the UI progress bar moves
     // smoothly instead of jumping 0 → 100 at completion.
     if (event.event_type === 'progress' && typeof event.payload?.pct === 'number') {
-      await sb.from('agent_runs').update({ progress_pct: event.payload.pct }).eq('id', runId);
+      // Only while running: a straggling progress event from a parallel
+      // engine branch used to land AFTER completion and overwrite 100 with
+      // 33%, which reads as a partial scan in the UI.
+      await sb.from('agent_runs').update({ progress_pct: event.payload.pct }).eq('id', runId).eq('status', 'running');
     }
     await emit(event);
   };
@@ -311,8 +526,57 @@ export async function executeAgentRun(
     }
   };
 
+  // Run-wide meter for agents dispatched OUTSIDE steps (every standalone
+  // agent). Cascade phases run inside `guarded` steps whose nested store
+  // shadows this one, so nothing is counted twice. Persisted on completion
+  // and on failure.
+  const runWideMeter = newMeter();
+  runMeter.enterWith(runWideMeter);
+
   try {
     let result: { summary: string; output: Record<string, unknown> };
+
+    // Preflight. Every agent needs the engine account; probe it with a
+    // one-token call before spending minutes of scan time and third-party
+    // SERP budget. Out of capacity → fails here at 0%, non-retriable, operator
+    // alerted, credits refunded — instead of at 75% after eight minutes.
+    // For measuring agents the probe covers EVERY engine and resolves a live
+    // model per engine (primary or verified fallback) — a retired upstream bot
+    // fails here at 0% with its name, instead of after three 5-engine attempts.
+    const measuring = agentId === 'monitor' || agentId === 'full_scan';
+    const engineModels: Record<string, string> = await runStep('preflight-engine', async () => {
+      if (!measuring) {
+        await poeChat({ model: DEFAULT_MODEL, messages: [{ role: 'user', content: 'ping' }], maxTokens: 1, retries: 1 });
+        return {};
+      }
+      const { data: rr } = await sb.from('agent_runs').select('trigger_method, options').eq('id', runId).maybeSingle();
+      const diagnostic = rr?.trigger_method === 'diagnostic';
+      const keys = rr?.trigger_method === 'preview'
+        ? ['chatgpt', 'google_aio']
+        : diagnostic && Array.isArray(rr?.options?.engineKeys) && rr.options.engineKeys.length
+          ? (rr.options.engineKeys as string[])
+          : undefined;
+      // Diagnostic: a dead engine is dropped and named, not fatal.
+      const { models, substituted, dead } = await resolveEngineModels(keys, { tolerateDead: diagnostic });
+      if (substituted.length) {
+        await persistAndEmit({ event_type: 'log', payload: { text: `Engine model substitution (primary unavailable upstream): ${substituted.join('; ')}` } });
+      }
+      if (dead.length) {
+        await persistAndEmit({ event_type: 'log', payload: { text: `Diagnostic scan: skipping engines with no live model — ${dead.join(', ')}.` } });
+      }
+      return models;
+    });
+    // Diagnostic runs: partial engine set allowed, labelled, never indexed.
+    const { data: runOpts } = measuring
+      ? await sb.from('agent_runs').select('trigger_method, options').eq('id', runId).maybeSingle()
+      : { data: null as any };
+    const isDiagnostic = runOpts?.trigger_method === 'diagnostic';
+    const diagnosticKeys: string[] | undefined = isDiagnostic
+      ? (Array.isArray(runOpts?.options?.engineKeys) && runOpts.options.engineKeys.length
+          ? (runOpts.options.engineKeys as string[])
+          : Object.keys(engineModels).concat('google_aio')
+        ).filter((k) => k === 'google_aio' || !!engineModels[k])
+      : undefined;
 
     if (agentId === 'full_scan') {
       // One-click cascade: Discovery → Monitor → Report, all into this one run.
@@ -332,6 +596,7 @@ export async function executeAgentRun(
         libraryCap: isPreview ? 4 : planPolicy?.promptLibraryCap,
         sampleCap: isPreview ? 8 : planPolicy?.sampledPerScan,
         ...(isPreview ? { engineKeys: ['chatgpt', 'google_aio'] } : {}),
+        engineModels,
       };
 
       // Each phase is one Inngest step → its own short invocation, durable
@@ -393,8 +658,10 @@ export async function executeAgentRun(
           { ...base, promptSet, keyPrompts, competitorSet: await loadCompetitorSet(sb, project.id), standardAnswers: await loadStandardAnswers(sb, project.id) },
           bandedEmit(33, isPreview ? 60 : 33),
         );
-        const sa = await recordCitationsAndIndex(sb, project.id, runId, domainOf(project.brand_url || ''), (m.output as { rawSamples?: any[] }).rawSamples || []);
+        await persistGoldenPool(sb, project, runId, m.output as Record<string, unknown>, isPreview || !!(m.output as any).partial);
+        const sa = await recordCitationsAndIndex(sb, project.id, runId, await loadBrandDomains(sb, project), (m.output as { rawSamples?: any[] }).rawSamples || []);
         (m.output as Record<string, unknown>).sourceAuthority = sa;
+        if (!('skipped' in (sa as any))) await queuePageFetch(project.id, runId);
         if ((m.output as any).competitorSetRefreshed) {
           await persistCompetitorSet(sb, project.id, (m.output as any).competitorSet);
         }
@@ -422,6 +689,7 @@ export async function executeAgentRun(
                 targetLanguage: project.target_language,
                 industry: project.industry,
                 brandProfile: await loadBrandProfile(sb, project.id),
+          citationBrief: await loadCitationBriefSafe(sb, project.id),
               },
               async (ev) => { if (ev.event_type !== 'progress') await persistAndEmit(ev); },
             );
@@ -446,7 +714,7 @@ export async function executeAgentRun(
         const mon = await runMonitorStep();
         const rep = await runStep('phase-report', async () => {
           await persistAndEmit({ event_type: 'milestone', payload: { label: 'Phase 3/3 · Report', step: 3, totalSteps: 3 } });
-          const r = await runReportAgent({ ...base, scorecard: mon.output }, bandedEmit(66, 34));
+          const r = await runReportAgent({ ...base, targetLanguage: await loadDeliverableLanguage(sb, project), scorecard: mon.output, brandProfile: await loadBrandProfile(sb, project.id), citationBrief: await loadCitationBriefSafe(sb, project.id), siteCorpus: await loadSiteCorpus(sb, project) }, bandedEmit(66, 34));
           await sb.from('assets').insert({
             project_id: project.id, agent_run_id: runId, type: 'geo_report',
             title: `${project.brand_name} — GEO visibility report`, format: 'markdown',
@@ -538,6 +806,8 @@ export async function executeAgentRun(
       ({ promptSet, keyPrompts } = applyCoreLock(await loadCoreKeyPrompts(sb, project.id), promptSet, keyPrompts));
       result = await runMonitorAgent(
         {
+          engineModels,
+          ...(isDiagnostic ? { engineKeys: diagnosticKeys, allowPartial: true } : {}),
           brandName: project.brand_name,
           brandUrl: project.brand_url,
           targetCountry: project.target_country,
@@ -551,8 +821,15 @@ export async function executeAgentRun(
         },
         persistAndEmit,
       );
-      const sa = await recordCitationsAndIndex(sb, project.id, runId, domainOf(project.brand_url || ''), (result.output as { rawSamples?: any[] }).rawSamples || []);
+      // Partial engine sets never enter the citation index — they would bias
+      // the source leverage and authority statistics toward the engines that
+      // happened to be up.
+      await persistGoldenPool(sb, project, runId, result.output as Record<string, unknown>, isDiagnostic || !!(result.output as any).partial);
+      const sa = isDiagnostic || (result.output as any).partial
+        ? { skipped: 'diagnostic' }
+        : await recordCitationsAndIndex(sb, project.id, runId, await loadBrandDomains(sb, project), (result.output as { rawSamples?: any[] }).rawSamples || []);
       (result.output as Record<string, unknown>).sourceAuthority = sa;
+      if (!('skipped' in (sa as any))) await queuePageFetch(project.id, runId);
       if ((result.output as any).competitorSetRefreshed) {
         await persistCompetitorSet(sb, project.id, (result.output as any).competitorSet);
       }
@@ -580,9 +857,12 @@ export async function executeAgentRun(
           brandName: project.brand_name,
           brandUrl: project.brand_url,
           targetCountry: project.target_country,
-          targetLanguage: project.target_language,
+          targetLanguage: await loadDeliverableLanguage(sb, project),
           industry: project.industry,
           scorecard,
+          brandProfile: await loadBrandProfile(sb, project.id),
+          citationBrief: await loadCitationBriefSafe(sb, project.id),
+          siteCorpus: await loadSiteCorpus(sb, project),
         },
         persistAndEmit,
       );
@@ -651,6 +931,7 @@ export async function executeAgentRun(
           industry: project.industry,
           target,
           brandProfile: await loadBrandProfile(sb, project.id),
+          citationBrief: await loadCitationBriefSafe(sb, project.id),
         },
         persistAndEmit,
       );
@@ -697,6 +978,7 @@ export async function executeAgentRun(
           targetLanguage: project.target_language,
           industry: project.industry,
           brandProfile: await loadBrandProfile(sb, project.id),
+          citationBrief: await loadCitationBriefSafe(sb, project.id),
         },
         persistAndEmit,
       );
@@ -764,6 +1046,7 @@ export async function executeAgentRun(
       };
     }
 
+    await addRunTokens(sb, runId, runWideMeter);
     await sb
       .from('agent_runs')
       .update({
@@ -868,6 +1151,7 @@ export async function executeAgentRun(
     }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
+    await addRunTokens(sb, runId, runWideMeter);
     await persistAndEmit({ event_type: 'error', payload: { message: msg } });
     await sb
       .from('agent_runs')
@@ -877,6 +1161,25 @@ export async function executeAgentRun(
         error_message: msg,
       })
       .eq('id', runId);
+    // Platform-level causes page the operator. Capacity exhaustion takes down
+    // every LLM-backed run on the platform; the founder must not learn of it
+    // from a customer (2026-09-07).
+    const root = isNonRetriable(err) ? err : (err as any)?.cause;
+    const capacity = isCapacityError(root);
+    const outage = !capacity && isNonRetriable(root);
+    if (capacity || outage) {
+      await notifyOperator({
+        kind: capacity ? 'engine_capacity' : 'scan_incomplete',
+        title: capacity
+          ? 'AI engine capacity exhausted — all scans failing'
+          : `Engine outage — scans failing (${((root as any)?.engines ?? []).join(', ') || 'see detail'})`,
+        detail: msg,
+        runId,
+        projectId: project.id,
+        projectSlug: (project as any).slug,
+        brand: project.brand_name,
+      }).catch((e) => console.error('[alerts] notifyOperator failed:', e));
+    }
     // Failed runs never keep the client's credits (idempotent, pool-mirroring).
     try {
       const refunded = await refundFailedRun(sb, runId);
