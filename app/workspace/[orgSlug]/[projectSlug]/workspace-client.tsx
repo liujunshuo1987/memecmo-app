@@ -151,7 +151,7 @@ function TermTip({ term, children }: { term: string; children?: any }) {
     <span className="relative inline-flex items-center gap-1 group/tip">
       {children}
       <span className="inline-flex items-center justify-center w-3 h-3 rounded-full border border-faint/60 text-faint text-[8px] leading-none cursor-help select-none">?</span>
-      <span className="pointer-events-none invisible group-hover/tip:visible absolute z-30 bottom-full left-0 mb-1.5 w-60 rounded-lg border border-edge bg-raised p-2.5 text-left shadow-xl normal-case tracking-normal">
+      <span className="pointer-events-none invisible group-hover/tip:visible absolute z-30 bottom-full left-0 mb-1.5 w-60 rounded-lg mc-chip-inset mc-chip-inset p-2.5 text-left shadow-xl normal-case tracking-normal">
         <span className="block text-[11px] leading-relaxed text-dim whitespace-normal">{text}</span>
         <a href="/guide" className="pointer-events-auto inline-block mt-1 text-[10px] text-brand hover:underline">Guide →</a>
       </span>
@@ -592,9 +592,9 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
   };
 
   return (
-    <div className="min-h-screen lg:h-screen lg:overflow-hidden print:!h-auto print:!overflow-visible bg-canvas text-ink flex flex-col">
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden print:!h-auto print:!overflow-visible mc-soft text-ink flex flex-col">
       {/* Top bar */}
-      <header className="print-hide border-b border-edge px-6 py-3 flex items-center justify-between bg-canvas/95 backdrop-blur z-10 shrink-0">
+      <header className="print-hide mx-4 mt-3 mb-1 px-5 py-3 rounded-2xl mc-chip-inset flex items-center justify-between z-10 shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           {/* White-label: channel orgs can brand the platform (e.g. 觀瀾智庫 GEO 平台). */}
           <a href="/dashboard" className="text-xs tracking-[0.2em] text-faint uppercase hover:text-dim">
@@ -625,14 +625,14 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
           )}
           {!demoMode && <button
             onClick={() => setSetsOpen(true)}
-            className="text-[11px] px-2 py-1 rounded-md border border-edge text-dim hover:text-ink transition whitespace-nowrap"
+            className="text-[11px] px-2 py-1 rounded-md mc-btn-soft text-dim hover:text-ink transition whitespace-nowrap"
           >
             {t('Sets')}
           </button>}
-          <a href="/guide" className="text-[11px] px-2 py-1 rounded-md border border-edge text-dim hover:text-ink transition whitespace-nowrap">
+          <a href="/guide" className="text-[11px] px-2 py-1 rounded-md mc-btn-soft text-dim hover:text-ink transition whitespace-nowrap">
             {t('Guide')}
           </a>
-          <div className="flex items-center rounded-md border border-edge overflow-hidden text-[11px]">
+          <div className="flex items-center rounded-md mc-chip-inset overflow-hidden text-[11px]">
             {([['en', 'EN'], ['zh', '中文'], ['vi', 'VN']] as const).map(([v, label]) => (
               <button
                 key={v}
@@ -688,7 +688,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
               <h3 className="text-sm font-semibold text-ink">{uiLang === 'zh' ? 'Credits 余额与充值' : uiLang === 'vi' ? 'Số dư Credits & nạp thêm' : 'Credits · balance & top-up'}</h3>
               <p className="text-xs text-faint">{organization.name}</p>
             </div>
-            <div className="rounded-lg border border-edge bg-canvas p-4 flex items-baseline justify-between">
+            <div className="rounded-lg mc-chip-inset p-4 flex items-baseline justify-between">
               <span className="text-3xl font-bold text-ink tabular-nums">{credits.total}</span>
               <span className="text-[11px] text-faint">{uiLang === 'zh' ? `赠送 ${credits.granted} · 购买 ${credits.purchased}` : uiLang === 'vi' ? `Tặng ${credits.granted} · Mua ${credits.purchased}` : `granted ${credits.granted} · purchased ${credits.purchased}`}</span>
             </div>
@@ -698,7 +698,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
             <div className="space-y-2">
               {Object.entries(creditPacks).map(([key, p]) => (
                 <button key={key} disabled={walletBusy !== null} onClick={() => buyPack(key)}
-                  className="w-full flex items-center justify-between text-xs px-4 py-2.5 rounded-lg border border-edge text-ink hover:border-brand/50 hover:bg-brand-soft/30 disabled:opacity-50 transition">
+                  className="w-full flex items-center justify-between text-xs px-4 py-2.5 rounded-lg mc-chip-inset text-ink hover:border-brand/50 hover:bg-brand-soft/30 disabled:opacity-50 transition">
                   <span>{p.credits.toLocaleString()} credits</span>
                   <span className="font-semibold">{walletBusy === key ? '…' : `${p.usd.toLocaleString()}`}</span>
                 </button>
@@ -707,7 +707,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
             {walletError && <div className="text-[11px] text-garnet bg-garnet/10 border border-garnet/40 rounded px-3 py-2">{walletError}</div>}
             <div className="flex items-center justify-between">
               <span className="text-[10px] text-faint">{uiLang === 'zh' ? '支持国际信用卡;对公转账请联系顾问' : uiLang === 'vi' ? 'Hỗ trợ thẻ quốc tế; chuyển khoản liên hệ tư vấn' : 'Cards accepted · bank transfer via your advisor'}</span>
-              <button onClick={() => setWalletOpen(false)} className="text-xs px-3 py-1.5 rounded-md border border-edge text-dim hover:text-ink transition">{uiLang === 'zh' ? '关闭' : uiLang === 'vi' ? 'Đóng' : 'Close'}</button>
+              <button onClick={() => setWalletOpen(false)} className="text-xs px-3 py-1.5 rounded-md mc-btn-soft text-dim hover:text-ink transition">{uiLang === 'zh' ? '关闭' : uiLang === 'vi' ? 'Đóng' : 'Close'}</button>
             </div>
           </div>
         </div>
@@ -719,7 +719,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
           <span className="text-[12px] text-ink"><span className="font-semibold text-gold">LIVE DEMO</span> · {project.brand_name} — real scans on the production engine, refreshed weekly · read-only</span>
           <span className="flex gap-2">
             <a href="https://memecmo.ai/#contact" className="text-[11px] px-3 py-1 rounded-md bg-brand text-on-brand font-semibold hover:brightness-110 transition">Get access for your brand →</a>
-            <a href="/login" className="text-[11px] px-3 py-1 rounded-md border border-edge text-dim hover:text-ink transition">Sign in</a>
+            <a href="/login" className="text-[11px] px-3 py-1 rounded-md mc-btn-soft text-dim hover:text-ink transition">Sign in</a>
           </span>
         </div>
       )}
@@ -732,7 +732,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
               <button
                 onClick={() => dispatchAgent('full_scan')}
                 disabled={sending}
-                className="mc-bloom w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-brand text-on-brand hover:brightness-110 disabled:bg-raised disabled:text-faint text-sm font-medium transition"
+                className="mc-bloom w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-brand text-on-brand hover:brightness-110 disabled:mc-chip-inset disabled:text-faint text-sm font-medium transition"
               >
                 <Icon name="full_scan" size={16} /> {t('Run full GEO scan')}
               </button>
@@ -742,7 +742,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
                 onKeyDown={(e) => { if (e.key === 'Enter' && intent.trim()) { e.preventDefault(); dispatchAgent('full_scan', intent.trim()); setIntent(''); } }}
                 placeholder={t('…focus the agents')}
                 disabled={sending}
-                className="w-full bg-surface border border-edge rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-blue-400/50"
+                className="w-full mc-input rounded-lg px-3 py-2 text-[13px] focus:outline-none focus:border-blue-400/50"
               />
             </div>
           ) : (
@@ -831,7 +831,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
                   {isTerminal && runStatus.output && (
                     <button
                       onClick={() => window.print()}
-                      className="text-[11px] px-2.5 py-1 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition"
+                      className="text-[11px] px-2.5 py-1 rounded mc-chip-inset text-dim hover:border-brand/50 hover:text-brand transition"
                     >
                       ⤓ {t('Export PDF')}
                     </button>
@@ -840,12 +840,12 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
                     <button
                       onClick={() => dispatchAgent(runStatus.agentId!)}
                       disabled={sending}
-                      className="text-[11px] px-2.5 py-1 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand disabled:opacity-40 transition"
+                      className="text-[11px] px-2.5 py-1 rounded mc-chip-inset text-dim hover:border-brand/50 hover:text-brand disabled:opacity-40 transition"
                     >
                       ↻ {t('Re-run')}
                     </button>
                   )}
-                  <div className="w-24 h-1.5 bg-raised rounded-full overflow-hidden">
+                  <div className="w-24 h-1.5 mc-chip-inset rounded-full overflow-hidden">
                     <div className={`h-full transition-all duration-700 ${runStatus.status === 'failed' ? 'bg-garnet' : 'bg-sage'}`} style={{ width: `${displayPct}%` }} />
                   </div>
                 </div>
@@ -883,7 +883,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
                     loop={{ runsByAgent, currentScore: headlineAigvr }}
                     history={history}
                   />
-                  <details className="print-hide rounded border border-edge bg-surface">
+                  <details className="print-hide rounded mc-chip-inset bg-surface">
                     <summary className="cursor-pointer px-3 py-2 text-[11px] uppercase tracking-widest text-faint select-none hover:text-dim">Process log · {activity.length} steps</summary>
                     <div className="px-3 pb-3 font-mono text-xs space-y-2 border-t border-edge pt-2">
                       {activity.map((ev) => (<ActivityRow key={ev.id} ev={ev} />))}
@@ -940,8 +940,8 @@ function NavItem({
       onClick={() => (ready ? onView(run!.runId, agentId) : onEmpty(agentId))}
       title={a?.description}
       role="button"
-      className={`w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-md border transition cursor-pointer ${
-        isViewing ? 'bg-sage/12 border-sage/40' : 'border-transparent hover:bg-raised'
+      className={`w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-lg transition cursor-pointer ${
+        isViewing ? 'bg-sage/12 border-sage/40' : 'mc-btn-soft hover:brightness-95'
       }`}
     >
       <span className="shrink-0 text-brand"><Icon name={agentId} size={17} /></span>
@@ -958,7 +958,7 @@ function NavItem({
       ) : canRun ? (
         <span
           onClick={(e) => { e.stopPropagation(); if (!disabled) onRun(agentId); }}
-          className={`text-[10px] shrink-0 px-1.5 py-0.5 rounded border border-edge text-faint hover:text-brand hover:border-brand/50 transition ${disabled ? 'opacity-50' : ''}`}
+          className={`text-[10px] shrink-0 px-1.5 py-0.5 rounded mc-btn-soft text-faint hover:text-brand hover:border-brand/50 transition ${disabled ? 'opacity-50' : ''}`}
         >
           ▶ {t('run')}
         </span>
@@ -1195,7 +1195,7 @@ function LiveProgress({ activity, agentId, isOperator, endRef }: {
         </ul>
       )}
       {isOperator && (
-        <details className="text-left rounded border border-edge bg-surface">
+        <details className="text-left rounded mc-chip-inset bg-surface">
           <summary className="cursor-pointer px-3 py-2 text-[11px] uppercase tracking-widest text-faint select-none hover:text-dim">
             {t('Technical trace')} · {activity.length}
           </summary>
@@ -1266,7 +1266,7 @@ function Bar({ value, color }: { value: number; color?: string }) {
   const v = Math.max(0, Math.min(100, value || 0));
   const cls = color ?? (v <= 0 ? 'bg-garnet/80' : v < 34 ? 'bg-red-400' : v < 67 ? 'bg-gold' : 'bg-sage');
   return (
-    <div className="h-2 bg-raised rounded-full overflow-hidden">
+    <div className="h-2 mc-track">
       <div className={`h-full rounded-full ${cls} transition-all duration-500`} style={{ width: `${v}%` }} />
     </div>
   );
@@ -1445,14 +1445,14 @@ function PreviewVerdict({ sc, brand, upgradeHref }: { sc: any; brand: string; up
       <div className="text-[15px] font-semibold text-ink leading-relaxed">{headline}</div>
 
       {exhibit && (
-        <div className="rounded-lg bg-raised/70 p-4 space-y-2">
+        <div className="rounded-lg mc-chip-inset/70 p-4 space-y-2">
           <div className="text-[10px] uppercase tracking-widest text-faint">
             {zh ? '证物 · 真实问答' : vi ? 'Bằng chứng · hỏi đáp thật' : 'Exhibit · a real exchange'}
           </div>
           <div className="text-[13px] text-ink font-medium">“{exhibit.prompt}”</div>
           <div className="text-[12px] text-dim leading-relaxed" dangerouslySetInnerHTML={{ __html: snippetHtml }} />
           <div className="flex items-center gap-2 pt-1">
-            <span className="text-[10px] px-2 py-0.5 rounded-full border border-edge text-dim">{exhibit.engine}</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full mc-chip-inset text-dim">{exhibit.engine}</span>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-garnet/10 text-garnet font-semibold">
               {zh ? `${brand}:未出现` : vi ? `${brand}: vắng mặt` : `${brand}: absent`}
             </span>
@@ -1468,7 +1468,7 @@ function PreviewVerdict({ sc, brand, upgradeHref }: { sc: any; brand: string; up
           {rivals.map((r) => (
             <div key={r.name} className="flex items-center gap-3">
               <span className="text-[12px] text-ink w-44 truncate">{r.name}</span>
-              <div className="flex-1 h-1.5 bg-raised rounded-full overflow-hidden"><i className="block h-full bg-brand rounded-full" style={{ width: `${Math.max(4, r.sovPct)}%` }} /></div>
+              <div className="flex-1 h-1.5 mc-chip-inset rounded-full overflow-hidden"><i className="block h-full bg-brand rounded-full" style={{ width: `${Math.max(4, r.sovPct)}%` }} /></div>
               <span className="text-[11px] text-dim tabular-nums w-10 text-right">{r.sovPct}%</span>
             </div>
           ))}
@@ -1512,7 +1512,7 @@ function TrialSiteTeaser({ site, upgradeHref }: { site: any; upgradeHref?: strin
         <div className="text-[13px] font-semibold text-ink">
           {zh ? '网站 AEO 体检(预览已完成)' : vi ? 'Kiểm tra AEO website (đã hoàn tất)' : 'Homepage AEO audit (completed in preview)'}
         </div>
-        <span className="text-[10px] px-2 py-0.5 rounded-full bg-raised text-faint">{zh ? '已锁定' : vi ? 'Đã khóa' : 'Locked'}</span>
+        <span className="text-[10px] px-2 py-0.5 rounded-full mc-chip-inset text-faint">{zh ? '已锁定' : vi ? 'Đã khóa' : 'Locked'}</span>
       </div>
       <div className="flex flex-wrap gap-4 text-[13px] text-ink tabular-nums">
         <span><b className="text-garnet">{missing}</b> {zh ? `项缺失(共 ${checklist.length} 项检查)` : vi ? `mục thiếu / ${checklist.length} kiểm tra` : `missing of ${checklist.length} checks`}</span>
@@ -1673,14 +1673,14 @@ function AdvisoryChat({ projectId, agentId, output, onDispatch }: {
           onKeyDown={(e) => { if (e.key === 'Enter' && q.trim()) { e.preventDefault(); ask(q); } }}
           placeholder={t('Ask about this result…')}
           disabled={busy}
-          className="flex-1 bg-surface border border-edge rounded-md px-3 py-2 text-[13px] focus:outline-none focus:border-blue-400/50"
+          className="flex-1 mc-input rounded-md px-3 py-2 text-[13px] focus:outline-none focus:border-blue-400/50"
         />
-        <button onClick={() => ask(q)} disabled={busy || !q.trim()} className="px-3 py-2 text-[13px] rounded-md bg-brand text-on-brand hover:brightness-110 disabled:bg-raised disabled:text-faint transition">{busy ? '…' : t('Ask')}</button>
+        <button onClick={() => ask(q)} disabled={busy || !q.trim()} className="px-3 py-2 text-[13px] rounded-md bg-brand text-on-brand hover:brightness-110 disabled:mc-chip-inset disabled:text-faint transition">{busy ? '…' : t('Ask')}</button>
       </div>
       {thread.length === 0 && (
         <div className="flex flex-wrap gap-1.5">
           {QUICK.map((qq) => (
-            <button key={qq} onClick={() => ask(qq)} disabled={busy} className="text-[10px] px-2 py-0.5 rounded-full border border-edge text-dim hover:border-brand/50 hover:text-brand disabled:opacity-40 transition">{qq}</button>
+            <button key={qq} onClick={() => ask(qq)} disabled={busy} className="text-[10px] px-2 py-0.5 rounded-full mc-chip-inset text-dim hover:border-brand/50 hover:text-brand disabled:opacity-40 transition">{qq}</button>
           ))}
         </div>
       )}
@@ -1771,13 +1771,13 @@ function ArtifactSandbox({ o, projectId, runId, versions: extVersions, onVersion
         <div className="flex gap-2 shrink-0">
           {savedNote && <span className="self-center text-[10px] text-gold">{savedNote}</span>}
           <MarkPublished projectId={projectId} runId={runId} artifactType={artifactType} title={o.title} targetPrompts={o.targetQuery ? [String(o.targetQuery)] : undefined} lang={UI_LANG} t={t} />
-          <button onClick={() => (editing ? finishEditing() : setEditing(true))} className="text-[11px] px-2 py-0.5 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition">{editing ? t('Done') : t('Edit')}</button>
-          <button onClick={() => navigator.clipboard?.writeText(current.content).catch(() => {})} className="text-[11px] px-2 py-0.5 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition">{t('Copy')}</button>
+          <button onClick={() => (editing ? finishEditing() : setEditing(true))} className="text-[11px] px-2 py-0.5 rounded mc-chip-inset text-dim hover:border-brand/50 hover:text-brand transition">{editing ? t('Done') : t('Edit')}</button>
+          <button onClick={() => navigator.clipboard?.writeText(current.content).catch(() => {})} className="text-[11px] px-2 py-0.5 rounded mc-chip-inset text-dim hover:border-brand/50 hover:text-brand transition">{t('Copy')}</button>
         </div>
       </div>
 
       {structured && (
-        <details className="rounded border border-edge bg-surface">
+        <details className="rounded mc-chip-inset bg-surface">
           <summary className="cursor-pointer px-3 py-2 text-[11px] uppercase tracking-widest text-faint select-none hover:text-dim">Structured view</summary>
           <div className="px-3 pb-3 pt-1 border-t border-edge">{structured}</div>
         </details>
@@ -1795,10 +1795,10 @@ function ArtifactSandbox({ o, projectId, runId, versions: extVersions, onVersion
         <textarea
           value={current.content}
           onChange={(e) => setVersions((vs) => vs.map((v, i) => (i === active ? { ...v, content: e.target.value } : v)))}
-          className="w-full h-72 bg-raised border border-edge rounded-md p-3 text-[12px] text-ink font-mono leading-relaxed focus:outline-none focus:border-blue-400/50"
+          className="w-full h-72 mc-chip-inset mc-chip-inset rounded-md p-3 text-[12px] text-ink font-mono leading-relaxed focus:outline-none focus:border-blue-400/50"
         />
       ) : (
-        <div className="text-[13px] text-ink leading-relaxed whitespace-pre-wrap max-h-[55vh] overflow-y-auto border border-edge rounded-md p-3 bg-raised">{current.content}</div>
+        <div className="text-[13px] text-ink leading-relaxed whitespace-pre-wrap max-h-[55vh] overflow-y-auto mc-chip-inset rounded-md p-3 mc-chip-inset">{current.content}</div>
       )}
 
       {/* Refine dialogue — scoped to this artifact */}
@@ -1811,15 +1811,15 @@ function ArtifactSandbox({ o, projectId, runId, versions: extVersions, onVersion
             onKeyDown={(e) => { if (e.key === 'Enter' && instr.trim()) { e.preventDefault(); refineWith(instr); } }}
             placeholder='e.g. "更口语，加入我们的报价"'
             disabled={busy}
-            className="flex-1 bg-surface border border-edge rounded-md px-3 py-2 text-[13px] focus:outline-none focus:border-blue-400/50"
+            className="flex-1 mc-input rounded-md px-3 py-2 text-[13px] focus:outline-none focus:border-blue-400/50"
           />
-          <button onClick={() => refineWith(instr)} disabled={busy || !instr.trim()} className="px-3 py-2 text-[13px] rounded-md bg-brand text-on-brand hover:brightness-110 disabled:bg-raised disabled:text-faint transition">
+          <button onClick={() => refineWith(instr)} disabled={busy || !instr.trim()} className="px-3 py-2 text-[13px] rounded-md bg-brand text-on-brand hover:brightness-110 disabled:mc-chip-inset disabled:text-faint transition">
             {busy ? '改写中…' : '改写'}
           </button>
         </div>
         <div className="flex flex-wrap gap-1.5">
           {QUICK.map((q) => (
-            <button key={q} onClick={() => refineWith(q)} disabled={busy} className="text-[10px] px-2 py-0.5 rounded-full border border-edge text-dim hover:border-brand/50 hover:text-brand disabled:opacity-40 transition">{q}</button>
+            <button key={q} onClick={() => refineWith(q)} disabled={busy} className="text-[10px] px-2 py-0.5 rounded-full mc-chip-inset text-dim hover:border-brand/50 hover:text-brand disabled:opacity-40 transition">{q}</button>
           ))}
         </div>
         {err && <div className="text-[11px] text-gold">{err}</div>}
@@ -1845,8 +1845,8 @@ function ContentResult({ o }: { o: Record<string, any> }) {
           )}
         </div>
         <div className="flex gap-2 shrink-0">
-          <button onClick={() => copy(o.fullMarkdown)} className="text-[11px] px-2 py-0.5 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition">{t('Copy page')}</button>
-          <button onClick={() => copy(JSON.stringify(o.schemaJsonLd, null, 2))} className="text-[11px] px-2 py-0.5 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition">{t('Copy schema')}</button>
+          <button onClick={() => copy(o.fullMarkdown)} className="text-[11px] px-2 py-0.5 rounded mc-chip-inset text-dim hover:border-brand/50 hover:text-brand transition">{t('Copy page')}</button>
+          <button onClick={() => copy(JSON.stringify(o.schemaJsonLd, null, 2))} className="text-[11px] px-2 py-0.5 rounded mc-chip-inset text-dim hover:border-brand/50 hover:text-brand transition">{t('Copy schema')}</button>
         </div>
       </div>
 
@@ -1854,7 +1854,7 @@ function ContentResult({ o }: { o: Record<string, any> }) {
       {o.metaDescription && <div className="text-[12px] text-faint italic">{o.metaDescription}</div>}
 
       {o.articleMarkdown && (
-        <div className="text-[13px] text-dim leading-relaxed whitespace-pre-wrap max-h-80 overflow-y-auto border border-edge rounded-md p-3 bg-raised">
+        <div className="text-[13px] text-dim leading-relaxed whitespace-pre-wrap max-h-80 overflow-y-auto mc-chip-inset rounded-md p-3 mc-chip-inset">
           {o.articleMarkdown}
         </div>
       )}
@@ -1900,7 +1900,7 @@ function ProfileResult({ o, projectId }: { o: Record<string, any>; projectId?: s
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
         {services.length > 0 && (
           <div><SectionLabel>Services</SectionLabel>
-            <EditableUnit {...unit('services')} kind="lines" rows={6}><div className="flex flex-wrap gap-1">{services.map((x: string, i: number) => <span key={i} className="text-[11px] px-1.5 py-0.5 rounded bg-raised border border-edge text-dim">{x}</span>)}</div></EditableUnit>
+            <EditableUnit {...unit('services')} kind="lines" rows={6}><div className="flex flex-wrap gap-1">{services.map((x: string, i: number) => <span key={i} className="text-[11px] px-1.5 py-0.5 rounded mc-chip-inset mc-chip-inset text-dim">{x}</span>)}</div></EditableUnit>
           </div>
         )}
         {diffs.length > 0 && (
@@ -1946,12 +1946,12 @@ function EncyclopediaResult({ o }: { o: Record<string, any> }) {
           <h3 className="text-sm font-semibold text-ink">Encyclopedia entry &amp; path</h3>
           <p className="text-[11px] text-faint mt-0.5">{o.targetWiki}</p>
         </div>
-        <button onClick={() => copy(o.fullMarkdown)} className="text-[11px] px-2 py-0.5 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition shrink-0">{t('Copy plan')}</button>
+        <button onClick={() => copy(o.fullMarkdown)} className="text-[11px] px-2 py-0.5 rounded mc-chip-inset text-dim hover:border-brand/50 hover:text-brand transition shrink-0">{t('Copy plan')}</button>
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
         <span className={`text-[10px] px-2 py-0.5 rounded border uppercase tracking-wide ${vColor}`}>notability: {n.verdict || '—'}</span>
-        {o.recommendedApproach && <span className="text-[10px] px-2 py-0.5 rounded bg-raised border border-edge text-dim">{String(o.recommendedApproach).replace(/_/g, ' ')}</span>}
+        {o.recommendedApproach && <span className="text-[10px] px-2 py-0.5 rounded mc-chip-inset mc-chip-inset text-dim">{String(o.recommendedApproach).replace(/_/g, ' ')}</span>}
       </div>
       {n.reasoning && <p className="text-[12px] text-dim leading-snug">{n.reasoning}</p>}
 
@@ -2020,7 +2020,7 @@ function DistributionResult({ o }: { o: Record<string, any> }) {
           <h3 className="text-sm font-semibold text-ink">Distribution kit</h3>
           <p className="text-[11px] text-faint mt-0.5">{targets.length} ready-to-send placements, tiered by authority · get cited where AI engines look</p>
         </div>
-        <button onClick={() => copy(o.fullMarkdown)} className="text-[11px] px-2 py-0.5 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition shrink-0">{t('Copy kit')}</button>
+        <button onClick={() => copy(o.fullMarkdown)} className="text-[11px] px-2 py-0.5 rounded mc-chip-inset text-dim hover:border-brand/50 hover:text-brand transition shrink-0">{t('Copy kit')}</button>
       </div>
       {tiers.map((tier) => (
         <div key={tier}>
@@ -2030,7 +2030,7 @@ function DistributionResult({ o }: { o: Record<string, any> }) {
               <div key={i} className="mc-card mc-card-sm p-3">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-[12px] font-medium text-ink truncate">{t.domain}</span>
-                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-raised border border-edge text-dim uppercase tracking-wide shrink-0">{(t.channelType || '').replace(/_/g, ' ')}</span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded mc-chip-inset mc-chip-inset text-dim uppercase tracking-wide shrink-0">{(t.channelType || '').replace(/_/g, ' ')}</span>
                   {t.effort && <span className="text-[9px] text-faint shrink-0">{t.effort}</span>}
                   <button onClick={() => copy(t.draft)} className="ml-auto text-[10px] text-faint hover:text-brand shrink-0">copy</button>
                 </div>
@@ -2062,7 +2062,7 @@ function SiteResult({ o }: { o: Record<string, any> }) {
             {o.existingSchema?.length ? ` · existing schema: ${o.existingSchema.join(', ')}` : ' · no existing schema'}
           </p>
         </div>
-        <button onClick={() => copy(o.fullMarkdown)} className="text-[11px] px-2 py-0.5 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition shrink-0">{t('Copy brief')}</button>
+        <button onClick={() => copy(o.fullMarkdown)} className="text-[11px] px-2 py-0.5 rounded mc-chip-inset text-dim hover:border-brand/50 hover:text-brand transition shrink-0">{t('Copy brief')}</button>
       </div>
 
       {checklist.length > 0 && (
@@ -2099,7 +2099,7 @@ function SiteResult({ o }: { o: Record<string, any> }) {
           <SectionLabel>Paste-in JSON-LD ({schema.length})</SectionLabel>
           <div className="space-y-1.5">
             {schema.map((s, i) => (
-              <div key={i} className="rounded border border-edge bg-raised">
+              <div key={i} className="rounded mc-chip-inset mc-chip-inset">
                 <div className="flex items-center justify-between px-2.5 py-1.5">
                   <span className="text-[11px] text-brand">{s.type}</span>
                   <button onClick={() => copy(JSON.stringify(s.jsonld, null, 2))} className="text-[10px] text-faint hover:text-brand">copy</button>
@@ -2148,7 +2148,7 @@ function DiscoveryResult({ o }: { o: Record<string, any> }) {
             <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden px-3 py-2.5 flex items-center gap-2 select-none rounded-lg hover:bg-surface">
               <span className="text-faint text-[9px] transition-transform group-open:rotate-90">▶</span>
               <span className="text-[12px] font-medium text-brand/90 flex-1 min-w-0 truncate">{c.label || c.category}</span>
-              <span className="text-[10px] text-dim px-1.5 py-0.5 rounded-full bg-raised tabular-nums">{(c.prompts || []).length}</span>
+              <span className="text-[10px] text-dim px-1.5 py-0.5 rounded-full mc-chip-inset tabular-nums">{(c.prompts || []).length}</span>
             </summary>
             <ul className="px-3 pb-2.5 pt-1.5 space-y-1.5 border-t border-edge">
               {(c.prompts || []).map((p: string, j: number) => (
@@ -2205,14 +2205,14 @@ function StandardAnswersResult({ o, projectId }: { o: Record<string, any>; proje
             <div className="text-2xl font-bold text-ink leading-none tabular-nums">{o.count ?? answers.length}</div>
             <div className="text-[10px] text-faint uppercase tracking-wider mt-0.5">answers</div>
           </div>
-          <button onClick={copyAll} className="text-[11px] px-2 py-1 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition">{t('Copy kit')}</button>
+          <button onClick={copyAll} className="text-[11px] px-2 py-1 rounded mc-chip-inset text-dim hover:border-brand/50 hover:text-brand transition">{t('Copy kit')}</button>
         </div>
       </div>
 
       <div className="space-y-2">
         {answers.map((a, i) => (
           <details key={i} className="group mc-card mc-card-sm">
-            <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden px-3 py-2.5 flex items-center gap-2 select-none rounded-lg hover:bg-raised">
+            <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden px-3 py-2.5 flex items-center gap-2 select-none rounded-lg hover:brightness-95">
               <span className="text-faint text-[9px] transition-transform group-open:rotate-90">▶</span>
               <span className="text-faint flex-none tabular-nums text-[11px]">{i + 1}.</span>
               <span className="text-[12px] font-medium text-brand/90 flex-1 min-w-0 truncate">{a.prompt}</span>
@@ -2280,7 +2280,7 @@ function BrandDocsPanel({ projectId }: { projectId: string }) {
     <div className="mc-card mc-card-sm px-3 py-2.5 space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-[11px] uppercase tracking-wider text-faint">{t('Brand documents')}</span>
-        <label className={`text-[11px] px-2 py-1 rounded border border-edge text-dim hover:text-brand hover:border-brand/50 transition cursor-pointer ${busy ? 'opacity-50 pointer-events-none' : ''}`}>
+        <label className={`text-[11px] px-2 py-1 rounded mc-chip-inset text-dim hover:text-brand hover:border-brand/50 transition cursor-pointer ${busy ? 'opacity-50 pointer-events-none' : ''}`}>
           {busy ? t('Uploading…') : `+ ${t('Upload')}`}
           <input ref={fileRef} type="file" accept=".txt,.md,.pdf" className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); }} />
@@ -2376,7 +2376,7 @@ function VerificationBar({ projectId, kind }: { projectId: string; kind: string 
             onChange={(e) => setEmail(e.target.value)}
             type="email"
             placeholder="client@company.com"
-            className="flex-1 bg-raised border border-edge rounded px-2 py-1 text-[12px] text-ink placeholder:text-faint focus:outline-none focus:border-brand/50"
+            className="flex-1 mc-chip-inset mc-chip-inset rounded px-2 py-1 text-[12px] text-ink placeholder:text-faint focus:outline-none focus:border-brand/50"
           />
           <button onClick={request} disabled={busy || !email.trim()} className="text-[11px] px-2.5 py-1 rounded bg-brand text-on-brand disabled:opacity-50">
             {busy ? '…' : t('Send')}
@@ -2406,7 +2406,7 @@ function ProvenanceStrip({ o, runId, createdAt, trigger }: { o: Record<string, a
   ].filter(Boolean);
   if (!bits.length) return null;
   return (
-    <div className="rounded-lg border border-edge bg-raised px-3 py-1.5 font-mono text-[10.5px] text-dim tracking-tight">
+    <div className="rounded-lg mc-chip-inset mc-chip-inset px-3 py-1.5 font-mono text-[10.5px] text-dim tracking-tight">
       {bits.join(' · ')}
     </div>
   );
@@ -2475,12 +2475,12 @@ function MonitorResult({ o, projectId, history }: { o: Record<string, any>; proj
       {allEngines.length > 1 && (
         <div className="flex flex-wrap items-center gap-1.5">
           <button onClick={() => setEngineView(null)}
-            className={`text-[11px] px-2.5 py-1 rounded-md border transition ${!engineView ? 'border-brand/60 bg-brand-soft text-brand font-semibold' : 'border-edge text-dim hover:text-ink'}`}>
+            className={`text-[11px] px-2.5 py-1 rounded-md transition ${!engineView ? 'mc-pill-active' : 'mc-btn-soft text-dim hover:text-ink'}`}>
             {t('All engines')}
           </button>
           {allEngines.map((e, i) => (
             <button key={i} onClick={() => setEngineView(e.engine === engineView ? null : e.engine)}
-              className={`text-[11px] px-2.5 py-1 rounded-md border transition ${engineView === e.engine ? 'border-brand/60 bg-brand-soft text-brand font-semibold' : 'border-edge text-dim hover:text-ink'}`}>
+              className={`text-[11px] px-2.5 py-1 rounded-md transition ${engineView === e.engine ? 'mc-pill-active' : 'mc-btn-soft text-dim hover:text-ink'}`}>
               {e.engine}
             </button>
           ))}
@@ -2523,7 +2523,7 @@ function MonitorResult({ o, projectId, history }: { o: Record<string, any>; proj
           <SectionLabel>{t('Answers diverging from the standard answers')}</SectionLabel>
           <div className="space-y-1.5">
             {o.accuracy.issues.map((iss: any, i: number) => (
-              <div key={i} className="rounded-lg border border-edge bg-canvas px-3 py-2">
+              <div key={i} className="rounded-lg mc-chip-inset px-3 py-2">
                 <div className="flex items-center gap-2 text-[11px]">
                   <span className={`px-1.5 py-0.5 rounded uppercase tracking-wider text-[9px] font-semibold ${iss.verdict === 'wrong' ? 'bg-garnet/15 text-garnet' : 'bg-gold/15 text-gold'}`}>{iss.verdict === 'wrong' ? (UI_LANG === 'en' ? 'divergent' : t('wrong')) : t('partial')}</span>
                   <span className="text-faint">{iss.engine}</span>
@@ -2619,7 +2619,7 @@ function MonitorResult({ o, projectId, history }: { o: Record<string, any>; proj
           <SectionLabel>High-intent gaps ({gaps.length})</SectionLabel>
           <ul className="space-y-2">
             {gaps.slice(0, 8).map((g, i) => (
-              <li key={i} className="rounded-md border border-edge border-l-2 border-l-garnet/50 bg-garnet/10 pl-2.5 pr-2 py-1.5">
+              <li key={i} className="rounded-md mc-chip-inset border-l-2 border-l-garnet/50 bg-garnet/10 pl-2.5 pr-2 py-1.5">
                 <div className="text-[12px] text-ink leading-snug">{g.prompt}</div>
                 <div className="mt-1 flex items-center gap-1.5 flex-wrap">
                   <span className="text-[10px] text-faint uppercase tracking-wide">{g.engine} · {g.stage}</span>
@@ -2681,13 +2681,13 @@ function ReportResult({ o }: { o: Record<string, any> }) {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {typeof o.aigvrScore === 'number' && (
-            <div className="flex items-center gap-1.5 rounded-full border border-edge bg-raised px-2.5 py-1">
+            <div className="flex items-center gap-1.5 rounded-full mc-chip-inset mc-chip-inset px-2.5 py-1">
               <span className="w-1.5 h-1.5 rounded-full" style={{ background: toneColor(o.aigvrScore) }} />
               <span className="text-[11px] text-dim">AIGVR <span className="font-semibold" style={{ color: toneColor(o.aigvrScore) }}>{o.aigvrScore}</span></span>
             </div>
           )}
           {o.markdown && (
-            <button onClick={copyMarkdown} className="text-[11px] px-2 py-1 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition">
+            <button onClick={copyMarkdown} className="text-[11px] px-2 py-1 rounded mc-chip-inset text-dim hover:border-brand/50 hover:text-brand transition">
               Copy Markdown
             </button>
           )}
@@ -2695,7 +2695,7 @@ function ReportResult({ o }: { o: Record<string, any> }) {
       </div>
 
       {o.executiveSummary && (
-        <div className="rounded-lg border border-edge border-l-2 border-l-emerald-400/50 bg-surface px-3.5 py-3">
+        <div className="rounded-lg mc-chip-inset border-l-2 border-l-emerald-400/50 bg-surface px-3.5 py-3">
           <div className="text-[10px] uppercase tracking-[0.18em] text-sage/70 mb-1.5">Executive summary</div>
           <p className="text-[13px] text-ink leading-relaxed">{o.executiveSummary}</p>
         </div>
@@ -2707,7 +2707,7 @@ function ReportResult({ o }: { o: Record<string, any> }) {
           <ul className="space-y-2.5">
             {visibleFindings.map((f, i) => (
               <li key={i} className="flex gap-2.5">
-                <span className="mt-0.5 flex-none w-5 h-5 rounded-full bg-raised border border-edge text-[10px] font-semibold text-dim flex items-center justify-center tabular-nums">{i + 1}</span>
+                <span className="mt-0.5 flex-none w-5 h-5 rounded-full mc-chip-inset mc-chip-inset text-[10px] font-semibold text-dim flex items-center justify-center tabular-nums">{i + 1}</span>
                 <div className="min-w-0">
                   <div className="text-[12.5px] text-ink font-medium leading-snug">{f.finding}</div>
                   {f.evidence && <div className="text-[11.5px] text-faint leading-snug mt-0.5">{f.evidence}</div>}
@@ -2733,11 +2733,11 @@ function ReportResult({ o }: { o: Record<string, any> }) {
           </div>
           <div className="space-y-2">
             {recs.map((rec, i) => { const isOpen = openRecs.has(i); return (
-              <div key={i} className={`rounded-lg border border-edge border-l-[3px] ${PRIORITY_RAIL[rec.priority] || PRIORITY_RAIL.P2} bg-surface ${isOpen ? 'p-3.5' : 'px-3.5 py-2.5'}`}>
+              <div key={i} className={`rounded-lg mc-chip-inset border-l-[3px] ${PRIORITY_RAIL[rec.priority] || PRIORITY_RAIL.P2} bg-surface ${isOpen ? 'p-3.5' : 'px-3.5 py-2.5'}`}>
                 <button type="button" onClick={() => toggleRec(i)} aria-expanded={isOpen} className="w-full text-left flex items-center gap-2">
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${PRIORITY_STYLE[rec.priority] || PRIORITY_STYLE.P2}`}>{rec.priority}</span>
                   <span className="text-[13px] font-semibold text-ink leading-tight">{rec.title}</span>
-                  {rec.targetStage && <span className="ml-auto shrink-0 text-[10px] text-dim px-1.5 py-0.5 rounded bg-raised capitalize">{rec.targetStage}</span>}
+                  {rec.targetStage && <span className="ml-auto shrink-0 text-[10px] text-dim px-1.5 py-0.5 rounded mc-chip-inset capitalize">{rec.targetStage}</span>}
                   <span className={`shrink-0 text-[11px] text-faint transition-transform ${isOpen ? 'rotate-90' : ''} ${rec.targetStage ? '' : 'ml-auto'}`} aria-hidden>▸</span>
                 </button>
                 {isOpen && (
@@ -2791,7 +2791,7 @@ function ReportResult({ o }: { o: Record<string, any> }) {
           <summary className="cursor-pointer select-none list-none flex items-center gap-2"><SectionLabel>{t('AI answers that contradict the site')} · {o.contradictions.length}</SectionLabel><span className="text-[10px] text-faint group-open:hidden">▸</span></summary>
           <ul className="space-y-1.5 mt-1">
             {o.contradictions.map((c: any, i: number) => (
-              <li key={i} className="rounded-md border border-edge border-l-2 border-l-garnet/50 bg-garnet/5 px-2.5 py-1.5 text-[11.5px] leading-snug">
+              <li key={i} className="rounded-md mc-chip-inset border-l-2 border-l-garnet/50 bg-garnet/5 px-2.5 py-1.5 text-[11.5px] leading-snug">
                 <div className="text-faint text-[10px]">{c.engine} · {c.prompt}</div>
                 <div><span className="text-garnet">{t('AI')}:</span> <span className="text-ink">{c.aiClaim}</span></div>
                 <div><span className="text-sage">{t('Site')}:</span> <span className="text-ink">{c.siteFact}</span>{c.sitePage && <> · <a href={c.sitePage} target="_blank" rel="noreferrer" className="text-brand hover:underline break-all">{String(c.sitePage).replace(/^https?:\/\/(www\.)?/, '').slice(0, 50)}</a></>}</div>
@@ -2919,7 +2919,7 @@ function SetsEditorModal({ projectId, brandName, onClose }: { projectId: string;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-canvas border border-edge rounded-xl w-full max-w-2xl max-h-[82vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-canvas mc-chip-inset rounded-xl w-full max-w-2xl max-h-[82vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-edge">
           <div className="flex items-center gap-2 min-w-0">
             {brandName && <span className="text-xs font-semibold text-ink truncate max-w-[220px] mr-1" title={brandName}>{brandName}</span>}
@@ -2927,7 +2927,7 @@ function SetsEditorModal({ projectId, brandName, onClose }: { projectId: string;
               <button
                 key={tb}
                 onClick={() => setTab(tb)}
-                className={`text-xs px-3 py-1.5 rounded-md transition ${tab === tb ? 'bg-brand text-on-brand' : 'text-dim hover:text-ink border border-edge'}`}
+                className={`text-xs px-3 py-1.5 rounded-md transition ${tab === tb ? 'bg-brand text-on-brand' : 'text-dim hover:text-ink mc-chip-inset'}`}
               >
                 {t(tb === 'competitors' ? 'Competitor set' : 'Prompt library')}
               </button>
@@ -2949,7 +2949,7 @@ function SetsEditorModal({ projectId, brandName, onClose }: { projectId: string;
                   <input
                     value={g.canonical}
                     onChange={(e) => setGroups((gs) => gs.map((x, k) => (k === i ? { ...x, canonical: e.target.value } : x)))}
-                    className="flex-1 bg-surface border border-edge rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-brand/50"
+                    className="flex-1 mc-input rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-brand/50"
                   />
                   <select
                     value={g.relationship ?? 'competitor'}
@@ -2971,7 +2971,7 @@ function SetsEditorModal({ projectId, brandName, onClose }: { projectId: string;
               ))}
               <button
                 onClick={() => setGroups((gs) => [...gs, { canonical: '', aliases: [], relationship: 'competitor' }])}
-                className="text-[11px] px-2.5 py-1.5 rounded-md border border-edge text-dim hover:text-brand hover:border-brand/50 transition"
+                className="text-[11px] px-2.5 py-1.5 rounded-md mc-btn-soft text-dim hover:text-brand hover:border-brand/50 transition"
               >
                 + {t('Add competitor')}
               </button>
@@ -3000,7 +3000,7 @@ function SetsEditorModal({ projectId, brandName, onClose }: { projectId: string;
                               <>
                                 <button
                                   onClick={() => togglePrompt(p)}
-                                  className={`flex-1 text-left text-[11px] px-2 py-1 rounded transition ${off ? 'line-through text-garnet/70 bg-garnet/5' : 'text-dim hover:bg-raised'}`}
+                                  className={`flex-1 text-left text-[11px] px-2 py-1 rounded transition ${off ? 'line-through text-garnet/70 bg-garnet/5' : 'text-dim hover:brightness-95'}`}
                                 >
                                   {rw ? rw.to : p}
                                   {rw && <span className="ml-1.5 text-[9px] text-sage">✎ {t('reworded')}</span>}
@@ -3024,13 +3024,13 @@ function SetsEditorModal({ projectId, brandName, onClose }: { projectId: string;
                                 value={editing.draft}
                                 onChange={(e) => setEditing((s) => (s ? { ...s, draft: e.target.value } : s))}
                                 rows={2}
-                                className="w-full bg-surface border border-edge rounded-md px-2 py-1.5 text-[11px] focus:outline-none focus:border-sage/60"
+                                className="w-full mc-input rounded-md px-2 py-1.5 text-[11px] focus:outline-none focus:border-sage/60"
                               />
                               <input
                                 value={editing.note}
                                 onChange={(e) => setEditing((s) => (s ? { ...s, note: e.target.value } : s))}
                                 placeholder={t('Why this change? (optional — trains the model)')}
-                                className="w-full bg-surface border border-edge rounded-md px-2 py-1.5 text-[10px] focus:outline-none focus:border-sage/60"
+                                className="w-full mc-input rounded-md px-2 py-1.5 text-[10px] focus:outline-none focus:border-sage/60"
                               />
                               <div className="flex items-center gap-2">
                                 <button onClick={commitRewrite} className="text-[10px] px-2.5 py-1 rounded bg-sage/15 text-sage hover:bg-sage/25 transition">{t('Apply')}</button>
@@ -3060,7 +3060,7 @@ function SetsEditorModal({ projectId, brandName, onClose }: { projectId: string;
                       <select
                         value={a.category}
                         onChange={(e) => setAddedItems((xs) => xs.map((x, k) => (k === i ? { ...x, category: e.target.value } : x)))}
-                        className="flex-none bg-surface border border-edge rounded-md px-2 py-1.5 text-[11px] text-dim focus:outline-none max-w-[11rem]"
+                        className="flex-none mc-input rounded-md px-2 py-1.5 text-[11px] text-dim focus:outline-none max-w-[11rem]"
                       >
                         {library.map((c) => (
                           <option key={c.category} value={c.category} className="bg-surface">{c.label}</option>
@@ -3071,7 +3071,7 @@ function SetsEditorModal({ projectId, brandName, onClose }: { projectId: string;
                         value={a.text}
                         onChange={(e) => setAddedItems((xs) => xs.map((x, k) => (k === i ? { ...x, text: e.target.value } : x)))}
                         placeholder={t('New prompt — write it the way a real customer asks')}
-                        className="flex-1 bg-surface border border-edge rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-brand/50"
+                        className="flex-1 mc-input rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:border-brand/50"
                       />
                       <button
                         onClick={() => setAddedItems((xs) => xs.filter((_, k) => k !== i))}
@@ -3084,7 +3084,7 @@ function SetsEditorModal({ projectId, brandName, onClose }: { projectId: string;
                   ))}
                   <button
                     onClick={() => setAddedItems((xs) => [...xs, { text: '', category: library[0]?.category ?? 'custom' }])}
-                    className="text-[11px] px-2.5 py-1.5 rounded-md border border-edge text-dim hover:text-brand hover:border-brand/50 transition"
+                    className="text-[11px] px-2.5 py-1.5 rounded-md mc-btn-soft text-dim hover:text-brand hover:border-brand/50 transition"
                   >
                     + {t('Add prompt')}
                   </button>
@@ -3099,7 +3099,7 @@ function SetsEditorModal({ projectId, brandName, onClose }: { projectId: string;
           <button
             onClick={save}
             disabled={busy || loading}
-            className="text-xs px-4 py-2 rounded-md bg-brand text-on-brand hover:brightness-110 disabled:bg-raised disabled:text-faint transition"
+            className="text-xs px-4 py-2 rounded-md bg-brand text-on-brand hover:brightness-110 disabled:mc-chip-inset disabled:text-faint transition"
           >
             {busy ? '…' : t('Save')}
           </button>

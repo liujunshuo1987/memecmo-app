@@ -144,10 +144,13 @@
 .mc-enter { animation: mc-breathe var(--dur-breath) var(--ease-signature) both; animation-delay: calc(var(--i, 0) * var(--stagger)); }
 
 /* Cards — soft-raised on the canvas; insets for wells and inputs. */
-.mc-card { background: var(--surface); border: 1px solid var(--edge); border-radius: var(--r-lg); box-shadow: var(--shadow-raise-sm); transition: box-shadow var(--dur-base) var(--ease-signature), transform var(--dur-base) var(--ease-signature); }
+.mc-card { background: var(--raised); border: 0; border-radius: var(--r-lg); box-shadow: var(--shadow-raise-lg); transition: box-shadow var(--dur-base) var(--ease-signature), transform var(--dur-base) var(--ease-signature); }
 .mc-card-sm { border-radius: var(--r-md); }
 .mc-card-hover:hover { box-shadow: var(--shadow-raise); transform: translateY(-1px); }
-.mc-card-accent { background: color-mix(in srgb, var(--brand) 8%, var(--surface)); border-color: color-mix(in srgb, var(--brand) 40%, transparent); }
+.mc-card-accent { background: color-mix(in srgb, var(--brand) 8%, var(--raised)); }
+.mc-input { background: var(--raised); border: 0; box-shadow: var(--shadow-inset-sm); }
+.mc-input:focus { outline: none; box-shadow: var(--shadow-inset-sm), 0 0 0 2px color-mix(in srgb, var(--brand) 45%, transparent); }
+.mc-pill-active { background: var(--raised); color: var(--brand); font-weight: 600; box-shadow: var(--shadow-inset-sm); }
 .mc-well { background: var(--raised); border-radius: var(--r-md); box-shadow: var(--shadow-inset); }
 
 /* Soft UI set — the dashboard's full neumorphism: ground = raised, every

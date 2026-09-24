@@ -113,12 +113,12 @@ export function EditableUnit({ unitKey, kind = 'text', generated, row, save, rev
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             rows={rows}
-            className="w-full bg-raised border border-edge rounded-md p-2 text-[12px] text-ink leading-relaxed focus:outline-none focus:border-brand/50"
+            className="w-full mc-chip-inset mc-chip-inset rounded-md p-2 text-[12px] text-ink leading-relaxed focus:outline-none focus:border-brand/50"
           />
           {kind !== 'text' && <div className="text-[10px] text-faint">{kind === 'facts' ? t('One fact per line — Label: value') : t('One item per line')}</div>}
           <div className="flex items-center gap-2">
             <button onClick={commit} disabled={busy} className="text-[11px] px-2 py-0.5 rounded bg-brand text-on-brand disabled:opacity-50">{t('Save')}</button>
-            <button onClick={() => setEditing(false)} disabled={busy} className="text-[11px] px-2 py-0.5 rounded border border-edge text-dim">{t('Cancel')}</button>
+            <button onClick={() => setEditing(false)} disabled={busy} className="text-[11px] px-2 py-0.5 rounded mc-chip-inset text-dim">{t('Cancel')}</button>
             {err && <span className="text-[10px] text-garnet">{err}</span>}
           </div>
         </div>

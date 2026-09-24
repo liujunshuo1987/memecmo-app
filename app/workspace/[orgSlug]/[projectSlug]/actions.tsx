@@ -80,19 +80,19 @@ export function InterventionForm({ projectId, lang, t, preset, onDone, onCancel 
     if (e) setErr(e); else onDone();
   };
   return (
-    <div className="rounded-md border border-edge bg-raised p-2.5 space-y-1.5 text-[11px]">
+    <div className="rounded-md mc-chip-inset mc-chip-inset p-2.5 space-y-1.5 text-[11px]">
       <div className="flex flex-wrap gap-1.5">
-        <select value={kind} onChange={(e) => setKind(e.target.value)} className="bg-surface border border-edge rounded px-1.5 py-1 text-ink">
+        <select value={kind} onChange={(e) => setKind(e.target.value)} className="mc-input rounded px-1.5 py-1 text-ink">
           {Object.entries(KIND_LABELS).map(([k, l]) => <option key={k} value={k}>{l[lang]}</option>)}
         </select>
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="bg-surface border border-edge rounded px-1.5 py-1 text-ink" />
+        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mc-input rounded px-1.5 py-1 text-ink" />
       </div>
-      <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={t('URL where it went live')} className="w-full bg-surface border border-edge rounded px-1.5 py-1 text-ink" />
-      <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('Note (optional)')} className="w-full bg-surface border border-edge rounded px-1.5 py-1 text-ink" />
+      <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder={t('URL where it went live')} className="w-full mc-input rounded px-1.5 py-1 text-ink" />
+      <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('Note (optional)')} className="w-full mc-input rounded px-1.5 py-1 text-ink" />
       {preset?.targetPrompts?.length ? <div className="text-faint">{t('Targets')}: {preset.targetPrompts.map((p) => `“${p.slice(0, 60)}”`).join(' · ')}</div> : null}
       <div className="flex items-center gap-2">
         <button onClick={submit} disabled={busy} className="px-2 py-0.5 rounded bg-brand text-on-brand disabled:opacity-50">{t('Log')}</button>
-        <button onClick={onCancel} disabled={busy} className="px-2 py-0.5 rounded border border-edge text-dim">{t('Cancel')}</button>
+        <button onClick={onCancel} disabled={busy} className="px-2 py-0.5 rounded mc-chip-inset text-dim">{t('Cancel')}</button>
         {err && <span className="text-garnet">{err}</span>}
       </div>
     </div>
@@ -162,7 +162,7 @@ export function MarkPublished({ projectId, runId, artifactType, title, targetPro
   if (done) return <span className="self-center text-[10px] text-gold">{t('Published')} · {done.published_at}{done.domain ? ` · ${done.domain}` : ''}</span>;
   return (
     <>
-      {!open && <button onClick={() => setOpen(true)} className="text-[11px] px-2 py-0.5 rounded border border-edge text-dim hover:border-brand/50 hover:text-brand transition">{t('Mark published')}</button>}
+      {!open && <button onClick={() => setOpen(true)} className="text-[11px] px-2 py-0.5 rounded mc-chip-inset text-dim hover:border-brand/50 hover:text-brand transition">{t('Mark published')}</button>}
       {open && (
         <div className="basis-full mt-2">
           <InterventionForm projectId={projectId} lang={lang} t={t} preset={{ kind: ASSET_KIND[artifactType] ?? 'other', title, targetPrompts, sourceRunId: runId, sourceAssetType: artifactType }} onDone={() => { setOpen(false); reload(); }} onCancel={() => setOpen(false)} />

@@ -36,9 +36,9 @@ export default function SourcesPage({ lang }: { lang: Lang }) {
     },
     { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: c.faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) },
   ];
-  const tierCls = (t: string) => (t === 'T1' ? 'bg-gold/15 text-gold border-gold/40' : 'bg-raised text-dim border-edge');
+  const tierCls = (t: string) => (t === 'T1' ? 'bg-gold/15 text-gold border-gold/40' : 'mc-chip-inset text-dim border-edge');
   return (
-    <main lang={c.htmlLang} className="min-h-screen bg-canvas text-ink">
+    <main lang={c.htmlLang} className="min-h-screen mc-soft text-ink">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <div className="max-w-4xl mx-auto px-gutter py-8 sm:py-12 mc-enter">
         <header className="flex items-center justify-between gap-4 mb-8">
@@ -88,8 +88,8 @@ export default function SourcesPage({ lang }: { lang: Lang }) {
 
         <div className="mt-6 flex flex-wrap gap-2 text-[12px]">
           <a href={PDF[lang]} className="px-3 py-1.5 rounded-md bg-brand text-on-brand font-semibold hover:brightness-110">{c.download}</a>
-          <a href={PATH[other]} className="px-3 py-1.5 rounded-md border border-edge text-dim hover:text-ink">{c.downloadOther}</a>
-          <a href="/standard/MemeCMO_AI_Visibility_Measurement_Standard_v1.0.pdf" className="px-3 py-1.5 rounded-md border border-edge text-dim hover:text-ink">{c.standard}</a>
+          <a href={PATH[other]} className="px-3 py-1.5 rounded-md mc-btn-soft text-dim hover:text-ink">{c.downloadOther}</a>
+          <a href="/standard/MemeCMO_AI_Visibility_Measurement_Standard_v1.0.pdf" className="px-3 py-1.5 rounded-md mc-btn-soft text-dim hover:text-ink">{c.standard}</a>
         </div>
 
         <section className="mt-10">

@@ -71,7 +71,7 @@ const domainOf = (u: string) => { try { return new URL(u).hostname.replace(/^www
 const pct = (n: number, d: number) => (d ? Math.round((100 * n) / d) : 0);
 
 function Tip({ text, children }: { text: string; children: ReactNode }) {
-  return <span className="inline-flex items-center gap-1">{children}<span title={text} className="cursor-help text-[10px] text-faint border border-edge rounded-full w-3.5 h-3.5 inline-flex items-center justify-center">?</span></span>;
+  return <span className="inline-flex items-center gap-1">{children}<span title={text} className="cursor-help text-[10px] text-faint mc-chip-inset rounded-full w-3.5 h-3.5 inline-flex items-center justify-center">?</span></span>;
 }
 function Title({ children, tip }: { children: ReactNode; tip?: string }) {
   return <div className="text-[10px] uppercase tracking-widest text-faint mb-1.5">{tip ? <Tip text={tip}>{children}</Tip> : children}</div>;
@@ -79,8 +79,8 @@ function Title({ children, tip }: { children: ReactNode; tip?: string }) {
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
-      <div className="bg-surface rounded-xl border border-edge shadow-xl max-w-4xl w-full max-h-[85vh] overflow-auto p-4" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-3"><div className="text-sm font-semibold text-ink">{title}</div><button onClick={onClose} className="text-[11px] px-2 py-0.5 rounded border border-edge text-dim">✕</button></div>
+      <div className="bg-surface rounded-xl mc-chip-inset shadow-xl max-w-4xl w-full max-h-[85vh] overflow-auto p-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3"><div className="text-sm font-semibold text-ink">{title}</div><button onClick={onClose} className="text-[11px] px-2 py-0.5 rounded mc-chip-inset text-dim">✕</button></div>
         {children}
       </div>
     </div>
@@ -149,7 +149,7 @@ function SovBar({ bench, totalMentions, lang, t }: { bench: Bench[]; totalMentio
     <div>
       <Title tip={TIP.sov[lang]}>{t('Share of Voice')}</Title>
       <div className="mc-card mc-card-sm p-3">
-        <div className="flex h-4 w-full rounded-full overflow-hidden bg-raised">
+        <div className="flex h-4 w-full mc-track">
           {segs.map((s, i) => <div key={i} title={`${s.name} · ${pct(s.v, totalMentions)}% · ${s.v}/${totalMentions}`} style={{ width: `${totalMentions ? (100 * s.v) / totalMentions : 0}%`, background: s.brand ? 'var(--gold)' : s.name === t('Others') ? 'var(--faint)' : catOf(segs.slice(0, i).filter((x) => !x.brand).length) }} />)}
         </div>
         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
@@ -186,7 +186,7 @@ function PresenceTrend({ history, brandName, bench, engineView, lang, t }: { his
       <Title tip={TIP.trend[lang]}>{t('Presence over time')}{engineView ? ` · ${engineView}` : ''} · {pts.length} {t('scans')}</Title>
       <div className="mc-card mc-card-sm p-3">
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full block" style={{ height: 'auto' }}>
-          {[0, 25, 50, 75, 100].map((g) => <g key={g}><line x1={L} x2={W - R} y1={y(g)} y2={y(g)} stroke="var(--raised)" strokeWidth={1} /><text x={L - 4} y={y(g) + 3} textAnchor="end" fill="var(--faint)" style={{ fontSize: 9 }}>{g}%</text></g>)}
+          {[0, 25, 50, 75, 100].map((g) => <g key={g}><line x1={L} x2={W - R} y1={y(g)} y2={y(g)} stroke="var(--edge)" strokeWidth={1} /><text x={L - 4} y={y(g) + 3} textAnchor="end" fill="var(--faint)" style={{ fontSize: 9 }}>{g}%</text></g>)}
           {compSeries.map((vals, i) => <path key={i} d={path(vals)} fill="none" stroke={catOf(i)} strokeOpacity={0.9} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />)}
           {pts.length > 1 && <path d={path(brandSeries)} fill="none" stroke="var(--gold)" strokeWidth={2.25} strokeLinejoin="round" strokeLinecap="round" />}
           {compSeries.map((vals, ci) => vals.map((v, i) => v == null ? null : <circle key={`${ci}-${i}`} cx={x(i)} cy={y(v)} r={2.5} fill={catOf(ci)}><title>{`${date(pts[i].ts)} · ${comps[ci]} · ${v}%`}</title></circle>))}
@@ -370,7 +370,7 @@ function PresenceByPrompt({ samples, engines, brandName, bench, engineView, lang
           <td className="px-2 py-1.5 text-faint whitespace-nowrap">{r.stage}{r.intent === 'high_intent' ? ' · ★' : ''}</td>
           {r.cells.map((c: any, i: number) => (
             <td key={i} className="px-1 py-1.5 text-center">
-              {c.s ? <button onClick={() => setOpen({ prompt: r.prompt, col: cols[i], s: c.s })} className={`w-6 h-6 rounded text-[13px] leading-none ${c.present ? 'text-gold hover:bg-gold/15' : 'text-faint hover:bg-raised'}`} title={t('Read the answer')}>{c.mark}</button> : <span className="text-faint/40">·</span>}
+              {c.s ? <button onClick={() => setOpen({ prompt: r.prompt, col: cols[i], s: c.s })} className={`w-6 h-6 rounded text-[13px] leading-none ${c.present ? 'text-gold hover:bg-gold/15' : 'text-faint hover:brightness-95'}`} title={t('Read the answer')}>{c.mark}</button> : <span className="text-faint/40">·</span>}
             </td>))}
           <td className="px-2 py-1.5 text-right tabular-nums text-dim">{r.present}/{r.n}</td>
         </tr>))}</tbody>
@@ -394,7 +394,7 @@ function PresenceByPrompt({ samples, engines, brandName, bench, engineView, lang
               <span>{t('Sentiment')}: <b className="text-ink">{open.s.sentiment}</b></span>
               {(open.s.competitorsPresent ?? []).length > 0 && <span>{t('Competitors named')}: <b className="text-ink">{open.s.competitorsPresent.join(', ')}</b></span>}
             </div>
-            <div className="rounded-md border border-edge bg-raised p-3 whitespace-pre-wrap leading-relaxed text-ink">{open.s.snippet}{open.s.snippet?.length >= 400 ? ' …' : ''}</div>
+            <div className="rounded-md mc-chip-inset mc-chip-inset p-3 whitespace-pre-wrap leading-relaxed text-ink">{open.s.snippet}{open.s.snippet?.length >= 400 ? ' …' : ''}</div>
             <div className="text-[10px] text-faint">{t('First 400 characters of the answer as recorded at scan time.')}</div>
             {(open.s.citations ?? []).length > 0 && (
               <div>
