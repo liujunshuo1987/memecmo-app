@@ -89,7 +89,7 @@ export default function SourcesPage({ lang }: { lang: Lang }) {
         <div className="mt-6 flex flex-wrap gap-2 text-[12px]">
           <a href={PDF[lang]} className="px-3 py-1.5 rounded-md bg-brand text-on-brand font-semibold hover:brightness-110">{c.download}</a>
           <a href={PATH[other]} className="px-3 py-1.5 rounded-md mc-btn-soft text-dim hover:text-ink">{c.downloadOther}</a>
-          <a href="/standard/MemeCMO_AI_Visibility_Measurement_Standard_v1.0.pdf" className="px-3 py-1.5 rounded-md mc-btn-soft text-dim hover:text-ink">{c.standard}</a>
+          <a href="/standard/MemeCMO_AI_Visibility_Measurement_Standard_v1.1.pdf" className="px-3 py-1.5 rounded-md mc-btn-soft text-dim hover:text-ink">{c.standard}</a>
         </div>
 
         <section className="mt-10">

@@ -1,5 +1,5 @@
 // Copy for the public "Sources AI engines cite" pages and PDFs (en / vi).
-// Wording follows the Measurement Standard v1.0: a citation is the engine
+// Wording follows the Measurement Standard v1.1: a citation is the engine
 // choosing a page as a source; counts are answers, never URL tallies.
 
 export type Lang = 'en' | 'vi';
@@ -40,7 +40,7 @@ export function copyFor(lang: Lang, d: { month: string; window: { days: number; 
       'Đơn vị là câu trả lời: một câu trả lời trích dẫn ba trang của cùng một website chỉ tính một. Tên miền phụ được gộp về tên miền chính (e.vnexpress.net → vnexpress.net).',
       `Chỉ công bố nguồn xuất hiện ở ≥${d.rules.minProjects} bộ câu hỏi (quy tắc "mỗi số liệu công bố cần ≥5 khách hàng" trong thỏa thuận dữ liệu của MemeCMO). ${d.counts.belowProjects} nguồn đặc thù ngành và ${d.counts.brandOwned} website thuộc thương hiệu bị loại.`,
       'Đây không phải lưu lượng truy cập hay điểm uy tín. Một trích dẫn nghĩa là engine đã chọn trang đó làm nguồn cho câu trả lời — đúng vị trí mà một thương hiệu cần hiện diện.',
-      'Phương pháp theo Tiêu chuẩn đo lường mức hiện diện trên AI của MemeCMO v1.0 (điều 9, chỉ mục nguồn). Dữ liệu thuộc lớp ③ (chỉ mục trích dẫn) — MemeCMO sở hữu; không có dữ liệu riêng của khách hàng nào trong bảng này.',
+      'Phương pháp theo Tiêu chuẩn đo lường mức hiện diện trên AI của MemeCMO v1.1 (điều 9–10, chỉ mục nguồn và bảng nguồn công khai). Dữ liệu thuộc lớp ③ (chỉ mục trích dẫn) — MemeCMO sở hữu; không có dữ liệu riêng của khách hàng nào trong bảng này.',
     ],
     useTitle: 'Dùng bảng này thế nào',
     use: [
@@ -55,8 +55,8 @@ export function copyFor(lang: Lang, d: { month: string; window: { days: number; 
       { q: 'Bao lâu cập nhật một lần?', a: 'Hằng tháng, với kỳ đo trượt 60 ngày, cùng phương pháp và cùng ngưỡng. Thay đổi phương pháp sẽ được ghi rõ theo điều 11 của Tiêu chuẩn.' },
       { q: 'Tôi có thể dùng lại dữ liệu này không?', a: 'Có. Bảng được phát hành theo giấy phép CC BY 4.0: dùng, trích dẫn, xuất bản lại tùy ý, chỉ cần ghi nguồn "MemeCMO — Sources AI engines cite in Vietnam" kèm đường dẫn.' },
     ],
-    download: 'Tải PDF', downloadOther: 'English version', standard: 'Tiêu chuẩn đo lường v1.0 (PDF)',
-    footer: `Phương pháp: Tiêu chuẩn đo lường mức hiện diện trên AI của MemeCMO v1.0 · Dữ liệu lớp ③ · Giấy phép CC BY 4.0 · © ${new Date().getUTCFullYear()} MemeCMO Tech Limited`,
+    download: 'Tải PDF', downloadOther: 'English version', standard: 'Tiêu chuẩn đo lường v1.1 (PDF)',
+    footer: `Phương pháp: Tiêu chuẩn đo lường mức hiện diện trên AI của MemeCMO v1.1 · Dữ liệu lớp ③ · Giấy phép CC BY 4.0 · © ${new Date().getUTCFullYear()} MemeCMO Tech Limited`,
     updated: 'Cập nhật',
   };
   return {
@@ -82,7 +82,7 @@ export function copyFor(lang: Lang, d: { month: string; window: { days: number; 
       'The unit is the answer: an answer citing three pages of one site counts once. Subdomains are merged into the registrable domain (e.vnexpress.net → vnexpress.net).',
       `Only sources cited across ≥${d.rules.minProjects} panels are published (MemeCMO's own "≥5 clients per published figure" rule). ${d.counts.belowProjects} industry-specific sources and ${d.counts.brandOwned} brand-owned sites were excluded.`,
       'This is not traffic and not an authority score. A citation means the engine chose that page as a source for its answer — which is exactly where a brand needs to be present.',
-      'Method per the MemeCMO AI Visibility Measurement Standard v1.0 (clause 9, source index). Data class ③ (citation index), owned by MemeCMO; no client-specific data is in this table.',
+      'Method per the MemeCMO AI Visibility Measurement Standard v1.1 (clauses 9–10, source index and public source list). Data class ③ (citation index), owned by MemeCMO; no client-specific data is in this table.',
     ],
     useTitle: 'How to use it',
     use: [
@@ -97,8 +97,8 @@ export function copyFor(lang: Lang, d: { month: string; window: { days: number; 
       { q: 'How often is it updated?', a: 'Monthly, on a rolling 60-day window, with the same method and thresholds. Any change of method is declared per clause 11 of the Standard.' },
       { q: 'Can I reuse the data?', a: 'Yes. The table is released under CC BY 4.0: use, quote and republish freely with attribution to "MemeCMO — Sources AI engines cite in Vietnam" and a link.' },
     ],
-    download: 'Download PDF', downloadOther: 'Bản tiếng Việt', standard: 'Measurement Standard v1.0 (PDF)',
-    footer: `Method: MemeCMO AI Visibility Measurement Standard v1.0 · Data class ③ · CC BY 4.0 · © ${new Date().getUTCFullYear()} MemeCMO Tech Limited`,
+    download: 'Download PDF', downloadOther: 'Bản tiếng Việt', standard: 'Measurement Standard v1.1 (PDF)',
+    footer: `Method: MemeCMO AI Visibility Measurement Standard v1.1 · Data class ③ · CC BY 4.0 · © ${new Date().getUTCFullYear()} MemeCMO Tech Limited`,
     updated: 'Updated',
   };
 }
