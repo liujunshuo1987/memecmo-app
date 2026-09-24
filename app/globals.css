@@ -112,6 +112,12 @@
   --ease-signature: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-press: cubic-bezier(0.4, 0, 0.2, 1);
   --stagger: 70ms;
+  /* soft UI (full neumorphism, dashboard): same-tone surfaces lifted by light and shade */
+  --shadow-raise-lg: 8px 8px 20px rgba(58,30,34,0.14), -8px -8px 20px rgba(255,255,255,0.95);
+  --shadow-raise-btn: 4px 4px 10px rgba(58,30,34,0.12), -4px -4px 10px rgba(255,255,255,0.9);
+  --shadow-inset-sm: inset 2px 2px 5px rgba(58,30,34,0.12), inset -2px -2px 5px rgba(255,255,255,0.9);
+  --shadow-well: inset 4px 4px 9px rgba(58,30,34,0.12), inset -4px -4px 9px rgba(255,255,255,0.9);
+  --shadow-brand: 5px 5px 12px rgba(199,107,122,0.35), -4px -4px 10px rgba(255,255,255,0.8);
   /* categorical palette — distinct hues inside the VI; the brand's own series is always gold */
   --cat-1: #C76B7A;  /* rose */
   --cat-2: #4F8A8B;  /* verdigris */
@@ -143,6 +149,17 @@
 .mc-card-hover:hover { box-shadow: var(--shadow-raise); transform: translateY(-1px); }
 .mc-card-accent { background: color-mix(in srgb, var(--brand) 8%, var(--surface)); border-color: color-mix(in srgb, var(--brand) 40%, transparent); }
 .mc-well { background: var(--raised); border-radius: var(--r-md); box-shadow: var(--shadow-inset); }
+
+/* Soft UI set — the dashboard's full neumorphism: ground = raised, every
+   element the same tone, depth from the dual shadow only (no borders). */
+.mc-soft { background: var(--raised); }
+.mc-card-soft { background: var(--raised); border: 0; border-radius: var(--r-lg); box-shadow: var(--shadow-raise-lg); transition: transform var(--dur-base) var(--ease-signature), box-shadow var(--dur-base) var(--ease-signature); }
+.mc-card-soft:hover { transform: translateY(-1px); }
+.mc-btn-soft { background: var(--raised); border: 0; border-radius: var(--r-md); box-shadow: var(--shadow-raise-btn); }
+.mc-btn-brand { background: var(--brand); color: var(--on-brand); border: 0; border-radius: var(--r-md); box-shadow: var(--shadow-brand); }
+.mc-chip-inset { background: var(--raised); border: 0; box-shadow: var(--shadow-inset-sm); }
+.mc-well-round { background: var(--raised); border-radius: var(--r-pill); box-shadow: var(--shadow-well); }
+.mc-track { background: var(--raised); border-radius: var(--r-pill); box-shadow: var(--shadow-inset-sm); overflow: hidden; }
 
 /* Press signature — every button, every layout: a short settle-in, an inner
    shadow, a light bloom from the centre. */

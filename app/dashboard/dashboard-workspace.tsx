@@ -129,8 +129,8 @@ export default function DashboardClient({ groups, latest = {}, userEmail, isRoot
   };
 
   return (
-    <div className="min-h-screen bg-canvas text-ink">
-      <header className="border-b border-edge px-6 py-3 flex items-center justify-between sticky top-0 bg-canvas/95 backdrop-blur z-10">
+    <div className="min-h-screen mc-soft text-ink">
+      <header className="mx-6 mt-3 px-5 py-3 flex items-center justify-between sticky top-3 z-10 rounded-2xl mc-chip-inset">
         <a href="https://memecmo.ai" className="text-xs tracking-[0.2em] text-dim uppercase hover:text-ink">
           MemeCMO.ai
         </a>
@@ -190,10 +190,10 @@ export default function DashboardClient({ groups, latest = {}, userEmail, isRoot
             const bill = billing[org.id];
             return (
               <section key={org.id} className="mc-enter">
-                <div className="mc-card mc-card-sm px-4 py-3 mb-3 flex items-center justify-between gap-3 flex-wrap">
+                <div className="mc-card-soft px-4 py-3 mb-4 flex items-center justify-between gap-3 flex-wrap">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h2 className="text-sm font-semibold">{org.name}</h2>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-raised border border-edge text-dim uppercase tracking-wider">
+                    <span className="text-[10px] px-2.5 py-1 rounded-full mc-chip-inset text-dim uppercase tracking-wider">
                       {ORG_TYPE_LABEL[org.type] ?? org.type}
                     </span>
                     {!active && (
@@ -233,14 +233,14 @@ export default function DashboardClient({ groups, latest = {}, userEmail, isRoot
                     <a
                       href={`/workspace/${org.slug}/rollup`}
                       title="全部项目最新扫描汇总一页 · portfolio rollup"
-                      className="text-xs px-3 py-1.5 rounded-md border border-edge text-dim hover:text-ink hover:border-edge-strong transition"
+                      className="text-xs px-3 py-1.5 rounded-lg mc-btn-soft text-dim hover:text-ink transition"
                     >
                       汇总 Rollup
                     </a>
                     {canInvite && (
                       <button
                         onClick={() => setInviteOrg(org)}
-                        className="text-xs px-3 py-1.5 rounded-md border border-edge text-dim hover:text-ink hover:border-edge-strong transition"
+                        className="text-xs px-3 py-1.5 rounded-lg mc-btn-soft text-dim hover:text-ink transition"
                       >
                         Invite
                       </button>
@@ -248,7 +248,7 @@ export default function DashboardClient({ groups, latest = {}, userEmail, isRoot
                     {canAddClient && (
                       <button
                         onClick={() => setNewClientFor(org)}
-                        className="text-xs px-3 py-1.5 rounded-md border border-brand/50 text-brand hover:bg-brand-soft transition"
+                        className="text-xs px-3 py-1.5 rounded-lg mc-btn-soft text-brand font-semibold transition"
                       >
                         + New client
                       </button>
@@ -256,7 +256,7 @@ export default function DashboardClient({ groups, latest = {}, userEmail, isRoot
                     {active && (
                       <button
                         onClick={() => setModalOrg(org)}
-                        className="text-xs px-3 py-1.5 rounded-md bg-brand text-on-brand hover:brightness-110 transition"
+                        className="text-xs px-3 py-1.5 rounded-lg mc-btn-brand font-semibold hover:brightness-110 transition"
                       >
                         + New project
                       </button>
@@ -265,33 +265,32 @@ export default function DashboardClient({ groups, latest = {}, userEmail, isRoot
                 </div>
 
                 {projects.length === 0 ? (
-                  <div className="text-xs text-faint italic border border-edge rounded-lg p-4">
+                  <div className="text-xs text-dim italic rounded-xl p-4 mc-chip-inset">
                     No projects yet{active ? ' — create one to get started.' : '.'}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {[...projects].sort((a, b) => (latest[b.id]?.at ?? '').localeCompare(latest[a.id]?.at ?? '')).map((p, i) => { const l = latest[p.id]; return (
                       <a
                         key={p.id}
                         href={`/workspace/${org.slug}/${p.slug}`}
-                        className="group mc-card mc-card-sm mc-card-hover mc-enter p-4 hover:border-brand/50 transition"
+                        className="group mc-card-soft mc-enter p-4 transition"
                         style={{ ['--i' as any]: i }}
                       >
-                        <div className="flex items-start gap-2 mb-2">
-                          <span className="text-lg leading-none mt-0.5">{FLAG[p.target_country] || '🌐'}</span>
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-lg leading-none">{FLAG[p.target_country] || '🌐'}</span>
                           <span className="text-sm font-medium truncate group-hover:text-ink flex-1 min-w-0">{p.brand_name}</span>
-                          {l && (
-                            <span className="shrink-0 text-right leading-none" title={`AI Mindset Index · last scan ${l.at}`}>
-                              <span className="text-[17px] font-semibold text-gold tabular-nums">{l.aigvr}</span>
-                              <span className="text-[9px] text-faint">/100</span>
-                            </span>
-                          )}
+                          <span className="shrink-0 w-[54px] h-[54px] mc-well-round flex flex-col items-center justify-center leading-none" title={l ? `AI Mindset Index · last scan ${l.at}` : 'no scan yet'}>
+                            {l ? (<><span className="text-[18px] font-semibold text-gold tabular-nums">{l.aigvr}</span><span className="text-[8px] text-faint tracking-wider">/100</span></>) : <span className="text-[11px] text-dim">—</span>}
+                          </span>
                         </div>
-                        {l ? (
-                          <div className="text-[11px] text-dim tabular-nums">{l.presence != null ? `${l.presence}% presence · ` : ''}<span className="text-faint">scan {l.at}</span></div>
-                        ) : (
-                          <div className="text-[11px] text-faint">no scan yet</div>
-                        )}
+                        <div className="flex flex-col gap-1 mb-2">
+                          <div className="flex justify-between text-[11px] text-dim tabular-nums">
+                            <span>{l && l.presence != null ? `Presence ${l.presence}%` : l ? 'Presence —' : 'No scan yet'}</span>
+                            <span>{l ? `scan ${l.at}` : 'run Discovery'}</span>
+                          </div>
+                          <div className="h-2 mc-track"><div className="h-full rounded-full bg-gold" style={{ width: `${l && l.presence != null ? Math.max(0, Math.min(100, l.presence)) : 0}%` }} /></div>
+                        </div>
                         <div className="text-[11px] text-faint">
                           {p.target_country} · {p.target_language || 'auto'}
                         </div>
