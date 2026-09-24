@@ -34,6 +34,7 @@ interface PlanRow {
 }
 interface Props {
   groups: Group[];
+  latest?: Record<string, { aigvr: number | null; presence: number | null; at: string }>;
   userEmail: string;
   isRootAdmin: boolean;
   billing: Record<string, Billing>;
@@ -90,7 +91,7 @@ function slugify(s: string): string {
     .slice(0, 40);
 }
 
-export default function DashboardClient({ groups, userEmail, isRootAdmin, billing, plansCatalog, stripeReady }: Props) {
+export default function DashboardClient({ groups, latest = {}, userEmail, isRootAdmin, billing, plansCatalog, stripeReady }: Props) {
   const router = useRouter();
   const [modalOrg, setModalOrg] = useState<Organization | null>(null);
   const [newClientFor, setNewClientFor] = useState<Organization | null>(null);
@@ -145,7 +146,7 @@ export default function DashboardClient({ groups, userEmail, isRootAdmin, billin
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-8">
-        <h1 className="text-xl font-semibold mb-1">Your GEO workspaces</h1>
+        <h1 className="text-xl font-semibold mb-1 mc-enter">Your GEO workspaces</h1>
         <p className="text-sm text-faint mb-8">
           Each project is one brand × one market. Open a project to run Discovery, Monitor and Report.
         </p>
@@ -188,8 +189,8 @@ export default function DashboardClient({ groups, userEmail, isRootAdmin, billin
             const canInvite = role === 'admin' && active;
             const bill = billing[org.id];
             return (
-              <section key={org.id}>
-                <div className="flex items-center justify-between mb-3">
+              <section key={org.id} className="mc-enter">
+                <div className="mc-card mc-card-sm px-4 py-3 mb-3 flex items-center justify-between gap-3 flex-wrap">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h2 className="text-sm font-semibold">{org.name}</h2>
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-raised border border-edge text-dim uppercase tracking-wider">
@@ -269,16 +270,28 @@ export default function DashboardClient({ groups, userEmail, isRootAdmin, billin
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {projects.map((p) => (
+                    {[...projects].sort((a, b) => (latest[b.id]?.at ?? '').localeCompare(latest[a.id]?.at ?? '')).map((p, i) => { const l = latest[p.id]; return (
                       <a
                         key={p.id}
                         href={`/workspace/${org.slug}/${p.slug}`}
-                        className="group rounded-lg border border-edge bg-surface p-4 hover:border-brand/50 hover:bg-raised transition"
+                        className="group mc-card mc-card-sm mc-card-hover mc-enter p-4 hover:border-brand/50 transition"
+                        style={{ ['--i' as any]: i }}
                       >
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-lg leading-none">{FLAG[p.target_country] || '🌐'}</span>
-                          <span className="text-sm font-medium truncate group-hover:text-ink">{p.brand_name}</span>
+                        <div className="flex items-start gap-2 mb-2">
+                          <span className="text-lg leading-none mt-0.5">{FLAG[p.target_country] || '🌐'}</span>
+                          <span className="text-sm font-medium truncate group-hover:text-ink flex-1 min-w-0">{p.brand_name}</span>
+                          {l && (
+                            <span className="shrink-0 text-right leading-none" title={`AI Mindset Index · last scan ${l.at}`}>
+                              <span className="text-[17px] font-semibold text-gold tabular-nums">{l.aigvr}</span>
+                              <span className="text-[9px] text-faint">/100</span>
+                            </span>
+                          )}
                         </div>
+                        {l ? (
+                          <div className="text-[11px] text-dim tabular-nums">{l.presence != null ? `${l.presence}% presence · ` : ''}<span className="text-faint">scan {l.at}</span></div>
+                        ) : (
+                          <div className="text-[11px] text-faint">no scan yet</div>
+                        )}
                         <div className="text-[11px] text-faint">
                           {p.target_country} · {p.target_language || 'auto'}
                         </div>
@@ -291,7 +304,7 @@ export default function DashboardClient({ groups, userEmail, isRootAdmin, billin
                         )}
                         {p.industry && <div className="text-[11px] text-faint truncate mt-1">{p.industry}</div>}
                       </a>
-                    ))}
+                    ); })}
                   </div>
                 )}
               </section>
@@ -387,7 +400,7 @@ function BillingModal({ org, bill, plans, stripeReady, onClose }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" onClick={onClose}>
-      <div className="w-full max-w-2xl rounded-xl border border-edge bg-surface p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-2xl mc-card p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
         <div>
           <h3 className="text-sm font-semibold text-ink">套餐与账单 · Plan &amp; billing</h3>
           <p className="text-xs text-faint">{org.name} · 当前 {bill?.planName ?? '—'}({bill?.status ?? '—'})· 本期已用 {bill?.used ?? 0}/{bill?.quota ?? 0} 次扫描</p>
@@ -524,7 +537,7 @@ function InviteModal({ org, onClose }: { org: Organization; onClose: () => void 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-xl border border-edge bg-surface p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-md mc-card p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
         <div>
           <h3 className="text-sm font-semibold text-ink">Invite a member</h3>
           <p className="text-xs text-faint">to {org.name} · they sign in with this email to join</p>
@@ -600,7 +613,7 @@ function NewClientModal({ parent, onClose, onCreated }: { parent: Organization; 
   };
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-xl border border-edge bg-surface p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-md mc-card p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
         <div>
           <h3 className="text-sm font-semibold text-ink">New client organization</h3>
           <p className="text-xs text-faint">under {parent.name} · needs MemeCMO approval before it goes live</p>
@@ -678,7 +691,7 @@ function NewProjectModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" onClick={onClose}>
       <div
-        className="w-full max-w-md rounded-xl border border-edge bg-surface p-6 space-y-4"
+        className="w-full max-w-md mc-card p-6 space-y-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div>

@@ -85,6 +85,82 @@
   --color-edge-rose: var(--edge-rose);
 }
 
+/* ── Semantic scales & the brand's motion signature (2026-09-23) ─────────
+   Rule: components use these tokens (or the utilities below), never raw
+   numbers. Spacing / type / radius / elevation / motion / chart palette. ── */
+:root {
+  /* spacing — 4px base */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px;
+  --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-12: 48px; --space-16: 64px;
+  --gutter: var(--space-4);           /* phone side gutter */
+  --measure: 68ch;                    /* max prose width */
+  /* type */
+  --text-2xs: 10px; --text-xs: 11px; --text-sm: 12.5px; --text-base: 14px; --text-md: 15px;
+  --text-lg: 18px; --text-xl: 22px; --text-2xl: 28px; --text-3xl: 36px; --text-display: clamp(34px, 5vw, 56px);
+  --leading-tight: 1.15; --leading-snug: 1.35; --leading-normal: 1.55; --leading-relaxed: 1.7;
+  --tracking-label: 0.12em; --tracking-wordmark: 0.2em;
+  /* radius */
+  --r-xs: 6px; --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 22px; --r-pill: 999px;
+  /* elevation — warm neumorphism: light from top-left, ink-tinted shade */
+  --shadow-raise-sm: 3px 3px 8px rgba(58,30,34,0.07), -3px -3px 8px rgba(255,255,255,0.80);
+  --shadow-raise: 6px 6px 16px rgba(58,30,34,0.09), -6px -6px 16px rgba(255,255,255,0.85);
+  --shadow-float: 0 14px 40px rgba(58,30,34,0.12);
+  --shadow-inset: inset 3px 3px 8px rgba(58,30,34,0.08), inset -3px -3px 8px rgba(255,255,255,0.75);
+  --shadow-press: inset 2px 2px 6px rgba(58,30,34,0.18), inset -1px -1px 4px rgba(255,255,255,0.45);
+  /* motion signature */
+  --dur-fast: 120ms; --dur-base: 220ms; --dur-slow: 420ms; --dur-breath: 1100ms;
+  --ease-signature: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-press: cubic-bezier(0.4, 0, 0.2, 1);
+  --stagger: 70ms;
+  /* categorical palette — distinct hues inside the VI; the brand's own series is always gold */
+  --cat-1: #C76B7A;  /* rose */
+  --cat-2: #4F8A8B;  /* verdigris */
+  --cat-3: #8E6C9E;  /* plum */
+  --cat-4: #5B7FA6;  /* slate */
+  --cat-5: #7E8F3A;  /* olive */
+  --cat-6: #A85C3B;  /* terracotta */
+}
+@theme inline {
+  --color-cat-1: var(--cat-1); --color-cat-2: var(--cat-2); --color-cat-3: var(--cat-3);
+  --color-cat-4: var(--cat-4); --color-cat-5: var(--cat-5); --color-cat-6: var(--cat-6);
+  --radius-xs: var(--r-xs); --radius-sm: var(--r-sm); --radius-md: var(--r-md); --radius-lg: var(--r-lg); --radius-xl: var(--r-xl);
+  --shadow-raise-sm: var(--shadow-raise-sm); --shadow-raise: var(--shadow-raise); --shadow-float: var(--shadow-float);
+  --shadow-inset: var(--shadow-inset); --shadow-press: var(--shadow-press);
+  --spacing-gutter: var(--gutter);
+}
+
+/* Breathing entrance — the page inhales into place. Stagger with --i. */
+@keyframes mc-breathe {
+  0%   { opacity: 0; transform: translateY(10px) scale(0.985); }
+  55%  { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.mc-enter { animation: mc-breathe var(--dur-breath) var(--ease-signature) both; animation-delay: calc(var(--i, 0) * var(--stagger)); }
+
+/* Cards — soft-raised on the canvas; insets for wells and inputs. */
+.mc-card { background: var(--surface); border: 1px solid var(--edge); border-radius: var(--r-lg); box-shadow: var(--shadow-raise-sm); transition: box-shadow var(--dur-base) var(--ease-signature), transform var(--dur-base) var(--ease-signature); }
+.mc-card-sm { border-radius: var(--r-md); }
+.mc-card-hover:hover { box-shadow: var(--shadow-raise); transform: translateY(-1px); }
+.mc-card-accent { background: color-mix(in srgb, var(--brand) 8%, var(--surface)); border-color: color-mix(in srgb, var(--brand) 40%, transparent); }
+.mc-well { background: var(--raised); border-radius: var(--r-md); box-shadow: var(--shadow-inset); }
+
+/* Press signature — every button, every layout: a short settle-in, an inner
+   shadow, a light bloom from the centre. */
+button, [role="button"], .mc-btn {
+  transition: transform var(--dur-fast) var(--ease-press), box-shadow var(--dur-fast) var(--ease-press), filter var(--dur-fast) var(--ease-press), background-color var(--dur-fast) var(--ease-press), color var(--dur-fast) var(--ease-press), border-color var(--dur-fast) var(--ease-press);
+}
+button:not(:disabled):active, [role="button"]:active, .mc-btn:active { transform: scale(0.97); box-shadow: var(--shadow-press); }
+button:focus-visible, [role="button"]:focus-visible, .mc-btn:focus-visible, a:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-sm); }
+.mc-bloom { position: relative; isolation: isolate; }
+.mc-bloom::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.35), transparent 62%); opacity: 0; transition: opacity var(--dur-base) var(--ease-signature); pointer-events: none; }
+.mc-bloom:active::after { opacity: 1; transition-duration: 0ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mc-enter { animation: none; }
+  button, [role="button"], .mc-btn, .mc-card { transition: none; }
+  button:not(:disabled):active, .mc-btn:active { transform: none; }
+}
+
 body {
   background: var(--canvas);
   color: var(--ink);

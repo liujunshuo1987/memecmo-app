@@ -29,6 +29,29 @@ export default async function DashboardPage() {
     orgs.map(async (org) => ({ org, role: roleByOrg[org.id] ?? null, projects: await listProjectsForOrg(org.id) })),
   );
 
+  // Latest comparable scan per project (score, presence, date) for the cards —
+  // one bounded query over all the user's projects, newest first, tiny payload
+  // (json path fields only), first row per project wins.
+  const projectIds = groups.flatMap((g) => g.projects.map((p) => p.id));
+  const latest: Record<string, { aigvr: number | null; presence: number | null; at: string }> = {};
+  if (projectIds.length) {
+    const { data: runs } = await supabase
+      .from('agent_runs')
+      .select('project_id, created_at, s1:output->>aigvrScore, s2:output->scorecard->>aigvrScore, p1:output->dimensions->>presence, p2:output->scorecard->dimensions->>presence')
+      .in('project_id', projectIds)
+      .in('agent_id', ['monitor', 'full_scan'])
+      .eq('status', 'completed')
+      .neq('trigger_method', 'diagnostic')
+      .order('created_at', { ascending: false })
+      .limit(Math.min(1000, projectIds.length * 8));
+    for (const r of (runs ?? []) as any[]) {
+      if (latest[r.project_id]) continue;
+      const score = r.s1 ?? r.s2; const pres = r.p1 ?? r.p2;
+      if (score == null) continue;
+      latest[r.project_id] = { aigvr: Math.round(Number(score)), presence: pres == null ? null : Math.round(Number(pres)), at: String(r.created_at).slice(0, 10) };
+    }
+  }
+
   // ③ Commercial: subscription + period usage per end-client org (RLS-scoped).
   const endClientIds = orgs.filter((o) => o.type === 'end_client').map((o) => o.id);
   const billing: Record<string, { planId: string; planName: string; quota: number; used: number; status: string; hasStripeSub: boolean }> = {};
@@ -67,6 +90,7 @@ export default async function DashboardPage() {
   return (
     <DashboardClient
       groups={groups}
+      latest={latest}
       userEmail={user.email ?? ''}
       isRootAdmin={isRootAdmin}
       billing={billing}

@@ -132,7 +132,7 @@ export function ActionsPanel({ projectId, lang, t }: { projectId?: string; lang:
   const [open, setOpen] = useState(false);
   if (!projectId) return null;
   return (
-    <div className="rounded-lg border border-edge bg-surface p-3 space-y-2">
+    <div className="mc-card mc-card-sm p-3 space-y-2">
       <div className="flex items-center justify-between">
         <div className="text-[10px] uppercase tracking-widest text-faint">{t('Actions')}</div>
         {!open && <button onClick={() => setOpen(true)} className="text-[10px] text-faint hover:text-brand">+ {t('Log an action')}</button>}

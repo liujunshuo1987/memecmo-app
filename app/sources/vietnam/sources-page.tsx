@@ -40,7 +40,7 @@ export default function SourcesPage({ lang }: { lang: Lang }) {
   return (
     <main lang={c.htmlLang} className="min-h-screen bg-canvas text-ink">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <div className="max-w-4xl mx-auto px-4 py-8 sm:py-12">
+      <div className="max-w-4xl mx-auto px-gutter py-8 sm:py-12 mc-enter">
         <header className="flex items-center justify-between gap-4 mb-8">
           <a href="/" className="text-xs tracking-[0.2em] uppercase text-faint hover:text-dim">MemeCMO.ai</a>
           <nav className="flex items-center gap-2 text-[11px]">
@@ -56,11 +56,11 @@ export default function SourcesPage({ lang }: { lang: Lang }) {
 
         <div className="mt-6 grid grid-cols-2 sm:grid-cols-5 gap-2">
           {c.kpis.map((k) => (
-            <div key={k.label} className="rounded-lg border border-edge bg-surface px-3 py-2"><div className="text-[10px] uppercase tracking-wider text-faint">{k.label}</div><div className="text-[15px] font-semibold tabular-nums mt-0.5 break-words">{k.value}</div></div>
+            <div key={k.label} className="mc-card mc-card-sm px-3 py-2"><div className="text-[10px] uppercase tracking-wider text-faint">{k.label}</div><div className="text-[15px] font-semibold tabular-nums mt-0.5 break-words">{k.value}</div></div>
           ))}
         </div>
 
-        <div className="mt-8 overflow-x-auto rounded-lg border border-edge bg-surface">
+        <div className="mt-8 overflow-x-auto mc-card mc-card-sm">
           <table className="w-full text-[12px]">
             <thead><tr className="border-b border-edge text-[10px] uppercase tracking-wider text-faint">
               <th className="px-2 py-2 text-left font-medium">{c.columns.rank}</th><th className="px-2 py-2 text-left font-medium">{c.columns.domain}</th><th className="px-2 py-2 text-left font-medium">{c.columns.type}</th><th className="px-2 py-2 text-left font-medium">{c.columns.tier}</th>

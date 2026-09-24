@@ -683,7 +683,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
 
       {walletOpen && credits && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" onClick={() => setWalletOpen(false)}>
-          <div className="w-full max-w-md rounded-xl border border-edge bg-surface p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-md mc-card p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
             <div>
               <h3 className="text-sm font-semibold text-ink">{uiLang === 'zh' ? 'Credits 余额与充值' : uiLang === 'vi' ? 'Số dư Credits & nạp thêm' : 'Credits · balance & top-up'}</h3>
               <p className="text-xs text-faint">{organization.name}</p>
@@ -726,13 +726,13 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
       {/* Three-zone shell: nav rail | stage | context */}
       <div className="wz-shell flex-1 grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)_300px] min-h-0">
         {/* LEFT — deliverables nav */}
-        <aside className="lg:border-r border-edge lg:overflow-y-auto px-4 py-4 space-y-4 lg:min-h-0">
+        <aside className="mc-enter lg:border-r border-edge lg:overflow-y-auto px-4 py-4 space-y-4 lg:min-h-0" style={{ ['--i' as any]: 1 }}>
           {canDispatch ? (
             <div className="space-y-2">
               <button
                 onClick={() => dispatchAgent('full_scan')}
                 disabled={sending}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-brand text-on-brand hover:brightness-110 disabled:bg-raised disabled:text-faint text-sm font-medium transition"
+                className="mc-bloom w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-brand text-on-brand hover:brightness-110 disabled:bg-raised disabled:text-faint text-sm font-medium transition"
               >
                 <Icon name="full_scan" size={16} /> {t('Run full GEO scan')}
               </button>
@@ -746,12 +746,14 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
               />
             </div>
           ) : (
-            <div className="text-[11px] text-faint leading-relaxed rounded-lg border border-edge bg-surface px-3 py-2.5">
+            <div className="text-[11px] text-faint leading-relaxed mc-card mc-card-sm px-3 py-2.5">
               {t('Scheduled scans keep this project fresh automatically.')}
             </div>
           )}
+          {/* Phone/tablet: the deliverable groups become a horizontal tab strip; desktop: the column. */}
+          <div className="flex lg:flex-col gap-4 overflow-x-auto lg:overflow-visible -mx-4 px-4 lg:mx-0 lg:px-0 pb-1 lg:pb-0">
           {DELIVERABLE_GROUPS.map((group) => (
-            <div key={group.label}>
+            <div key={group.label} className="min-w-[230px] lg:min-w-0 shrink-0 lg:shrink">
               <div className="text-[10px] uppercase tracking-widest text-faint mb-1.5">{t(group.label)}</div>
               <div className="space-y-1">
                 {group.items.map((aid) => (
@@ -773,10 +775,11 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
               </div>
             </div>
           ))}
+          </div>
         </aside>
 
         {/* CENTER — stage */}
-        <main ref={resultTopRef} className="lg:overflow-y-auto px-6 py-5 lg:min-h-0 min-w-0">
+        <main ref={resultTopRef} className="mc-enter lg:overflow-y-auto px-4 sm:px-6 py-5 lg:min-h-0 min-w-0">
           {!runStatus && emptyAgent ? (
             <div className="h-full flex flex-col items-center justify-center text-center gap-3 py-16">
               <div className="text-brand"><Icon name={emptyAgent} size={32} /></div>
@@ -903,7 +906,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
         </main>
 
         {/* RIGHT — at-a-glance context */}
-        <aside className="hidden lg:block lg:border-l border-edge lg:overflow-y-auto px-4 py-4 space-y-4 lg:min-h-0">
+        <aside className="mc-enter border-t lg:border-t-0 lg:border-l border-edge lg:overflow-y-auto px-4 py-4 space-y-4 lg:min-h-0" style={{ ['--i' as any]: 2 }}>
           <TrendPanel history={history} />
           <ContextPanel headlineAigvr={headlineAigvr} scoreRun={scoreRun} runsByAgent={runsByAgent} totalAgents={DELIVERABLE_GROUPS.reduce((n, g) => n + g.items.length, 0)} projectId={demoMode ? undefined : project.id} />
         </aside>
@@ -1029,7 +1032,7 @@ function TrendPanel({ history }: { history: ScanPoint[] }) {
   const dColor = (d: number | null, goodUp = true) => (d == null || d === 0 ? 'text-faint' : (d > 0) === goodUp ? 'text-sage' : 'text-garnet');
 
   return (
-    <div className="rounded-lg border border-edge bg-surface p-4 space-y-2">
+    <div className="mc-card mc-card-sm p-4 space-y-2">
       <div className="flex items-center justify-between">
         <div className="text-[10px] uppercase tracking-widest text-faint">{SCORE_LABEL} {t('trend')} · {history.length}</div>
         {dA != null && <div className={`text-[11px] font-medium ${dColor(dA)}`}>{arrow(dA)} {Math.abs(dA)}</div>}
@@ -1126,7 +1129,7 @@ function ContextPanel({ headlineAigvr, scoreRun, runsByAgent, totalAgents, proje
     <div className="space-y-4">
       {/* Standard metrics lead (SVP feedback); composite is a summary dial. */}
       {sc && (
-        <div className="rounded-lg border border-edge bg-surface p-3 space-y-2">
+        <div className="mc-card mc-card-sm p-3 space-y-2">
           <div className="text-[10px] uppercase tracking-widest text-faint">{t('Latest scan')}</div>
           <ContextMetric tip="presence" label="Presence" value={presence != null ? `${presence}%` : '—'} sub={frac(ov.brandHits, nAnswers)} />
           <ContextMetric tip="sov" label="Share of Voice" value={sov != null ? `${Math.round(sov)}%` : '—'} sub={frac(ov.brandHits, totalMentions)} />
@@ -1144,13 +1147,13 @@ function ContextPanel({ headlineAigvr, scoreRun, runsByAgent, totalAgents, proje
         <ActionsPanel projectId={projectId} lang={UI_LANG} t={t} />
       )}
       {SCORE_DISPLAY !== 'enterprise' && (
-        <div className="rounded-lg border border-edge bg-surface p-4 text-center">
+        <div className="mc-card mc-card-sm p-4 text-center">
           <div className="text-[10px] uppercase tracking-widest text-faint mb-1"><TermTip term="index">{SCORE_LABEL}</TermTip></div>
           <div className={`text-3xl font-semibold leading-none ${headlineAigvr == null ? 'text-faint' : headlineAigvr >= 67 ? 'text-sage' : headlineAigvr >= 34 ? 'text-gold' : 'text-garnet'}`}>{headlineAigvr ?? '—'}</div>
           <div className="text-[10px] text-faint mt-1">/ 100</div>
         </div>
       )}
-      <div className="rounded-lg border border-edge bg-surface p-3">
+      <div className="mc-card mc-card-sm p-3">
         <div className="text-[10px] uppercase tracking-widest text-faint mb-1">{t('Deliverables')}</div>
         <div className="text-sm text-ink">{readyCount} / {totalAgents} {t('ready')}</div>
       </div>
@@ -1374,7 +1377,7 @@ function ClosedLoop({ o, loop, anchorAgent }: { o: Record<string, any>; loop: { 
   const delta = reportScore != null && cur != null ? Math.round((cur - reportScore) * 10) / 10 : null;
   const recCount = (o.recommendations || []).length;
   return (
-    <div className="rounded-xl border border-edge bg-surface p-4 space-y-2">
+    <div className="mc-card p-4 space-y-2">
       <div className="text-[10px] uppercase tracking-widest text-faint">{t('Since this report')}</div>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[12px]">
         <span className="text-dim">{recCount} {t('recommendations')}</span>
@@ -1438,7 +1441,7 @@ function PreviewVerdict({ sc, brand, upgradeHref }: { sc: any; brand: string; up
       : `Across ${samples.length} buyer questions, ${brand} appeared just ${hits} time${hits === 1 ? '' : 's'}.`);
 
   return (
-    <div className="rounded-xl border border-edge bg-surface p-5 space-y-4">
+    <div className="mc-card p-5 space-y-4">
       <div className="text-[15px] font-semibold text-ink leading-relaxed">{headline}</div>
 
       {exhibit && (
@@ -1650,7 +1653,7 @@ function AdvisoryChat({ projectId, agentId, output, onDispatch }: {
   };
   const QUICK = [t('Which gap should we attack first?'), t('Why is my visibility low on some engines?'), t('What should we do first?')];
   return (
-    <div className="print-hide rounded-xl border border-edge bg-surface p-4 space-y-2">
+    <div className="print-hide mc-card p-4 space-y-2">
       <div className="text-[10px] uppercase tracking-widest text-faint">{t('Ask about this result')}</div>
       {thread.map((t, i) => (
         <div key={i} className="space-y-1">
@@ -1759,7 +1762,7 @@ function ArtifactSandbox({ o, projectId, runId, versions: extVersions, onVersion
   const QUICK = quick && quick.length ? quick : ['更口语自然', '更简短', '加入联系方式与报价', '更突出竞争优势'];
 
   return (
-    <div className="rounded-xl border border-edge bg-surface p-4 space-y-3">
+    <div className="mc-card p-4 space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-ink">{t(title)}</h3>
@@ -1830,7 +1833,7 @@ function ContentResult({ o }: { o: Record<string, any> }) {
   const faq: any[] = o.faq || [];
   const copy = (text?: string) => { if (text) navigator.clipboard?.writeText(text).catch(() => {}); };
   return (
-    <div className="rounded-xl border border-edge bg-surface p-5 space-y-4">
+    <div className="mc-card p-5 space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-ink">Content draft</h3>
@@ -1887,7 +1890,7 @@ function ProfileResult({ o, projectId }: { o: Record<string, any>; projectId?: s
   const NAP_KEYS = ['name', 'address', 'phone', 'email', 'website'];
   const napShown = NAP_KEYS.filter((k) => val(`nap.${k}`));
   return (
-    <div className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+    <div className="mc-card p-5 space-y-3">
       <div>
         <h3 className="text-sm font-semibold text-ink">Canonical brand profile</h3>
         <p className="text-[11px] text-faint mt-0.5">{o.sourcedFromHomepage ? 'verified against homepage' : 'from brand knowledge'} · reused by all execution agents · {t('your edits are kept when the agent re-runs')}</p>
@@ -1937,7 +1940,7 @@ function EncyclopediaResult({ o }: { o: Record<string, any> }) {
     : n.verdict === 'borderline' ? 'bg-gold/20 text-gold border-gold/40'
     : 'bg-garnet/20 text-garnet border-garnet/40';
   return (
-    <div className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+    <div className="mc-card p-5 space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-ink">Encyclopedia entry &amp; path</h3>
@@ -2011,7 +2014,7 @@ function DistributionResult({ o }: { o: Record<string, any> }) {
   const tierColor: Record<number, string> = { 1: 'text-garnet', 2: 'text-gold', 3: 'text-sage' };
   const tiers = Array.from(new Set(targets.map((t) => t.tier || 3))).sort((a, b) => a - b);
   return (
-    <div className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+    <div className="mc-card p-5 space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-ink">Distribution kit</h3>
@@ -2024,7 +2027,7 @@ function DistributionResult({ o }: { o: Record<string, any> }) {
           <div className={`text-[10px] uppercase tracking-widest mb-1.5 ${tierColor[tier] || 'text-dim'}`}>{tierLabel[tier] || `Tier ${tier}`}</div>
           <div className="space-y-2">
             {targets.filter((t) => (t.tier || 3) === tier).map((t, i) => (
-              <div key={i} className="rounded-lg border border-edge bg-surface p-3">
+              <div key={i} className="mc-card mc-card-sm p-3">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-[12px] font-medium text-ink truncate">{t.domain}</span>
                   <span className="text-[9px] px-1.5 py-0.5 rounded bg-raised border border-edge text-dim uppercase tracking-wide shrink-0">{(t.channelType || '').replace(/_/g, ' ')}</span>
@@ -2050,7 +2053,7 @@ function SiteResult({ o }: { o: Record<string, any> }) {
   const copy = (t?: string) => { if (t) navigator.clipboard?.writeText(t).catch(() => {}); };
   const dot = (s: string) => (s === 'ok' ? 'text-sage' : s === 'weak' ? 'text-gold' : 'text-garnet');
   return (
-    <div className="rounded-xl border border-edge bg-surface p-5 space-y-3">
+    <div className="mc-card p-5 space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-ink">Homepage AEO upgrade</h3>
@@ -2117,7 +2120,7 @@ function DiscoveryResult({ o }: { o: Record<string, any> }) {
   const keySet = new Set((o.keyPrompts || []).map((p: string) => nk(p)));
   const isKey = (p: string) => keySet.has(nk(p));
   return (
-    <div className="rounded-xl border border-edge bg-surface p-5 space-y-4">
+    <div className="mc-card p-5 space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-ink tracking-wide">Discovery — prompt set</h3>
@@ -2141,7 +2144,7 @@ function DiscoveryResult({ o }: { o: Record<string, any> }) {
 
       <div className="space-y-1.5">
         {cats.map((c, i) => (
-          <details key={i} className="group rounded-lg border border-edge bg-surface open:bg-surface">
+          <details key={i} className="group mc-card mc-card-sm open:bg-surface">
             <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden px-3 py-2.5 flex items-center gap-2 select-none rounded-lg hover:bg-surface">
               <span className="text-faint text-[9px] transition-transform group-open:rotate-90">▶</span>
               <span className="text-[12px] font-medium text-brand/90 flex-1 min-w-0 truncate">{c.label || c.category}</span>
@@ -2191,7 +2194,7 @@ function StandardAnswersResult({ o, projectId }: { o: Record<string, any>; proje
   const copyAll = () =>
     copy(answers.map((a, i) => `${i + 1}. ${a.prompt}\n` + blocksOf(a).map((b) => `[${b.lab}] ${b.val}`).join('\n')).join('\n\n'));
   return (
-    <div className="rounded-xl border border-edge bg-surface p-5 space-y-4">
+    <div className="mc-card p-5 space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-ink tracking-wide">{t('Standard answer library')}</h3>
@@ -2208,7 +2211,7 @@ function StandardAnswersResult({ o, projectId }: { o: Record<string, any>; proje
 
       <div className="space-y-2">
         {answers.map((a, i) => (
-          <details key={i} className="group rounded-lg border border-edge bg-surface">
+          <details key={i} className="group mc-card mc-card-sm">
             <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden px-3 py-2.5 flex items-center gap-2 select-none rounded-lg hover:bg-raised">
               <span className="text-faint text-[9px] transition-transform group-open:rotate-90">▶</span>
               <span className="text-faint flex-none tabular-nums text-[11px]">{i + 1}.</span>
@@ -2274,7 +2277,7 @@ function BrandDocsPanel({ projectId }: { projectId: string }) {
   };
 
   return (
-    <div className="rounded-lg border border-edge bg-surface px-3 py-2.5 space-y-2">
+    <div className="mc-card mc-card-sm px-3 py-2.5 space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-[11px] uppercase tracking-wider text-faint">{t('Brand documents')}</span>
         <label className={`text-[11px] px-2 py-1 rounded border border-edge text-dim hover:text-brand hover:border-brand/50 transition cursor-pointer ${busy ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -2354,14 +2357,14 @@ function VerificationBar({ projectId, kind }: { projectId: string; kind: string 
   }
   if (review?.status === 'pending') {
     return (
-      <div className="flex items-center gap-2 text-[11px] text-dim rounded-lg border border-edge bg-surface px-3 py-1.5">
+      <div className="flex items-center gap-2 text-[11px] text-dim mc-card mc-card-sm px-3 py-1.5">
         ⏳ {t('Awaiting client verification')} · {review.client_email}
       </div>
     );
   }
 
   return (
-    <div className="rounded-lg border border-edge bg-surface px-3 py-2">
+    <div className="mc-card mc-card-sm px-3 py-2">
       {!showForm ? (
         <button onClick={() => setShowForm(true)} className="text-[11px] text-dim hover:text-brand transition">
           ✉ {t('Request client verification')}
@@ -2411,7 +2414,7 @@ function ProvenanceStrip({ o, runId, createdAt, trigger }: { o: Record<string, a
 
 function KpiTile({ label, value, sub, accent, tip }: { label: string; value: string | number; sub?: string; accent?: boolean; tip?: string }) {
   return (
-    <div className={`rounded-lg border px-3 py-2 ${accent ? 'border-brand/40 bg-brand-soft/40' : 'border-edge bg-surface'}`}>
+    <div className={`mc-card mc-card-sm px-3 py-2 ${accent ? 'mc-card-accent' : ''}`}>
       <div className="text-[10px] uppercase tracking-wider text-faint">{tip ? <TermTip term={tip}>{label}</TermTip> : label}</div>
       <div className="text-lg font-semibold text-ink tabular-nums leading-tight">{value}</div>
       {sub && <div className="text-[10px] text-faint truncate">{sub}</div>}
@@ -2451,7 +2454,7 @@ function MonitorResult({ o, projectId, history }: { o: Record<string, any>; proj
   const hasTom = tom.overallRate != null;
 
   return (
-    <div className="rounded-xl border border-edge bg-surface p-5 space-y-5">
+    <div className="mc-card p-5 space-y-5">
       {/* Header: title + headline gauge */}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
@@ -2670,7 +2673,7 @@ function ReportResult({ o }: { o: Record<string, any> }) {
   const allOpen = recs.length > 0 && openRecs.size === recs.length;
   const visibleFindings = showAllFindings || findings.length <= 3 ? findings : findings.slice(0, 3);
   return (
-    <div className="rounded-xl border border-edge bg-surface p-5 space-y-5">
+    <div className="mc-card p-5 space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-ink tracking-wide">GEO Visibility Report</h3>

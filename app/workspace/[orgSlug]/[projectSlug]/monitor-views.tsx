@@ -63,6 +63,10 @@ const TIP: Record<string, Record<Lang, string>> = {
   },
 };
 
+// Competitor series colours: distinct hues inside the VI (globals.css --cat-*); the brand's own series is always gold.
+const CAT = ['var(--cat-1)', 'var(--cat-2)', 'var(--cat-3)', 'var(--cat-4)', 'var(--cat-5)', 'var(--cat-6)'];
+const catOf = (i: number) => CAT[i % CAT.length];
+
 const domainOf = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, '').toLowerCase(); } catch { return ''; } };
 const pct = (n: number, d: number) => (d ? Math.round((100 * n) / d) : 0);
 
@@ -125,7 +129,7 @@ function BrandVisibility({ bench, nAnswers, totalMentions, brandRow, partners, l
   return (
     <div>
       <Title tip={TIP.visibility[lang]}>{t('Brand visibility')}</Title>
-      <div className="overflow-x-auto rounded-lg border border-edge bg-surface">{table(sorted.slice(0, 6))}</div>
+      <div className="overflow-x-auto mc-card mc-card-sm">{table(sorted.slice(0, 6))}</div>
       {sorted.length > 6 && <button onClick={() => setAll(true)} className="mt-1 text-[10px] text-faint hover:text-brand underline decoration-dotted">{t('Show all')} · {sorted.length}</button>}
       {all && <Modal title={`${t('Brand visibility')} · ${sorted.length}`} onClose={() => setAll(false)}>{table(sorted)}</Modal>}
       <div className="text-[10px] text-faint mt-1">{t('Presence rates are per answer and do not add up; share of voice does.')} · {nAnswers} {t('answers')} · {totalMentions} {t('brand mentions')}</div>
@@ -144,12 +148,12 @@ function SovBar({ bench, totalMentions, lang, t }: { bench: Bench[]; totalMentio
   return (
     <div>
       <Title tip={TIP.sov[lang]}>{t('Share of Voice')}</Title>
-      <div className="rounded-lg border border-edge bg-surface p-3">
+      <div className="mc-card mc-card-sm p-3">
         <div className="flex h-4 w-full rounded-full overflow-hidden bg-raised">
-          {segs.map((s, i) => <div key={i} title={`${s.name} · ${pct(s.v, totalMentions)}% · ${s.v}/${totalMentions}`} style={{ width: `${totalMentions ? (100 * s.v) / totalMentions : 0}%`, background: s.brand ? 'var(--gold)' : 'var(--brand)', opacity: s.brand ? 1 : shade(i) }} />)}
+          {segs.map((s, i) => <div key={i} title={`${s.name} · ${pct(s.v, totalMentions)}% · ${s.v}/${totalMentions}`} style={{ width: `${totalMentions ? (100 * s.v) / totalMentions : 0}%`, background: s.brand ? 'var(--gold)' : s.name === t('Others') ? 'var(--faint)' : catOf(segs.slice(0, i).filter((x) => !x.brand).length) }} />)}
         </div>
         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
-          {segs.map((s, i) => <span key={i} className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: s.brand ? 'var(--gold)' : 'var(--brand)', opacity: s.brand ? 1 : shade(i) }} /><span className={s.brand ? 'text-gold font-semibold' : 'text-dim'}>{s.brand && '★ '}{s.name}</span><span className="tabular-nums text-ink">{pct(s.v, totalMentions)}%</span><span className="tabular-nums text-faint">{s.v}/{totalMentions}</span></span>)}
+          {segs.map((s, i) => <span key={i} className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: s.brand ? 'var(--gold)' : s.name === t('Others') ? 'var(--faint)' : catOf(segs.slice(0, i).filter((x) => !x.brand).length) }} /><span className={s.brand ? 'text-gold font-semibold' : 'text-dim'}>{s.brand && '★ '}{s.name}</span><span className="tabular-nums text-ink">{pct(s.v, totalMentions)}%</span><span className="tabular-nums text-faint">{s.v}/{totalMentions}</span></span>)}
         </div>
         <div className="text-[10px] text-faint mt-1.5">{t('Share of voice, this scan')} · {totalMentions} {t('brand mentions')}</div>
       </div>
@@ -180,18 +184,18 @@ function PresenceTrend({ history, brandName, bench, engineView, lang, t }: { his
   return (
     <div>
       <Title tip={TIP.trend[lang]}>{t('Presence over time')}{engineView ? ` · ${engineView}` : ''} · {pts.length} {t('scans')}</Title>
-      <div className="rounded-lg border border-edge bg-surface p-3">
+      <div className="mc-card mc-card-sm p-3">
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full block" style={{ height: 'auto' }}>
           {[0, 25, 50, 75, 100].map((g) => <g key={g}><line x1={L} x2={W - R} y1={y(g)} y2={y(g)} stroke="var(--raised)" strokeWidth={1} /><text x={L - 4} y={y(g) + 3} textAnchor="end" fill="var(--faint)" style={{ fontSize: 9 }}>{g}%</text></g>)}
-          {compSeries.map((vals, i) => <path key={i} d={path(vals)} fill="none" stroke="var(--brand)" strokeOpacity={0.55 - i * 0.1} strokeWidth={1.25} strokeLinejoin="round" strokeLinecap="round" />)}
+          {compSeries.map((vals, i) => <path key={i} d={path(vals)} fill="none" stroke={catOf(i)} strokeOpacity={0.9} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />)}
           {pts.length > 1 && <path d={path(brandSeries)} fill="none" stroke="var(--gold)" strokeWidth={2.25} strokeLinejoin="round" strokeLinecap="round" />}
-          {compSeries.map((vals, ci) => vals.map((v, i) => v == null ? null : <circle key={`${ci}-${i}`} cx={x(i)} cy={y(v)} r={2} fill="var(--brand)" fillOpacity={0.55 - ci * 0.1}><title>{`${date(pts[i].ts)} · ${comps[ci]} · ${v}%`}</title></circle>))}
+          {compSeries.map((vals, ci) => vals.map((v, i) => v == null ? null : <circle key={`${ci}-${i}`} cx={x(i)} cy={y(v)} r={2.5} fill={catOf(ci)}><title>{`${date(pts[i].ts)} · ${comps[ci]} · ${v}%`}</title></circle>))}
           {brandSeries.map((v, i) => v == null ? null : <circle key={i} cx={x(i)} cy={y(v)} r={i === pts.length - 1 ? 3.5 : 2.5} fill="var(--gold)"><title>{`${date(pts[i].ts)} · ${brandName} · ${v}%${brandFrac[i] ? ` (${brandFrac[i]})` : ''}`}</title></circle>)}
           {pts.map((p, i) => (i % labelEvery === 0 || i === pts.length - 1) ? <text key={i} x={x(i)} y={H - 6} textAnchor={i === 0 ? 'start' : i === pts.length - 1 ? 'end' : 'middle'} fill="var(--faint)" style={{ fontSize: 9 }}>{date(p.ts)}</text> : null)}
         </svg>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-faint">
           <span className="inline-flex items-center gap-1"><span className="w-3 h-0.5 bg-gold inline-block" />★ {brandName}</span>
-          {comps.map((c, i) => <span key={c} className="inline-flex items-center gap-1"><span className="w-3 h-0.5 bg-brand inline-block" style={{ opacity: 0.55 - i * 0.1 }} />{c}</span>)}
+          {comps.map((c, i) => <span key={c} className="inline-flex items-center gap-1"><span className="w-3 h-0.5 inline-block" style={{ background: catOf(i) }} />{c}</span>)}
           {engineView && <span>{t('Engine view shows your brand only; competitor lines are whole-scan.')}</span>}
           <span className="ml-auto">
             {prev && dBrand != null ? <><span className={tone(dBrand)}>{arrow(dBrand)} {Math.abs(Math.round(dBrand))}%</span> {t('vs previous scan')}{mover ? <> · {t('biggest mover')}: {mover.name} <span className={tone(mover.d, false)}>{arrow(mover.d)} {Math.abs(Math.round(mover.d))}%</span></> : null}</> : t('Run another scan to track change.')}
@@ -214,7 +218,7 @@ function PresenceByEngine({ samples, engines, brandName, bench, lang, t }: { sam
   return (
     <div>
       <Title tip={TIP.byEngine[lang]}>{t('Presence by engine')}</Title>
-      <div className="rounded-lg border border-edge bg-surface p-3 overflow-x-auto">
+      <div className="mc-card mc-card-sm p-3 overflow-x-auto">
         <div className="flex gap-4 min-w-[560px]">
           {engines.map((eng) => (
             <div key={eng} className="flex-1 min-w-0">
@@ -222,7 +226,7 @@ function PresenceByEngine({ samples, engines, brandName, bench, lang, t }: { sam
                 {names.map((name, i) => { const c = cell(eng, name); const p = pct(c.n, c.d); return (
                   <div key={name} className="flex-1 flex flex-col items-center justify-end min-w-0" title={`${name} · ${eng}: ${c.n}/${c.d}`}>
                     <div className="text-[9px] tabular-nums text-dim">{p}%</div>
-                    <div className={`w-full rounded-t ${i === 0 ? 'bg-gold' : 'bg-brand/40'}`} style={{ height: `${Math.max(2, p)}px` }} />
+                    <div className={`w-full rounded-t ${i === 0 ? 'bg-gold' : ''}`} style={{ height: `${Math.max(2, p)}px`, background: i === 0 ? undefined : catOf(i - 1) }} />
                   </div>); })}
               </div>
               <div className="text-[10px] text-faint text-center mt-1 truncate">{eng}</div>
@@ -230,7 +234,7 @@ function PresenceByEngine({ samples, engines, brandName, bench, lang, t }: { sam
           ))}
         </div>
         <div className="text-[10px] text-faint mt-2 flex flex-wrap gap-x-3 gap-y-0.5">
-          {names.map((n, i) => <span key={n} className="flex items-center gap-1"><span className={`w-2 h-2 rounded-sm ${i === 0 ? 'bg-gold' : 'bg-brand/40'}`} />{i === 0 ? `★ ${n}` : n}</span>)}
+          {names.map((n, i) => <span key={n} className="flex items-center gap-1"><span className={`w-2 h-2 rounded-sm ${i === 0 ? 'bg-gold' : ''}`} style={{ background: i === 0 ? undefined : catOf(i - 1) }} />{i === 0 ? `★ ${n}` : n}</span>)}
           <span className="ml-auto">{t('vs top 4 brands')}</span>
         </div>
       </div>
@@ -285,7 +289,7 @@ function CitationSources({ samples, ranking, pages, lang, t }: { samples: Sample
   return (
     <div>
       <Title tip={TIP.sources[lang]}>{t('Sources AI cites')}</Title>
-      <div className="overflow-x-auto rounded-lg border border-edge bg-surface">{table(sorted.slice(0, 8))}</div>
+      <div className="overflow-x-auto mc-card mc-card-sm">{table(sorted.slice(0, 8))}</div>
       {sorted.length > 8 && <button onClick={() => setAll(true)} className="mt-1 text-[10px] text-faint hover:text-brand underline decoration-dotted">{t('Show all')} · {sorted.length} {t('domains')}</button>}
       {all && <Modal title={`${t('Sources AI cites')} · ${sorted.length}`} onClose={() => setAll(false)}>{table(sorted)}</Modal>}
     </div>
@@ -314,7 +318,7 @@ function CitationProfile({ rows, engineView, lang, t }: { rows: ProfileRow[]; en
             </div>
           );
           return (
-            <div key={r.engine} className="rounded-lg border border-edge bg-surface p-3 space-y-1">
+            <div key={r.engine} className="mc-card mc-card-sm p-3 space-y-1">
               <div className="flex items-baseline justify-between"><span className="text-[12px] font-semibold text-ink">{r.engine}</span><span className="text-[10px] text-faint">{r.pages} {t('pages read')}</span></div>
               <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-2 text-[9px] uppercase tracking-wider text-faint"><span /><span className="text-right">{t('all')}</span><span className="text-right">{contrast ? t('3+ cites') : ''}</span><span className="text-right">{contrast ? t('1–2') : ''}</span></div>
               <Row label="schema.org" all={P(r.schemaShare)} h={heavy && P(heavy.schemaShare)} l={light && P(light.schemaShare)} />
@@ -375,7 +379,7 @@ function PresenceByPrompt({ samples, engines, brandName, bench, engineView, lang
   return (
     <div>
       <Title tip={TIP.byPrompt[lang]}>{t('Presence by question')}{engineView ? ` · ${engineView}` : ''}</Title>
-      <div className="overflow-x-auto rounded-lg border border-edge bg-surface">{table(sorted.slice(0, 10))}</div>
+      <div className="overflow-x-auto mc-card mc-card-sm">{table(sorted.slice(0, 10))}</div>
       <div className="flex items-center gap-3 mt-1 text-[10px] text-faint">
         <span>● {t('featured')} · ◐ {t('listed')} · ○ {t('passing')} · — {t('absent')} · ★ {t('high intent')}</span>
         {sorted.length > 10 && <button onClick={() => setAll(true)} className="ml-auto hover:text-brand underline decoration-dotted">{t('Show all')} · {sorted.length}</button>}
@@ -474,13 +478,13 @@ export function MonitorViews({ o, engineView, lang, t, projectId, history }: { o
   if (!all.length) return null;
   return (
     <div className="space-y-5">
-      <PresenceTrend history={history ?? []} brandName={brandName} bench={bench} engineView={engineView} lang={lang} t={t} />
-      <BrandVisibility bench={benchView} nAnswers={nAnswers} totalMentions={totalMentions} brandRow={brandRow} partners={Array.isArray(o.partners) ? o.partners : []} lang={lang} t={t} />
-      <SovBar bench={benchView} totalMentions={totalMentions} lang={lang} t={t} />
-      {!engineView && <PresenceByEngine samples={all} engines={engines} brandName={brandName} bench={bench} lang={lang} t={t} />}
-      <CitationSources samples={samples} ranking={ranking} pages={pages} lang={lang} t={t} />
-      <CitationProfile rows={profile} engineView={engineView} lang={lang} t={t} />
-      <PresenceByPrompt samples={all} engines={engines} brandName={brandName} bench={bench} engineView={engineView} lang={lang} t={t} />
+      <div className="mc-enter" style={{ ['--i' as any]: 0 }}><PresenceTrend history={history ?? []} brandName={brandName} bench={bench} engineView={engineView} lang={lang} t={t} /></div>
+      <div className="mc-enter" style={{ ['--i' as any]: 1 }}><BrandVisibility bench={benchView} nAnswers={nAnswers} totalMentions={totalMentions} brandRow={brandRow} partners={Array.isArray(o.partners) ? o.partners : []} lang={lang} t={t} /></div>
+      <div className="mc-enter" style={{ ['--i' as any]: 2 }}><SovBar bench={benchView} totalMentions={totalMentions} lang={lang} t={t} /></div>
+      <div className="mc-enter" style={{ ['--i' as any]: 3 }}>{!engineView && <PresenceByEngine samples={all} engines={engines} brandName={brandName} bench={bench} lang={lang} t={t} />}</div>
+      <div className="mc-enter" style={{ ['--i' as any]: 4 }}><CitationSources samples={samples} ranking={ranking} pages={pages} lang={lang} t={t} /></div>
+      <div className="mc-enter" style={{ ['--i' as any]: 5 }}><CitationProfile rows={profile} engineView={engineView} lang={lang} t={t} /></div>
+      <div className="mc-enter" style={{ ['--i' as any]: 6 }}><PresenceByPrompt samples={all} engines={engines} brandName={brandName} bench={bench} engineView={engineView} lang={lang} t={t} /></div>
     </div>
   );
 }
