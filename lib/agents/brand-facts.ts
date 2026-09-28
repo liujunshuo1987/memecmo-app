@@ -29,3 +29,19 @@ export function brandProfileBlock(p: any | null | undefined): string {
     .filter(Boolean)
     .join('\n');
 }
+
+// Policy documents ("Claims policy — …") tell agents how NOT to use certain
+// figures; they must not also count as evidence for those figures. The
+// numeric-grounding corpus is the brand facts + every uploaded doc except
+// policy/rule docs (FMVN 2026-09-28: a NielsenIQ "92%" quoted only inside the
+// Chicilon claims policy slipped into a cost article).
+const POLICY_DOC_RE = /^\[[^\]]*(policy|guideline|rules?|chính sách|quy định|quy tắc|政策|规则|规范)[^\]]*\]/iu;
+
+export function brandFactsCorpus(p: any | null | undefined): string {
+  if (!p) return '';
+  const docs = String(p.uploadedDocs || '')
+    .split('\n---\n')
+    .filter((d) => d.trim() && !POLICY_DOC_RE.test(d.trim()))
+    .join('\n---\n');
+  return brandProfileBlock({ ...p, uploadedDocs: docs || undefined });
+}

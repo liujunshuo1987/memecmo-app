@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { poeChat } from '@/lib/llm/poe';
 import { brandProfileBlock } from '@/lib/agents/brand-facts';
+import { contentRulesBlock, groundNumbers } from '@/lib/agents/grounding';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -58,9 +59,12 @@ export async function POST(req: NextRequest) {
     'draft unless the instruction says otherwise. Stay factually consistent with the ' +
     'canonical brand facts. Return ONLY the full revised Markdown artifact, nothing else.';
 
+  const lang = project.target_language;
   const userMsg = [
     facts || null,
     facts ? '' : null,
+    contentRulesBlock(lang) + '\n(Figures already in the current draft or given in the instruction also count as facts.)',
+    '',
     'CURRENT DRAFT:',
     '"""',
     currentContent.slice(0, 16000),
@@ -78,7 +82,11 @@ export async function POST(req: NextRequest) {
       maxTokens: 6000,
       temperature: 0.5,
     });
-    return NextResponse.json({ content: res.content });
+    // Same guarantee as the generating agents: a figure the model introduced
+    // that is in neither the brand facts, the current draft nor the
+    // instruction becomes a placeholder.
+    const grounded = groundNumbers(res.content, `${facts}\n${currentContent}\n${instruction}`, lang);
+    return NextResponse.json({ content: grounded.text, numbersReplaced: grounded.removed.length });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 502 });
   }

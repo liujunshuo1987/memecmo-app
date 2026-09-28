@@ -10,9 +10,11 @@
 
 import { poeChat, parseJsonFromLLM, DEFAULT_MODEL, assertComplete } from '@/lib/llm/poe';
 import { outputTokenBudget } from '@/lib/markets';
-import { brandProfileBlock } from './brand-facts';
+import { brandProfileBlock, brandFactsCorpus } from './brand-facts';
 import { stateFrameBlock } from './state-frames';
 import { scanUnverifiedClaims, FAKE_USER_RE, COMMUNITY_RE } from './compliance';
+import { contentRulesBlock, groundNumbers, numberPlaceholder, scanStyle } from './grounding';
+import { ownerExclusion, type CompetitorGroup } from './source-owners';
 
 type EventEmitter = (event: {
   event_type: 'log' | 'tool_call' | 'tool_result' | 'progress' | 'output_chunk' | 'error' | 'milestone';
@@ -28,6 +30,9 @@ interface DistributeInput {
   sources: { domain: string; citations: number; isBrand: boolean }[];
   competitors?: string[];
   brandProfile?: any;
+  competitorSet?: { groups?: CompetitorGroup[] } | null;
+  excludeDomains?: string[]; // projects.metadata.distributionExclude
+  sourceTitles?: Record<string, string[]>; // cited page titles per domain (geo_pages)
 }
 
 const LANGUAGE_NAMES: Record<string, string> = {
@@ -44,6 +49,7 @@ interface Target {
   draft: string; // submission copy — or, for community channels, the engagement brief
   why: string;
   format?: 'submission' | 'engagement_brief';
+  ownerType?: string; // model's read of who runs the site; 'vendor'/'competitor' is dropped
   complianceFlags?: string[]; // deterministic post-check findings the operator must resolve before sending
 }
 
@@ -98,10 +104,26 @@ export async function runDistributeAgent(
   const langCode = (input.targetLanguage || 'en').toLowerCase();
   const languageName = LANGUAGE_NAMES[langCode] || 'English';
 
-  // Target the highest-authority THIRD-PARTY domains (exclude the brand's own).
-  const targets = (input.sources || []).filter((s) => !s.isBrand).slice(0, 6);
+  // Target the highest-authority THIRD-PARTY domains — never the brand's own,
+  // a competitor's, or a vendor's selling the same category.
+  const ownerCheck = ownerExclusion({ competitorSet: input.competitorSet, excludeDomains: input.excludeDomains, sourceTitles: input.sourceTitles });
+  const excluded: { domain: string; reason: string }[] = [];
+  const targets: DistributeInput['sources'] = [];
+  for (const s of input.sources || []) {
+    if (s.isBrand) continue;
+    const why = ownerCheck(s.domain);
+    if (why) excluded.push({ domain: s.domain, reason: why });
+    else if (targets.length < 6) targets.push(s);
+  }
+  const rivals = Array.from(new Set([
+    ...(input.competitorSet?.groups ?? []).filter((g) => g.relationship !== 'self' && g.relationship !== 'directory').map((g) => g.canonical),
+    ...(input.competitors ?? []),
+  ]));
 
   await emit({ event_type: 'milestone', payload: { label: 'Distribution started', step: 1, totalSteps: 3 } });
+  for (const x of excluded) {
+    await emit({ event_type: 'log', payload: { text: `Skipped ${x.domain}: ${x.reason}` } });
+  }
   await emit({
     event_type: 'log',
     payload: {
@@ -128,18 +150,26 @@ export async function runDistributeAgent(
     '(3) Every factual claim must come from the verified brand facts provided — no ' +
     'invented numbers, no "trusted by millions"-style claims not in the facts. ' +
     '(4) Do NOT include Wikipedia or other encyclopedia targets — they are handled by ' +
-    'a dedicated compliant workflow. Output strict JSON only.';
+    'a dedicated compliant workflow. (5) Never target a website owned by a competitor or by ' +
+    'any company selling the same products/services as the brand (rival networks, agencies ' +
+    'or resellers, price-quote/booking sites) — they will not publish the brand. Output strict JSON only.';
 
   const sourceList = targets.length
-    ? targets.map((t) => `- ${t.domain} (cited ${t.citations}× by AI engines)`).join('\n')
+    ? targets
+        .map((t) => {
+          const titles = (input.sourceTitles?.[t.domain.replace(/^www\./, '').toLowerCase()] ?? []).filter(Boolean).slice(0, 2);
+          return `- ${t.domain} (cited ${t.citations}× by AI engines)` + (titles.length ? ` — cited pages: ${titles.map((x) => `"${x}"`).join('; ')}` : '');
+        })
+        .join('\n')
     : '(none indexed — recommend standard high-authority placements for this market/industry)';
 
   const user = [
     `Brand: ${input.brandName}` + (input.brandUrl ? ` (${input.brandUrl})` : ''),
     `Market: ${input.targetCountry}` + (input.industry ? ` · ${input.industry}` : ''),
     `Write all submission copy in ${languageName}.`,
-    input.competitors?.length ? `Competitors already present on these sources: ${input.competitors.join(', ')}.` : null,
+    rivals.length ? `Competitors (never target their websites; do not mention them): ${rivals.join(', ')}.` : null,
     (brandProfileBlock(input.brandProfile) + stateFrameBlock(input.targetCountry, input.industry)) || null,
+    contentRulesBlock(langCode),
     '',
     'Target sources (the domains AI engines actually cite for this category — get the brand featured here):',
     sourceList,
@@ -151,7 +181,7 @@ export async function runDistributeAgent(
       'platforms, tier 3 = directories/listings (quick wins). Return ONLY JSON of this shape:',
     '{',
     '  "targets": [',
-    '    { "domain": "the source", "channelType": "directory|industry_media|review_site|social|video|community|other", "format": "submission|engagement_brief",',
+    '    { "domain": "the source", "channelType": "directory|industry_media|review_site|social|video|community|other", "format": "submission|engagement_brief", "ownerType": "independent_media|directory|platform|community|research|vendor",',
     '      "tier": 1, "effort": "quick|medium|high",',
     '      "title": "listing title / PR angle", "draft": "the actual submission/listing/pitch body in ' + languageName + ', 120-180 words, ready to send", "why": "one line: why this source moves AI visibility" }',
     '  ]',
@@ -186,10 +216,38 @@ export async function runDistributeAgent(
     throw new Error(`Distribute model returned unparseable output: ${e instanceof Error ? e.message : String(e)}`);
   }
   const rawList = (Array.isArray(parsed.targets) ? parsed.targets : []).sort((a, b) => (a.tier || 9) - (b.tier || 9));
-  const { kept: list, dropped } = applyComplianceGuardrails(rawList);
+  // The model may add placements of its own — they pass the same owner check.
+  const ownerDropped: { domain: string; reason: string }[] = [];
+  const ownedOk = rawList.filter((t) => {
+    const why = ownerCheck(t.domain) ?? (/vendor|competitor/i.test(String(t.ownerType || '')) ? 'Site is run by a company selling the same category — would never publish the brand.' : null);
+    if (why) ownerDropped.push({ domain: t.domain, reason: why });
+    return !why;
+  });
+  const { kept: list, dropped: complianceDropped } = applyComplianceGuardrails(ownedOk);
+  const dropped = [...ownerDropped, ...complianceDropped];
+
+  // Figures not in the brand facts become placeholders; coined translations are flagged.
+  const corpus = brandFactsCorpus(input.brandProfile);
+  const ph = numberPlaceholder(langCode);
+  let numbersReplaced = 0;
+  for (const t of list) {
+    const title = groundNumbers(t.title || '', corpus, langCode);
+    const draft = groundNumbers(t.draft || '', corpus, langCode);
+    t.title = title.text;
+    t.draft = draft.text;
+    const removed = [...title.removed, ...draft.removed];
+    const flags = [...(t.complianceFlags ?? [])];
+    if (removed.length) {
+      numbersReplaced += removed.length;
+      // Count only — echoing the invented figures would put them back in the kit.
+      flags.push(`${removed.length} figure(s) not in the brand facts were replaced with ${ph} — fill in from a verified source or delete.`);
+    }
+    flags.push(...scanStyle(`${t.title}\n${t.draft}`, langCode));
+    if (flags.length) t.complianceFlags = flags;
+  }
   if (!list.length) throw new Error('Distribution produced no compliant targets.');
   for (const d of dropped) {
-    await emit({ event_type: 'log', payload: { text: `Compliance guardrail removed ${d.domain}: ${d.reason}` } });
+    await emit({ event_type: 'log', payload: { text: `Guardrail removed ${d.domain}: ${d.reason}` } });
   }
   const flaggedCount = list.filter((t) => t.complianceFlags?.length).length;
   if (flaggedCount) {
@@ -221,7 +279,7 @@ export async function runDistributeAgent(
     output: {
       language: langCode,
       targets: list,
-      compliance: { dropped, flaggedCount },
+      compliance: { dropped: [...excluded, ...dropped], flaggedCount, numbersReplaced },
       fullMarkdown: mdStr,
       generatedBy: `${res.model}`,
     },

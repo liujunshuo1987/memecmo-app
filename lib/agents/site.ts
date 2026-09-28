@@ -9,7 +9,8 @@
 
 import { poeChat, parseJsonFromLLM, DEFAULT_MODEL, assertComplete } from '@/lib/llm/poe';
 import { outputTokenBudget } from '@/lib/markets';
-import { brandProfileBlock } from './brand-facts';
+import { brandProfileBlock, brandFactsCorpus } from './brand-facts';
+import { contentRulesBlock, groundNumbers, numberPlaceholder, scanStyle } from './grounding';
 import { stateFrameBlock } from './state-frames';
 
 type EventEmitter = (event: {
@@ -126,6 +127,7 @@ export async function runSiteAgent(
     siteBlock,
     '',
     brandProfileBlock(input.brandProfile) + stateFrameBlock(input.targetCountry, input.industry),
+    contentRulesBlock(langCode) + '\n(Figures already on the current homepage also count as facts.)',
     input.citationBrief ? '\n' + input.citationBrief + '\n' : null,
     '',
     'Produce an AEO upgrade as JSON of this shape:',
@@ -164,7 +166,20 @@ export async function runSiteAgent(
     throw new Error(`Site model returned unparseable output: ${e instanceof Error ? e.message : String(e)}`);
   }
   const checklist = parsed.aeoChecklist || [];
-  const edits = parsed.homepageEdits || [];
+  // Proposed copy may only carry figures from the brand facts or the live homepage.
+  const corpus = `${brandFactsCorpus(input.brandProfile)}\n${site.text}`;
+  let numbersReplaced = 0;
+  const edits = (parsed.homepageEdits || []).map((e) => {
+    const r = groundNumbers(e.change || '', corpus, langCode);
+    numbersReplaced += r.removed.length;
+    return { ...e, change: r.text };
+  });
+  const reviewNotes = [
+    ...(numbersReplaced
+      ? [`${numbersReplaced} figure(s) not in the brand facts or on the homepage were replaced with ${numberPlaceholder(langCode)} — fill in from a verified source or delete.`]
+      : []),
+    ...scanStyle(edits.map((e) => e.change).join('\n'), langCode),
+  ];
   const schema = parsed.schema || [];
   if (!schema.length && !edits.length) throw new Error('Site audit produced no actionable output.');
 
@@ -175,6 +190,8 @@ export async function runSiteAgent(
   const md = [
     `# ${input.brandName} — Homepage AEO Upgrade`,
     '',
+    ...reviewNotes.map((n) => `> ⚠ REVIEW: ${n}`),
+    ...(reviewNotes.length ? [''] : []),
     site.ok ? `Audited: ${input.brandUrl}  ·  existing schema: ${site.existingSchema.join(', ') || 'none'}` : `Brand: ${input.brandName} (homepage not fetched)`,
     '',
     '## AEO Checklist',
@@ -198,6 +215,7 @@ export async function runSiteAgent(
       language: langCode,
       aeoChecklist: checklist,
       homepageEdits: edits,
+      review: { numbersReplaced, notes: reviewNotes },
       schema,
       fullMarkdown: md,
       generatedBy: `${res.model}`,

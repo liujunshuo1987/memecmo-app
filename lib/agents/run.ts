@@ -154,6 +154,25 @@ async function loadSiteCorpus(sb: ReturnType<typeof svc>, project: ProjectLite, 
   } catch (e) { console.warn('[pages] corpus unavailable:', e instanceof Error ? e.message : String(e)); return []; }
 }
 
+// Titles of the pages AI engines cited, per domain — lets the distribution
+// owner check tell a publisher from a vendor's price-quote site.
+async function loadSourceTitles(sb: ReturnType<typeof svc>, domains: string[]): Promise<Record<string, string[]>> {
+  const hosts = Array.from(new Set(domains.map((d) => d.replace(/^www\./, '').toLowerCase()))).slice(0, 40);
+  if (!hosts.length) return {};
+  try {
+    const { data } = await sb.from('geo_pages').select('domain, title').in('domain', [...hosts, ...hosts.map((h) => `www.${h}`)]).eq('ok', true).limit(1500);
+    const out: Record<string, string[]> = {};
+    for (const r of data ?? []) {
+      const d = String((r as any).domain || '').replace(/^www\./, '').toLowerCase();
+      if ((r as any).title) (out[d] ??= []).push(String((r as any).title));
+    }
+    return out;
+  } catch (e) {
+    console.warn('[pages] source titles unavailable:', e instanceof Error ? e.message : String(e));
+    return {};
+  }
+}
+
 // Frozen competitor set (score stability) lives on projects.metadata.
 async function loadCompetitorSet(sb: ReturnType<typeof svc>, projectId: string): Promise<any | null> {
   const { data } = await sb.from('projects').select('metadata').eq('id', projectId).maybeSingle();
@@ -893,7 +912,13 @@ export async function executeAgentRun(
       };
       const gaps = (scorecard.gaps || []) as { prompt: string; stage: string; competitorsPresent?: string[] }[];
       let target: { query: string; stage: string; competitors?: string[] };
-      if (gaps.length) {
+      if (userPrompt?.trim()) {
+        // Operator named the buyer question (e.g. regenerate a withdrawn draft
+        // for that query) — use it; keep the gap's stage/competitors if known.
+        const q = userPrompt.trim();
+        const g = gaps.find((x) => x.prompt.trim().toLowerCase() === q.toLowerCase());
+        target = { query: q, stage: g?.stage ?? 'evaluation', competitors: g?.competitorsPresent };
+      } else if (gaps.length) {
         const g = [...gaps].sort((a, b) => rank(a.stage) - rank(b.stage))[0];
         target = { query: g.prompt, stage: g.stage, competitors: g.competitorsPresent };
       } else {
@@ -955,6 +980,8 @@ export async function executeAgentRun(
         throw new Error('Scorecard asset corrupted — re-run Monitor.');
       }
       const sources = (scorecard.sourceAuthority?.ranking || []) as { domain: string; citations: number; isBrand: boolean }[];
+      const { data: projMeta } = await sb.from('projects').select('metadata').eq('id', project.id).maybeSingle();
+      const meta = (projMeta?.metadata ?? {}) as { competitorSet?: any; distributionExclude?: unknown };
       result = await runDistributeAgent(
         {
           brandName: project.brand_name,
@@ -965,6 +992,9 @@ export async function executeAgentRun(
           sources,
           competitors: scorecard.competitors,
           brandProfile: await loadBrandProfile(sb, project.id),
+          competitorSet: meta.competitorSet ?? null,
+          excludeDomains: Array.isArray(meta.distributionExclude) ? meta.distributionExclude.map(String) : [],
+          sourceTitles: await loadSourceTitles(sb, sources.filter((s) => !s.isBrand).slice(0, 40).map((s) => s.domain)),
         },
         persistAndEmit,
       );

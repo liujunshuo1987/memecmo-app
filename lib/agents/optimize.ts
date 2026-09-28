@@ -8,8 +8,9 @@
 
 import { poeChat, parseJsonFromLLM, DEFAULT_MODEL, assertComplete } from '@/lib/llm/poe';
 import { outputTokenBudget } from '@/lib/markets';
-import { brandProfileBlock } from './brand-facts';
+import { brandProfileBlock, brandFactsCorpus } from './brand-facts';
 import { stateFrameBlock } from './state-frames';
+import { contentRulesBlock, groundNumbers, numberPlaceholder, scanStyle } from './grounding';
 
 type EventEmitter = (event: {
   event_type:
@@ -82,7 +83,8 @@ export async function runOptimizeAgent(
     'You are a senior GEO content strategist and native-level copywriter. You write ' +
     'pages that AI answer engines (ChatGPT, Gemini, Perplexity, Claude) will retrieve ' +
     'and cite: directly answer the buyer question up front, use clear question-style ' +
-    'headings, concise factual paragraphs, concrete specifics/data, and a FAQ. Mention ' +
+    'headings, concise factual paragraphs, concrete specifics (figures only from the ' +
+    'brand facts provided), and a FAQ. Mention ' +
     'the brand naturally only where genuinely relevant — never keyword-stuff. ' +
     'Output strict JSON only.';
 
@@ -92,6 +94,7 @@ export async function runOptimizeAgent(
     `Write everything in ${languageName}.`,
     input.target.competitors?.length ? `Competitors currently winning this query: ${input.target.competitors.join(', ')}.` : null,
     (brandProfileBlock(input.brandProfile) + stateFrameBlock(input.targetCountry, input.industry)) || null,
+    contentRulesBlock(langCode),
     input.citationBrief ? '\n' + input.citationBrief + '\n' : null,
     '',
     `Target buyer query to win (write the page that should rank/be-cited for it):`,
@@ -149,7 +152,28 @@ export async function runOptimizeAgent(
   }
   if (!parsed.articleMarkdown) throw new Error('Optimize produced no article.');
 
-  const faq = Array.isArray(parsed.faq) ? parsed.faq : [];
+  // Figures not in the brand facts become placeholders — the page schema and
+  // Markdown are built from the grounded text only.
+  const corpus = brandFactsCorpus(input.brandProfile);
+  let numbersReplaced = 0;
+  const ground = (t: string) => {
+    const r = groundNumbers(t || '', corpus, langCode);
+    numbersReplaced += r.removed.length;
+    return r.text;
+  };
+  parsed.title = ground(parsed.title);
+  parsed.metaDescription = ground(parsed.metaDescription);
+  parsed.articleMarkdown = ground(parsed.articleMarkdown);
+  const faq = (Array.isArray(parsed.faq) ? parsed.faq : []).map((f) => ({ question: ground(f.question), answer: ground(f.answer) }));
+  const reviewNotes = [
+    ...(numbersReplaced
+      ? [`${numbersReplaced} figure(s) not in the brand facts were replaced with ${numberPlaceholder(langCode)} — fill in from a verified source or delete before publishing.`]
+      : []),
+    ...scanStyle([parsed.title, parsed.articleMarkdown, ...faq.map((f) => `${f.question}\n${f.answer}`)].join('\n'), langCode),
+  ];
+  if (numbersReplaced) {
+    await emit({ event_type: 'log', payload: { text: `Replaced ${numbersReplaced} unsupported figure(s) with placeholders.` } });
+  }
   const schema = buildFaqSchema(faq);
 
   await emit({ event_type: 'milestone', payload: { label: 'Assembling page', step: 2, totalSteps: 3 } });
@@ -160,7 +184,8 @@ export async function runOptimizeAgent(
     ? '\n\n## FAQ\n\n' + faq.map((f) => `**${f.question}**\n\n${f.answer}`).join('\n\n')
     : '';
   const schemaBlock = '\n\n---\n\n<!-- JSON-LD: paste into the page <head> for AEO -->\n```json\n' + JSON.stringify(schema, null, 2) + '\n```';
-  const fullMarkdown = `# ${parsed.title}\n\n${parsed.articleMarkdown}${faqMd}${schemaBlock}`;
+  const reviewMd = reviewNotes.length ? reviewNotes.map((n) => `> ⚠ REVIEW: ${n}`).join('\n') + '\n\n' : '';
+  const fullMarkdown = `${reviewMd}# ${parsed.title}\n\n${parsed.articleMarkdown}${faqMd}${schemaBlock}`;
 
   await emit({ event_type: 'progress', payload: { pct: 100 } });
   await emit({ event_type: 'milestone', payload: { label: 'Content draft ready', step: 3, totalSteps: 3 } });
@@ -177,6 +202,7 @@ export async function runOptimizeAgent(
       articleMarkdown: parsed.articleMarkdown,
       faq,
       schemaJsonLd: schema,
+      review: { numbersReplaced, notes: reviewNotes },
       fullMarkdown,
       generatedBy: `${res.model}`,
     },
