@@ -57,6 +57,35 @@ export async function canAccessOrg(
   return !!rmem;
 }
 
+/** Admin or editor of the org, its parent, or the root org. Mirrors
+ *  canDispatch on the workspace page. The client operating team records its own
+ *  feedback (interventions, fact edits) under its own name; viewers only read. */
+export async function canEditOrg(
+  authed: SupabaseClient,
+  userId: string,
+  org: { id: string; parent_org_id: string | null },
+): Promise<boolean> {
+  const ids = [org.id];
+  if (org.parent_org_id) ids.push(org.parent_org_id);
+  const { data: mems } = await authed
+    .from('organization_members')
+    .select('organization_id')
+    .eq('user_id', userId)
+    .in('organization_id', ids)
+    .in('role', ['admin', 'editor'])
+    .limit(1);
+  if (mems && mems.length) return true;
+  const { data: root } = await authed.from('organizations').select('id').eq('type', 'root').maybeSingle();
+  if (!root) return false;
+  const { data: rmem } = await authed
+    .from('organization_members')
+    .select('role')
+    .eq('organization_id', root.id)
+    .eq('user_id', userId)
+    .maybeSingle();
+  return rmem?.role === 'admin' || rmem?.role === 'editor';
+}
+
 /** Is the caller a member of the root (operator) org? Operator delivery runs
  *  are part of the contracted service — never credit-charged — and operator-
  *  only endpoints (engine health, digest preview) gate on this. */

@@ -5,13 +5,14 @@
 // POST   { projectId, kind, url?, publishedAt, title?, note?, targetPrompts?: string[], sourceRunId?, sourceAssetType? }
 // DELETE ?projectId=&id=          (marks removed; history is never deleted)
 //
-// Authorisation mirrors edits/project-sets: the caller must administer the
-// project's org. Service client after that check.
+// Authorisation: any member of the project's org may read (GET); writes need
+// admin or editor (canEditOrg), so the client operating team logs its own
+// actions under its own name. Service client after that check.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { serviceClient } from '@/lib/commerce';
-import { canAdminOrg } from '@/lib/org-auth';
+import { canAccessOrg, canEditOrg } from '@/lib/org-auth';
 import { unitHash } from '@/lib/edits';
 import { INTERVENTION_KINDS, computeOutcomes, domainOf, loadInterventions, citedAfterMap } from '@/lib/interventions';
 import { inngest } from '@/lib/inngest/client';
@@ -19,7 +20,7 @@ import { inngest } from '@/lib/inngest/client';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-async function authorize(projectId: string) {
+async function authorize(projectId: string, mode: 'read' | 'write') {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
@@ -27,7 +28,9 @@ async function authorize(projectId: string) {
   const { data: project } = await svc.from('projects').select('id, organizations(id, parent_org_id)').eq('id', projectId).maybeSingle();
   if (!project) return { error: NextResponse.json({ error: 'Project not found' }, { status: 404 }) };
   const org: any = (project as any).organizations;
-  if (!(await canAdminOrg(supabase, user.id, { id: org.id, parent_org_id: org.parent_org_id }))) {
+  const scope = { id: org.id, parent_org_id: org.parent_org_id };
+  const allowed = mode === 'write' ? await canEditOrg(supabase, user.id, scope) : await canAccessOrg(supabase, user.id, scope);
+  if (!allowed) {
     return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   }
   return { svc, user };
@@ -37,7 +40,7 @@ export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams;
   const projectId = q.get('projectId');
   if (!projectId) return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
-  const a = await authorize(projectId);
+  const a = await authorize(projectId, 'read');
   if ('error' in a) return a.error;
   const list = await loadInterventions(a.svc, projectId, { sourceRunId: q.get('sourceRunId') ?? undefined });
   const withOutcomes = q.get('withOutcomes') === '1';
@@ -58,7 +61,7 @@ export async function POST(req: NextRequest) {
   const targets = Array.isArray(body.targetPrompts)
     ? body.targetPrompts.filter((p: unknown) => typeof p === 'string' && p.trim()).slice(0, 20).map((p: string) => ({ hash: unitHash(p), prompt: p.trim() }))
     : [];
-  const a = await authorize(projectId);
+  const a = await authorize(projectId, 'write');
   if ('error' in a) return a.error;
   const { data, error } = await a.svc
     .from('interventions')
@@ -81,7 +84,7 @@ export async function DELETE(req: NextRequest) {
   const q = req.nextUrl.searchParams;
   const projectId = q.get('projectId'), id = q.get('id');
   if (!projectId || !id) return NextResponse.json({ error: 'Missing projectId or id' }, { status: 400 });
-  const a = await authorize(projectId);
+  const a = await authorize(projectId, 'write');
   if ('error' in a) return a.error;
   const { error } = await a.svc.from('interventions').update({ status: 'removed' }).eq('project_id', projectId).eq('id', id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
