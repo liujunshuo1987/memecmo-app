@@ -4,6 +4,7 @@
 // "New project" flow. Each project links into its agent workspace.
 
 import { useState, useEffect } from 'react';
+import { planShortLines, readPlanLang, type PlanLang } from '@/lib/plans-catalog';
 import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -350,6 +351,8 @@ function BillingModal({ org, bill, plans, stripeReady, onClose }: {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [credits, setCredits] = useState<{ balance: { granted: number; purchased: number; total: number }; packs: Record<string, { credits: number; usd: number; label: string }> } | null>(null);
+  const [lang, setLang] = useState<PlanLang>('zh');
+  useEffect(() => { setLang(readPlanLang()); }, []);
 
   useEffect(() => {
     fetch(`/api/workspace/credits?orgId=${org.id}`)
@@ -425,14 +428,7 @@ function BillingModal({ org, bill, plans, stripeReady, onClose }: {
                   {p.price_usd_month != null && <span className="text-[10px] font-normal text-faint"> /月</span>}
                 </div>
                 <ul className="text-[11px] text-dim space-y-0.5">
-                  {p.scan_cadence === 'weekly' && (
-                    <li className="text-sage font-medium">每周自动扫描 + 邮件周报 · Weekly auto-scan &amp; report</li>
-                  )}
-                  <li>手动加扫 {p.monthly_scan_quota} 次 / 月 · {p.monthly_scan_quota} manual scans</li>
-                  <li>最多 {p.max_projects} 个项目 · {p.max_projects} project{p.max_projects > 1 ? 's' : ''}</li>
-                  {p.included_credits_monthly != null && p.included_credits_monthly > 0 && (
-                    <li>含 {p.included_credits_monthly} credits / 月</li>
-                  )}
+                  {planShortLines(p, lang).map((line) => <li key={line}>{line}</li>)}
                 </ul>
                 {p.price_usd_month == null ? (
                   <a
@@ -456,13 +452,11 @@ function BillingModal({ org, bill, plans, stripeReady, onClose }: {
         </div>
 
         <div className="text-right">
-          <a
-            href="https://memecmo.ai/compare/"
-            target="_blank"
-            rel="noreferrer"
-            className="text-[11px] text-dim hover:text-ink underline underline-offset-2"
-          >
-            看看这些价格在市面上意味着什么 · How we compare →
+          <a href="/pricing" target="_blank" rel="noreferrer" className="text-[11px] text-brand hover:text-ink underline underline-offset-2 mr-3">
+            {lang === 'zh' ? '服务项明细、计费规则与 Credit →' : lang === 'vi' ? 'Chi tiết dịch vụ, quy tắc tính phí & credit →' : 'Service items, billing rules & credits →'}
+          </a>
+          <a href="https://memecmo.ai/compare/" target="_blank" rel="noreferrer" className="text-[11px] text-dim hover:text-ink underline underline-offset-2">
+            {lang === 'zh' ? '与市面工具对比' : lang === 'vi' ? 'So với công cụ khác' : 'How we compare'} →
           </a>
         </div>
 
@@ -474,7 +468,11 @@ function BillingModal({ org, bill, plans, stripeReady, onClose }: {
               {credits && <span className="text-[10px] font-normal text-faint"> 分(赠 {credits.balance.granted} / 购 {credits.balance.purchased})</span>}
             </span>
           </div>
-          <p className="text-[11px] text-faint">定时扫描与报告按约交付、不扣分;主动发起全扫 25 分、内容加跑 10 分。</p>
+          <p className="text-[11px] text-faint">
+            {lang === 'zh' ? '定期扫描与报告不扣 credit;手动触发:完整扫描 / 监测 25,报告与内容类 10。失败的运行自动退回。'
+              : lang === 'vi' ? 'Quét và báo cáo định kỳ không trừ credit; chạy thủ công: quét đầy đủ / giám sát 25, báo cáo & nội dung 10. Lần chạy lỗi được hoàn tự động.'
+              : 'Scheduled scans and reports never consume credits; manual runs: full scan / monitor 25, report & content agents 10. Failed runs are refunded.'}
+          </p>
           <div className="flex flex-wrap gap-2">
             {credits ? (
               Object.entries(credits.packs).map(([key, p]) => (

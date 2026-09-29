@@ -56,10 +56,14 @@ export async function POST(req: NextRequest) {
             const sb = serviceClient();
             const { data: sub } = await sb
               .from('org_subscriptions')
-              .select('plan_id, plans(included_credits_monthly)')
+              .select('plan_id, plans(included_credits_monthly, scan_cadence)')
               .eq('organization_id', orgId)
               .maybeSingle();
             const included = Number((sub?.plans as any)?.included_credits_monthly ?? 0);
+            // Scheduled cadence follows the plan (Starter monthly · Growth
+            // biweekly · Scale weekly) — the quota is sized for it.
+            const cadenceRaw = String((sub?.plans as any)?.scan_cadence ?? 'weekly');
+            const cadence = ['weekly', 'biweekly', 'monthly'].includes(cadenceRaw) ? cadenceRaw : 'weekly';
             if (included > 0) await applyPlanAllowance(sb, orgId, included);
             // Self-serve trial → paying customer: lift the preview fences.
             const { data: org } = await sb.from('organizations').select('metadata, billing_email').eq('id', orgId).maybeSingle();
@@ -80,7 +84,7 @@ export async function POST(req: NextRequest) {
               await sb.from('projects').update({
                 metadata: {
                   ...meta,
-                  reporting: 'weekly',
+                  reporting: cadence,
                   reportSchedule: {
                     ...(meta.reportSchedule || {}),
                     recipients: (meta.reportSchedule?.recipients?.length ? meta.reportSchedule.recipients : (org?.billing_email ? [org.billing_email] : [])),

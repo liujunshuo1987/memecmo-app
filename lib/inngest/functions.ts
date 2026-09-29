@@ -33,7 +33,7 @@ function schedulingEnabled(): boolean {
 }
 
 // Active projects (with active org) opted into one of the given cadences.
-async function listScheduledProjects(cadences: string[]): Promise<{ id: string; organization_id: string; schedule: any }[]> {
+async function listScheduledProjects(cadences: string[]): Promise<{ id: string; organization_id: string; schedule: any; reporting: string }[]> {
   const sb = svc();
   const { data } = await sb
     .from('projects')
@@ -42,7 +42,7 @@ async function listScheduledProjects(cadences: string[]): Promise<{ id: string; 
     .in('metadata->>reporting', cadences);
   return (data ?? [])
     .filter((p: any) => p.organizations?.status === 'active')
-    .map((p: any) => ({ id: p.id, organization_id: p.organization_id, schedule: p.metadata?.reportSchedule ?? {} }));
+    .map((p: any) => ({ id: p.id, organization_id: p.organization_id, schedule: p.metadata?.reportSchedule ?? {}, reporting: String(p.metadata?.reporting ?? '') }));
 }
 
 // Insert a queued run + hand off to Inngest, exactly like the HTTP endpoint but
@@ -203,8 +203,12 @@ export const scheduledWeekly = inngest.createFunction(
   async ({ step }) => {
     if (!schedulingEnabled()) return { skipped: 'SCHEDULED_SCANS_ENABLED!=1' };
     const dow = new Date().getUTCDay();
-    const projects = (await step.run('list-weekly', () => listScheduledProjects(['weekly'])))
-      .filter((p) => ((p.schedule?.scanDay ?? 1) === dow));
+    // Biweekly projects (Growth plan) scan on their day in even epoch-weeks —
+    // a fixed parity, so the interval is always exactly 14 days.
+    const evenWeek = Math.floor(Date.now() / (7 * 86400e3)) % 2 === 0;
+    const projects = (await step.run('list-weekly', () => listScheduledProjects(['weekly', 'biweekly'])))
+      .filter((p) => ((p.schedule?.scanDay ?? 1) === dow))
+      .filter((p) => p.reporting !== 'biweekly' || evenWeek);
     let enqueued = 0;
     for (const p of projects) {
       const id = await step.run(`monitor-${p.id}`, () => enqueueScheduledRun(p.id, p.organization_id, 'monitor'));
@@ -225,7 +229,7 @@ export const scheduledMonthly = inngest.createFunction(
     for (const p of monthly) {
       await step.run(`monitor-${p.id}`, () => enqueueScheduledRun(p.id, p.organization_id, 'monitor'));
     }
-    const all = await step.run('list-all', () => listScheduledProjects(['weekly', 'monthly']));
+    const all = await step.run('list-all', () => listScheduledProjects(['weekly', 'biweekly', 'monthly']));
     let reports = 0;
     for (const p of all) {
       const id = await step.run(`report-${p.id}`, () => enqueueScheduledRun(p.id, p.organization_id, 'report'));
