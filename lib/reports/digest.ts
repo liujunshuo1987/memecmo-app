@@ -26,6 +26,7 @@ import { poeChat, parseJsonFromLLM, DEFAULT_MODEL, assertComplete } from '@/lib/
 import { sendEmail } from '@/lib/email';
 import { gate, domainCandidates, figuresFromScorecard, type GroundTruth, type VerificationReport } from './verify';
 import { loadInterventions, computeOutcomes, outcomeFigures, describeOutcome, citesPerScan, type Intervention, type Outcome } from '@/lib/interventions';
+import { loadCollabAlignment, type CollabAlignment } from '@/lib/collab-alignment';
 
 export type DigestStage = 'build' | 'optimize' | 'steady';
 export type DigestLang = 'zh' | 'en' | 'vi';
@@ -37,6 +38,8 @@ export interface ReportSchedule {
   stageOverride?: DigestStage;
   lastDigestAt?: string;
   lastAlertRunId?: string;
+  // Opt-in per project: show the collaboration-alignment line (lib/collab-alignment).
+  collabMetric?: boolean;
 }
 
 const APP_URL = 'https://app.memecmo.ai';
@@ -71,6 +74,12 @@ const UI = {
     citationSection: '引用源明细', ownDomain: '品牌自域', thirdParty: '第三方来源',
     leverageSection: '信源杠杆',
     ivxSection: '行动与结果', ivxAwaiting: '等待下一次扫描', ivxPresence: '目标问题上品牌在场', ivxCited: '被引用次数', ivxScans: (b: number, a: number) => `发布前 ${b} 次扫描 · 发布后 ${a} 次`, ivxNote: '口径:同一问题、同一引擎,发布日前后各次扫描中品牌在场的回答数 ÷ 该窗口内的回答数;引用次数为该域名在全部回答引用链接中出现的次数。',
+    collabSection: '协作一致度(近 28 天)',
+    collabValue: (trust: number, n: number, on: number) => `${trust.toFixed(2)} · 贵方署名更新 ${n} 条,其中 ${Math.round(on * 100)}% 落在重点 20 题上`,
+    collabNone: '近 28 天平台上没有贵方署名的行动或答案修改,暂无法计算。每次发布后在平台上点"记一条行动"记录一次,即可计入。',
+    collabGovernance: (f: number, s: number) => `另有治理类更新:事实修改 ${f} 条、问题/竞品集修改 ${s} 条(计入参与,不计入方向)。`,
+    collabNeglected: '差距最大、本期尚无行动的问题',
+    collabNote: '口径:以本期开始前最近一次扫描为基准,重点 20 题上每题的差距 = 1 − 提到品牌的回答 ÷ 该题回答数;贵方本期署名的行动与答案修改按题计量;两者的余弦相似度,负值记为 0(0 = 方向无关,1 = 完全一致)。仅计贵方账号,不含 MemeCMO 代录。',
     methodChange: (list: string) => `方法学变更:本期与上期对比的引擎中,底层模型发生了变化(${list})。这是供应商侧的模型更替,不是品牌表现的变化;该引擎的分数以本期为新基线,本期不解读其涨跌。`,
     provenance: (checked: number, passed: number) =>
       `数据核验:本期解读共 ${checked} 条论断,逐条对照本项目扫描数据与引用索引核验,${passed} 条通过。未能核验的论断已降级或移除,不进入本报告。`,
@@ -105,6 +114,12 @@ const UI = {
     citationSection: 'Citation sources', ownDomain: 'Brand-owned', thirdParty: 'Third-party',
     leverageSection: 'Source leverage',
     ivxSection: 'Actions and what moved', ivxAwaiting: 'awaiting the next scan', ivxPresence: 'brand present on the targeted question', ivxCited: 'times cited', ivxScans: (b: number, a: number) => `${b} scans before publishing · ${a} after`, ivxNote: 'Method: same question, same engine — answers naming the brand ÷ answers in the window before vs after the publish date; "times cited" counts the domain across all answer links.',
+    collabSection: 'Collaboration alignment (last 28 days)',
+    collabValue: (trust: number, n: number, on: number) => `${trust.toFixed(2)} · ${n} update(s) signed by your team, ${Math.round(on * 100)}% on the Core 20 questions`,
+    collabNone: 'No actions or answer edits signed by your team on the platform in the last 28 days, so alignment cannot be computed yet. Logging each publication once ("Log an action") makes it count.',
+    collabGovernance: (f: number, s: number) => `Governance updates: ${f} fact edit(s), ${s} prompt/competitor-set edit(s) (count as participation, not direction).`,
+    collabNeglected: 'Largest gaps with no action yet',
+    collabNote: 'Method: baseline = the last scan before the period; per Core 20 question, gap = 1 − answers naming the brand ÷ answers on that question; your team\'s signed actions and answer edits are counted per question; the score is the cosine of the two, negatives set to 0 (0 = unrelated direction, 1 = fully aligned). Your accounts only; MemeCMO proxy entries excluded.',
     methodChange: (list: string) => `Methodology change: the model behind one or more engines changed between the two scans compared (${list}). This is a provider-side model replacement, not a change in brand performance; that engine's score resets its baseline this issue and its movement is not interpreted.`,
     provenance: (checked: number, passed: number) =>
       `Verification: ${checked} claims in this issue were each checked against this project's own scan data and citation index; ${passed} passed. Claims that could not be verified were demoted or removed and do not appear above.`,
@@ -139,6 +154,12 @@ const UI = {
     citationSection: 'Nguồn trích dẫn', ownDomain: 'Tên miền thương hiệu', thirdParty: 'Nguồn bên thứ ba',
     leverageSection: 'Đòn bẩy nguồn trích dẫn',
     ivxSection: 'Hành động và kết quả', ivxAwaiting: 'chờ lần quét tiếp theo', ivxPresence: 'thương hiệu xuất hiện ở câu hỏi mục tiêu', ivxCited: 'lần được trích dẫn', ivxScans: (b: number, a: number) => `${b} lần quét trước khi đăng · ${a} lần sau`, ivxNote: 'Chuẩn đo: cùng câu hỏi, cùng engine — số câu trả lời có nhắc thương hiệu ÷ số câu trả lời trong cửa sổ trước và sau ngày đăng; "lần được trích dẫn" đếm tên miền trong mọi liên kết được trích.',
+    collabSection: 'Mức đồng hướng phối hợp (28 ngày gần nhất)',
+    collabValue: (trust: number, n: number, on: number) => `${trust.toFixed(2)} · ${n} cập nhật có ghi tên đội ngũ Quý công ty, ${Math.round(on * 100)}% thuộc 20 câu hỏi trọng tâm`,
+    collabNone: 'Trong 28 ngày qua chưa có hành động hay chỉnh sửa câu trả lời nào do đội ngũ Quý công ty ghi trên nền tảng, nên chưa tính được. Mỗi lần đăng bài, ghi lại một lần ("Ghi một hành động") là được tính.',
+    collabGovernance: (f: number, s: number) => `Cập nhật quản trị: ${f} chỉnh sửa dữ kiện, ${s} chỉnh sửa bộ câu hỏi/đối thủ (tính vào mức tham gia, không tính vào hướng).`,
+    collabNeglected: 'Các câu hỏi có khoảng trống lớn nhất nhưng chưa có hành động',
+    collabNote: 'Chuẩn đo: lấy lần quét gần nhất trước kỳ làm mốc; với mỗi câu trong 20 câu trọng tâm, khoảng trống = 1 − số câu trả lời nhắc thương hiệu ÷ số câu trả lời của câu đó; hành động và chỉnh sửa có ghi tên của Quý công ty được tính theo từng câu; điểm là cosin giữa hai vectơ, giá trị âm tính là 0 (0 = không cùng hướng, 1 = hoàn toàn cùng hướng). Chỉ tính tài khoản của Quý công ty, không tính phần MemeCMO ghi hộ.',
     methodChange: (list: string) => `Thay đổi phương pháp: mô hình nền của một hoặc nhiều engine đã thay đổi giữa hai lần quét được so sánh (${list}). Đây là việc nhà cung cấp thay mô hình, không phải thay đổi trong hiệu suất thương hiệu; điểm của engine đó lấy kỳ này làm mốc mới và không diễn giải biến động.`,
     provenance: (checked: number, passed: number) =>
       `Kiểm chứng: ${checked} luận điểm trong kỳ này đã được đối chiếu với dữ liệu quét và kho nguồn trích dẫn của chính dự án; ${passed} luận điểm đạt. Những luận điểm không kiểm chứng được đã bị hạ cấp hoặc loại bỏ, không xuất hiện ở trên.`,
@@ -294,6 +315,8 @@ interface GatherResult {
   // What the client put into the world (last 90 days) and what the engines
   // did after — the causal half of the loop, computed from the scans.
   interventions: { list: Intervention[]; outcomes: Record<string, Outcome> };
+  // Opt-in (schedule.collabMetric): client team's alignment with the measured gaps.
+  collab: CollabAlignment | null;
   actions: { label: string; summary: string; at: string }[];
   latestReport: any | null; // Report-agent output completed within 7 days, if any
   brandDomains: Set<string>;
@@ -419,6 +442,12 @@ async function gather(sb: SupabaseClient, projectId: string): Promise<GatherResu
     (iv) => Date.now() - new Date(iv.published_at).getTime() < 90 * 86400e3,
   );
   const actionOutcomes = await computeOutcomes(sb, projectId, actionList);
+  const collab = schedule.collabMetric
+    ? await loadCollabAlignment(sb, projectId, new Date(Date.now() - 28 * 86400e3), new Date()).catch((e) => {
+        console.error('[digest] collab alignment failed:', e instanceof Error ? e.message : e);
+        return null;
+      })
+    : null;
   const truth: GroundTruth = {
     domains: new Set<string>(),
     engines: new Set<string>((current?.engines ?? (current?.metrics?.perEngine ?? []).map((e: any) => e.engine)) as string[]),
@@ -437,6 +466,7 @@ async function gather(sb: SupabaseClient, projectId: string): Promise<GatherResu
     previous: scorecards[1]?.sc ?? null,
     engineChange: engineModelChanges(scorecards[0]?.sc, scorecards[1]?.sc),
     interventions: { list: actionList, outcomes: actionOutcomes },
+    collab,
     currentMeta: scorecards[0] ? { id: scorecards[0].id, at: scorecards[0].completed_at, trigger: (scorecards[0] as any).trigger_method } : null,
     previousMeta: scorecards[1] ? { id: scorecards[1].id, at: scorecards[1].completed_at, trigger: (scorecards[1] as any).trigger_method } : null,
     actions,
@@ -875,6 +905,24 @@ function digestHtml(g: GatherResult, interp: Interpretation | null): string {
       `<div style="font-size:10.5px;color:#9A9A9A;margin-top:6px;">${esc(t.ivxNote)}</div></div>`
     : '';
 
+  // Collaboration alignment (opt-in) — every figure is a count or a cosine from the
+  // project's own records; no interpretation.
+  const c = g.collab;
+  const collabBlock = c
+    ? `<div style="margin-top:22px;"><div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#8A7F78;margin-bottom:8px;">${esc(t.collabSection)}</div>` +
+      (c.trust != null
+        ? `<div style="font-size:13px;color:#2B2B2B;"><strong>${esc(t.collabValue(c.trust, c.participation.actions + c.participation.answerEdits, c.onPlanShare ?? 0))}</strong></div>`
+        : `<div style="font-size:12.5px;color:#4A4A4A;">${esc(t.collabNone)}</div>`) +
+      (c.participation.factEdits || c.participation.setEdits
+        ? `<div style="font-size:12px;color:#4A4A4A;margin-top:4px;">${esc(t.collabGovernance(c.participation.factEdits, c.participation.setEdits))}</div>`
+        : '') +
+      (c.neglected.length
+        ? `<div style="font-size:12px;color:#4A4A4A;margin-top:6px;">${esc(t.collabNeglected)}:</div>` +
+          c.neglected.map((d) => `<div style="font-size:12px;color:#4A4A4A;margin-top:2px;">“${esc(d.prompt.slice(0, 90))}” — ${d.present}/${d.total}</div>`).join('')
+        : '') +
+      `<div style="font-size:10.5px;color:#9A9A9A;margin-top:6px;">${esc(t.collabNote)}</div></div>`
+    : '';
+
   const provenanceBlock =
     interp?.verification && interp.verification.checked
       ? `<div style="margin-top:22px;padding:10px 12px;background:#F3F6F3;border-left:3px solid #5B8266;border-radius:6px;font-size:11.5px;color:#4A5A4E;line-height:1.6;">${esc(
@@ -901,6 +949,7 @@ function digestHtml(g: GatherResult, interp: Interpretation | null): string {
       ${strategyBlock}
       ${cooperationBlock}
       ${ivxBlock}
+      ${collabBlock}
       ${provenanceBlock}
       <div style="margin-top:26px;padding-top:16px;border-top:1px solid rgba(58,30,34,0.08);">
         <p style="margin:0 0 8px;font-size:12px;color:#6E625F;">${esc(t.fullReport)}</p>
