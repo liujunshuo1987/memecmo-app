@@ -11,6 +11,7 @@ import { runEnginePatrol } from '@/lib/engines/health';
 import { dueUrls, fetchBatch, chunk, type DueUrl } from '@/lib/pages/queue';
 import { discoverSitePages, registerSitePages } from '@/lib/pages/sitemap';
 import { verifyIntervention, verifyDueInterventions } from '@/lib/pages/verify';
+import { handleLarkMessage } from '@/lib/lark-bot';
 import { previewReadyEmail, nurtureD1Email, nurtureD3Email, nurtureD7Email, TrialEmailCtx } from '@/lib/emails/trial';
 
 function svc() {
@@ -422,4 +423,15 @@ export const interventionVerify = inngest.createFunction(
   },
 );
 
-export const functions = [runAgent, scheduledWeekly, scheduledMonthly, scheduledDigest, scheduledTrialNurture, engineHealthPatrol, pagesFetch, interventionVerify];
+// One @-message to the Lark bot (lib/lark-bot). Stored by /api/lark/events first,
+// so the webhook answers Lark within its 3 s; the reply happens here.
+export const larkMessage = inngest.createFunction(
+  { id: 'lark-message', name: 'Handle a Lark @-message', triggers: [{ event: 'lark/message.received' }] },
+  async ({ event, step }) => {
+    const rowId = String((event as any)?.data?.rowId ?? '');
+    if (!rowId) return { skipped: 'no row' };
+    return step.run('handle', () => handleLarkMessage(svc(), rowId));
+  },
+);
+
+export const functions = [runAgent, scheduledWeekly, scheduledMonthly, scheduledDigest, scheduledTrialNurture, engineHealthPatrol, pagesFetch, interventionVerify, larkMessage];
