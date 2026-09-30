@@ -4,6 +4,7 @@
 // theirs. Nothing the bot parses is written until the sender confirms.
 
 import { canEditOrg } from '@/lib/org-auth';
+import { notifyOperator } from '@/lib/alerts';
 import { domainOf } from '@/lib/interventions';
 import { unitHash } from '@/lib/edits';
 import { inngest } from '@/lib/inngest/client';
@@ -13,13 +14,19 @@ type Sb = any;
 
 const vnToday = () => new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
 
-async function senderAccount(sb: Sb, openId: string): Promise<{ userId: string; email: string } | null> {
-  const email = await larkUserEmail(openId).catch(() => null);
-  if (!email) return null;
+// Why an identity failed is kept in lark_messages.outcome (internal only — never
+// posted to the group), so a mismatch can be fixed without guessing:
+//   no-email      Lark returned no email (external member, or outside the app's contact scope)
+//   no-account:X  Lark email X has no platform account
+async function senderAccount(sb: Sb, openId: string): Promise<{ userId: string; email: string } | { why: string }> {
+  let email: string | null = null;
+  try { email = await larkUserEmail(openId); } catch (e) { return { why: `no-email(${e instanceof Error ? e.message.slice(0, 80) : 'error'})` }; }
+  if (!email) return { why: 'no-email' };
   const { data, error } = await sb.rpc('user_id_by_email', { p_email: email });
   if (error) throw new Error(`user_id_by_email: ${error.message}`);
-  return data ? { userId: String(data), email } : null;
+  return data ? { userId: String(data), email } : { why: `no-account:${email}` };
 }
+const isAccount = (w: any): w is { userId: string; email: string } => !!w && typeof w.userId === 'string';
 
 async function boundProject(sb: Sb, chatId: string) {
   const { data: b } = await sb.from('lark_bindings').select('project_id').eq('chat_id', chatId).maybeSingle();
@@ -52,7 +59,11 @@ const brandHosts = (p: any): string[] => {
 
 const NO_ACCOUNT =
   'Chưa ghi được: email Lark của bạn chưa khớp với tài khoản có quyền chỉnh sửa trên nền tảng MemeCMO. Vui lòng dùng email đã đăng ký, hoặc báo MemeCMO mở quyền. · 未登记：您的 Lark 邮箱未对应到平台上有编辑权限的账号，请联系 MemeCMO 开通。';
-const UNBOUND = 'Nhóm này chưa được gắn với dự án nào trên nền tảng. · 本群尚未绑定平台项目。(MemeCMO: @bot /bind <project-slug>)';
+const ASK_ACK =
+  'Đã nhận. Bot chưa tự trả lời được câu hỏi dạng này; đã chuyển cho MemeCMO, sẽ có người trả lời trực tiếp trong nhóm. · 已收到。机器人还不能自己回答这类问题，已转给 MemeCMO，会有人在群里直接回复。';
+const LINK_HINT =
+  'Nếu link là bài / trang vừa đăng và cần ghi thành hành động: /hanhdong <link> <ngày đăng> · 如果是刚发布的稿件或页面、需要登记为行动：/hanhdong <链接> <发布日期>';
+const UNBOUND ='Nhóm này chưa được gắn với dự án nào trên nền tảng. · 本群尚未绑定平台项目。(MemeCMO: @bot /bind <project-slug>)';
 
 /** Handle one stored @-message (Inngest worker). Returns the outcome label. */
 export async function handleLarkMessage(sb: Sb, rowId: string): Promise<string> {
@@ -64,15 +75,23 @@ export async function handleLarkMessage(sb: Sb, rowId: string): Promise<string> 
     return outcome;
   };
   if (row.event_type !== 'im.message.receive_v1' || !row.message_id) return finish('ignored:not-a-message');
-  if (row.msg_type !== 'text') return finish('ignored:non-text');
+  // Text and rich text are read; a bare attachment (a screenshot sent to the bot
+  // in a DM) is still a message for MemeCMO — it goes to the question path below.
+  const attachment = ['image', 'file', 'media', 'audio'].includes(row.msg_type);
+  if (row.msg_type !== 'text' && row.msg_type !== 'post' && !attachment) return finish(`ignored:${row.msg_type}`);
 
-  const text = larkText(row.content?.content);
-  const cmd = (text.match(/^\/(\w+)/)?.[1] ?? '').toLowerCase();
+  const text = attachment ? `[${row.msg_type === 'image' ? 'ảnh' : row.msg_type}]` : larkText(row.content?.content, row.msg_type);
+  // A known command may come after a pasted link ("<link> @bot /hanhdong …"), so it
+  // is looked for anywhere after whitespace (the "/faq" inside a URL never matches);
+  // an unknown one only counts at the start, so "50 /tháng" is not a command.
+  const cmd = (text.match(/(?:^|\s)\/(bind|hanhdong|maau|help)\b/i)?.[1] ?? text.match(/^\/([a-z]+)\b/i)?.[1] ?? '').toLowerCase();
 
   if (cmd === 'bind') {
     const who = await senderAccount(sb, row.sender_open_id);
-    if (!who || !(await isOperator(sb, who.userId))) return finish('bind:denied', await larkReply(row.message_id, { text: 'Chỉ MemeCMO mới gắn được nhóm · 仅 MemeCMO 可绑定。' }));
-    const slug = text.split(/\s+/)[1] ?? '';
+    if (!isAccount(who) || !(await isOperator(sb, who.userId))) {
+      return finish(`bind:denied:${isAccount(who) ? `not-operator:${who.email}` : who.why}`, await larkReply(row.message_id, { text: 'Chỉ MemeCMO mới gắn được nhóm · 仅 MemeCMO 可绑定。' }));
+    }
+    const slug = text.match(/\/bind\s+(\S+)/i)?.[1] ?? '';
     const { data: p } = await sb.from('projects').select('id, brand_name, slug').eq('slug', slug).maybeSingle();
     if (!p) return finish('bind:no-project', await larkReply(row.message_id, { text: `Không tìm thấy dự án "${slug}" · 找不到项目。` }));
     await sb.from('lark_bindings').upsert({ chat_id: row.chat_id, project_id: p.id, created_by: who.email }, { onConflict: 'chat_id' });
@@ -84,8 +103,8 @@ export async function handleLarkMessage(sb: Sb, rowId: string): Promise<string> 
     if (!project) return finish('ignored:unbound', await larkReply(row.message_id, { text: UNBOUND }));
     const who = await senderAccount(sb, row.sender_open_id);
     const org: any = project.organizations;
-    if (!who || !(await canEditOrg(sb, who.userId, { id: org.id, parent_org_id: org.parent_org_id }))) {
-      return finish('hanhdong:no-account', await larkReply(row.message_id, { text: NO_ACCOUNT }));
+    if (!isAccount(who) || !(await canEditOrg(sb, who.userId, { id: org.id, parent_org_id: org.parent_org_id }))) {
+      return finish(`hanhdong:denied:${isAccount(who) ? `read-only:${who.email}` : who.why}`, await larkReply(row.message_id, { text: NO_ACCOUNT }));
     }
     const draft = parseHanhdong(text, vnToday(), brandHosts(project));
     if (!draft.url) return finish('hanhdong:no-url', await larkReply(row.message_id, { text: `Thiếu link bài đã đăng · 缺少发布链接。\n\n${HELP_TEXT}` }));
@@ -98,8 +117,29 @@ export async function handleLarkMessage(sb: Sb, rowId: string): Promise<string> 
     return finish('maau:not-yet', await larkReply(row.message_id, { text: 'Phiếu yêu cầu MAAU sẽ mở trong đợt tiếp theo · MAAU 需求单将在下一阶段开放。' }));
   }
 
-  // Anything else @-addressed to the bot: the command list (green zone).
-  return finish('help', await larkReply(row.message_id, { text: HELP_TEXT }));
+  if (!text || cmd === 'help') return finish('help', await larkReply(row.message_id, { text: HELP_TEXT }));
+  if (cmd) {
+    return finish(`unknown:${cmd}`, await larkReply(row.message_id, { text: `Không có lệnh /${cmd} · 没有 /${cmd} 这个指令。\n\n${HELP_TEXT}` }));
+  }
+
+  // A question or request in plain words (9-30: "<link> kiểm tra khả năng AI index").
+  // No model reads the group, so the bot cannot answer it; answering with the
+  // command list read as a non-answer. It says a person will reply, and makes
+  // that true by alerting MemeCMO.
+  const project = await boundProject(sb, row.chat_id);
+  const asker = await larkUserEmail(row.sender_open_id).catch(() => null);
+  let alerted = false;
+  try {
+    const r = await notifyOperator({
+      kind: 'lark_request',
+      title: `Lark 群提问${project ? ` · ${project.brand_name}` : ''}`,
+      detail: `${asker ?? row.sender_open_id}: "${text.slice(0, 600)}" — 请在群里直接回复。`,
+      projectId: project?.id, projectSlug: project?.slug, brand: project?.brand_name,
+    });
+    alerted = r.sent;
+  } catch { /* the acknowledgement still goes out; the outcome records the miss */ }
+  const reply = /https?:\/\//i.test(text) ? `${ASK_ACK}\n\n${LINK_HINT}` : ASK_ACK;
+  return finish(`request:${alerted ? 'alerted' : 'alert-failed'}`, await larkReply(row.message_id, { text: reply }));
 }
 
 /** Handle a card button click (synchronous: Lark expects the reply within 3 s). */
@@ -129,7 +169,7 @@ export async function handleLarkCardAction(sb: Sb, event: any): Promise<object> 
 
   const who = await senderAccount(sb, operator);
   const org: any = project.organizations;
-  if (!who || !(await canEditOrg(sb, who.userId, { id: org.id, parent_org_id: org.parent_org_id }))) {
+  if (!isAccount(who) || !(await canEditOrg(sb, who.userId, { id: org.id, parent_org_id: org.parent_org_id }))) {
     return { toast: toast('error', 'Tài khoản chưa có quyền chỉnh sửa · 账号无编辑权限') };
   }
   // A double click must not log the action twice.

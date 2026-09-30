@@ -95,9 +95,23 @@ export async function larkUserEmail(openId: string): Promise<string | null> {
 
 // ─── Commands ────────────────────────────────────────────────────────────────
 /** Message text without the @mention placeholders ("@_user_1"). */
-export function larkText(content: unknown): string {
-  let text = '';
-  try { text = String(JSON.parse(String(content ?? '{}')).text ?? ''); } catch { text = ''; }
+// Feedback often arrives as rich text ("post": formatting, pasted links, a
+// screenshot next to the words); it is flattened here, images marked "[ảnh]".
+export function larkText(content: unknown, msgType = 'text'): string {
+  let obj: any = {};
+  try { obj = JSON.parse(String(content ?? '{}')); } catch { obj = {}; }
+  let text = String(obj?.text ?? '');
+  if (msgType === 'post') {
+    // Received posts are {title, content}; some clients wrap them per locale ({zh_cn: {...}}).
+    const body: any = Array.isArray(obj?.content) ? obj : Object.values(obj ?? {}).find((v: any) => Array.isArray(v?.content)) ?? {};
+    const el = (e: any): string =>
+      e?.tag === 'text' ? String(e.text ?? '')
+        : e?.tag === 'a' ? [e.text, e.href].filter((s, i, a) => s && a.indexOf(s) === i).join(' ')
+        : e?.tag === 'img' || e?.tag === 'media' ? ' [ảnh] '
+        : '';
+    const lines = (body.content ?? []).map((para: any) => (Array.isArray(para) ? para.map(el).join('') : ''));
+    text = [body.title, ...lines].filter(Boolean).join('\n');
+  }
   return text.replace(/@_user_\d+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
@@ -123,7 +137,7 @@ export interface HanhdongDraft {
 
 /** Parse "/hanhdong <url> <date> [kind] [Q3,Q5] [note]" (order-free after the command). */
 export function parseHanhdong(text: string, today: string, brandHosts: string[] = []): HanhdongDraft {
-  let rest = text.replace(/^\/hanhdong\b/i, ' ');
+  let rest = text.replace(/(^|\s)\/hanhdong\b/i, ' ');
   const urlM = rest.match(/https?:\/\/[^\s<>"]+/i);
   const url = urlM ? urlM[0].replace(/[),.;]+$/, '') : null;
   if (urlM) rest = rest.replace(urlM[0], ' ');
@@ -199,5 +213,6 @@ export const HELP_TEXT = [
   '• /hanhdong <link> <YYYY-MM-DD> [loại] [Q1–Q20] [ghi chú] — ghi một bài đã đăng · 登记一次发布',
   '  Ví dụ · 例: /hanhdong https://vnexpress.net/... 2026-10-02 Q1 bài tiêu chuẩn đánh giá',
   '• /maau — phiếu yêu cầu MAAU (sắp mở · 即将开放)',
+  '• Góp ý / câu hỏi cho MemeCMO: @bot kèm nội dung (có thể kèm ảnh) — bot xác nhận và chuyển ngay · 给 MemeCMO 的反馈或问题：@机器人 + 内容（可附截图），机器人确认并即时转交',
   'Bot chỉ đọc tin nhắn có @ bot · 机器人只读 @ 它的消息。',
 ].join('\n');

@@ -16,7 +16,7 @@ const svc = () =>
   });
 
 export interface OperatorAlert {
-  kind: 'engine_capacity' | 'run_failed' | 'scan_incomplete' | 'engine_retired' | 'engine_fallback' | 'serpapi_quota';
+  kind: 'engine_capacity' | 'run_failed' | 'scan_incomplete' | 'engine_retired' | 'engine_fallback' | 'serpapi_quota' | 'lark_request';
   title: string;
   detail: string;
   runId?: string;
