@@ -60,7 +60,7 @@ const brandHosts = (p: any): string[] => {
 const NO_ACCOUNT =
   'Chưa ghi được: email Lark của bạn chưa khớp với tài khoản có quyền chỉnh sửa trên nền tảng MemeCMO. Vui lòng dùng email đã đăng ký, hoặc báo MemeCMO mở quyền. · 未登记：您的 Lark 邮箱未对应到平台上有编辑权限的账号，请联系 MemeCMO 开通。';
 const ASK_ACK =
-  'Đã nhận. Bot chưa tự trả lời được câu hỏi dạng này; đã chuyển cho MemeCMO, sẽ có người trả lời trực tiếp trong nhóm. · 已收到。机器人还不能自己回答这类问题，已转给 MemeCMO，会有人在群里直接回复。';
+  'Đã nhận và chuyển cho MemeCMO. Câu trả lời sẽ được gửi ngay dưới tin nhắn này sau khi MemeCMO duyệt. · 已收到并转给 MemeCMO。答复经 MemeCMO 审核后，会直接发在这条消息下面。';
 const LINK_HINT =
   'Nếu link là bài / trang vừa đăng và cần ghi thành hành động: /hanhdong <link> <ngày đăng> · 如果是刚发布的稿件或页面、需要登记为行动：/hanhdong <链接> <发布日期>';
 const UNBOUND ='Nhóm này chưa được gắn với dự án nào trên nền tảng. · 本群尚未绑定平台项目。(MemeCMO: @bot /bind <project-slug>)';
@@ -190,4 +190,25 @@ export async function handleLarkCardAction(sb: Sb, event: any): Promise<object> 
     }
   }
   return { toast: toast('success', 'Đã ghi · 已登记'), card: { type: 'raw', data: hanhdongCard(draft, core, ctx, 'saved') } };
+}
+
+/**
+ * Post MemeCMO's answer under a stored question, through the bot. Only for a
+ * question the bot itself received in a bound group, only once, and only with
+ * the name of the person who approved the text — the bot never composes it.
+ */
+export async function postOperatorAnswer(sb: Sb, d: { rowId: string; text: string; approvedBy: string }): Promise<string> {
+  const text = d.text.trim();
+  if (!d.rowId || !text) return 'refused:empty';
+  if (!d.approvedBy.trim()) return 'refused:no-approver';
+  if (text.length > 20000) return 'refused:too-long';
+  const { data: row } = await sb.from('lark_messages').select('id, message_id, chat_id, event_type, answered_at').eq('id', d.rowId).maybeSingle();
+  if (!row || row.event_type !== 'im.message.receive_v1' || !row.message_id) return 'refused:not-a-question';
+  if (row.answered_at) return 'already-answered';
+  if (!(await boundProject(sb, row.chat_id))) return 'refused:unbound';
+  const replyId = await larkReply(row.message_id, { text });
+  const now = new Date().toISOString();
+  const { error } = await sb.from('lark_messages').update({ answered_at: now, answer: { reply_id: replyId, text, approved_by: d.approvedBy.trim(), sent_at: now } }).eq('id', row.id);
+  if (error) throw new Error(`answer posted (${replyId}) but not recorded: ${error.message}`);
+  return `answered:${replyId}`;
 }
