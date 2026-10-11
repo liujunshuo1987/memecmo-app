@@ -36,7 +36,20 @@ export interface HealthResult {
   listedModels: number | null;
   probes: ModelProbe[];
   serpapi: SerpQuota;
+  /** Keys the patrol needs that are absent in the deployment it ran in. */
+  missingEnv: string[];
+  /** Which deployment ran the patrol — 'local' when not on Vercel. */
+  deployment: string;
 }
+
+// A missing key is a property of the deployment that ran the patrol, not of
+// the engines. 2026-09-24…30: the Vercel Preview deployment (Supabase keys,
+// no POE_API_KEY) ran this cron via its Inngest branch environment and filed
+// "Engine dead — ChatGPT, Gemini, Perplexity, Claude" every night while the
+// production patrol, 40 s earlier, found all engines alive.
+const REQUIRED_ENV = ['POE_API_KEY', 'SERPAPI_KEY'] as const;
+const deploymentLabel = () =>
+  [process.env.VERCEL_ENV ?? 'local', process.env.VERCEL_GIT_COMMIT_REF, process.env.VERCEL_URL].filter(Boolean).join(' · ');
 
 // SerpAPI: alert when fewer than this many searches remain (≈ 20 scans at 24
 // AIO queries each) or under 15% of the plan, whichever is larger.
@@ -88,8 +101,11 @@ async function serpQuota(): Promise<SerpQuota> {
 }
 
 export async function checkEngineHealth(engines: Engine[] = ENGINES): Promise<HealthResult> {
-  const listed = await poeModelIds();
-  const poeEngines = engines.filter((e) => e.kind === 'poe');
+  const missingEnv = REQUIRED_ENV.filter((k) => !process.env[k]);
+  // Without the key every probe fails identically; probing says nothing about the engines.
+  const canProbe = !missingEnv.includes('POE_API_KEY');
+  const listed = canProbe ? await poeModelIds() : null;
+  const poeEngines = canProbe ? engines.filter((e) => e.kind === 'poe') : [];
   const results = await Promise.all(
     poeEngines.flatMap((e) => [probe(e, e.model, 'primary', listed), ...(e.fallbacks ?? []).map((m) => probe(e, m, 'fallback', listed))]),
   );
@@ -100,12 +116,18 @@ export async function checkEngineHealth(engines: Engine[] = ENGINES): Promise<He
     listedModels: listed ? listed.size : null,
     probes: results.map((r) => r.p),
     serpapi,
+    missingEnv,
+    deployment: deploymentLabel(),
   };
 }
 
 /** Pure: which conditions deserve an operator alert. Tested without I/O. */
 export function alertsFor(r: HealthResult): OperatorAlert[] {
   const out: OperatorAlert[] = [];
+  if (r.missingEnv.length) {
+    out.push({ kind: 'engine_config', title: `Engine patrol ran without ${r.missingEnv.join(', ')} (${r.deployment})`, detail: `The deployment that ran the patrol has no ${r.missingEnv.join(' / ')}. This says nothing about the engines. In production, scans that need the key will fail — restore it in Vercel. Anywhere else, that deployment should not be running crons at all (see cronsEnabled in lib/inngest/functions.ts).` });
+    if (r.missingEnv.includes('POE_API_KEY')) return out; // no probes ran — nothing else to judge
+  }
   if (r.capacity) {
     out.push({ kind: 'engine_capacity', title: 'AI engine capacity exhausted — tonight\'s scans will fail', detail: 'The engine account returned 402 on the daily patrol ping. Top up before the 02:00 UTC scan window.' });
     return out; // everything else is noise while the account is empty

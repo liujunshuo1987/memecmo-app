@@ -33,6 +33,18 @@ function schedulingEnabled(): boolean {
   return process.env.SCHEDULED_SCANS_ENABLED === '1';
 }
 
+// Crons fire in EVERY Inngest environment the app is synced to — including the
+// branch environment each Vercel preview deployment registers (pushes to
+// work/*). Preview carries the production Supabase keys but not POE/SERPAPI/
+// RESEND/OPERATOR_ALERT_EMAILS, so a preview cron writes false alarms and
+// half-done side effects into production tables (2026-09-24…30: a nightly
+// "all engines dead" alert from the preview patrol). Cron work runs only on the
+// production deployment; locally (no VERCEL_ENV) it runs so the dev server works.
+function cronsEnabled(): boolean {
+  return (process.env.VERCEL_ENV ?? 'production') === 'production';
+}
+const CRON_SKIPPED = () => ({ skipped: `crons disabled on VERCEL_ENV=${process.env.VERCEL_ENV}` });
+
 // Active projects (with active org) opted into one of the given cadences.
 async function listScheduledProjects(cadences: string[]): Promise<{ id: string; organization_id: string; schedule: any; reporting: string }[]> {
   const sb = svc();
@@ -307,6 +319,9 @@ const NURTURE_STAGES: { event: string; minDays: number; build: (c: TrialEmailCtx
 export const scheduledTrialNurture = inngest.createFunction(
   { id: 'trial-nurture', name: 'Trial nurture emails', triggers: [{ cron: '30 3 * * *' }] },
   async ({ step }) => {
+    // Without RESEND_API_KEY a preview run would record the stage as done
+    // (sent:false) and production would then skip the real email.
+    if (!cronsEnabled()) return CRON_SKIPPED();
     const sb = svc();
     const sent: string[] = [];
     const orgs = await step.run('list-trial-orgs', async () => {
@@ -371,7 +386,7 @@ export const scheduledTrialNurture = inngest.createFunction(
 // on conditions that would make tonight's scans fail or change methodology.
 export const engineHealthPatrol = inngest.createFunction(
   { id: 'engine-health-patrol', name: 'Daily engine liveness patrol', triggers: [{ cron: '30 1 * * *' }] },
-  async ({ step }) => step.run('patrol', () => runEnginePatrol(svc())),
+  async ({ step }) => (cronsEnabled() ? step.run('patrol', () => runEnginePatrol(svc())) : CRON_SKIPPED()),
 );
 
 // Cited-page fetcher: reads the pages the engines cited (features, not
@@ -382,6 +397,7 @@ export const engineHealthPatrol = inngest.createFunction(
 export const pagesFetch = inngest.createFunction(
   { id: 'pages-fetch', name: 'Cited-page fetcher', concurrency: { limit: 1 }, triggers: [{ event: 'geo/pages.fetch' }, { cron: '0 2 * * *' }] },
   async ({ event, step }) => {
+    if ((event as any)?.name === 'inngest/scheduled.timer' && !cronsEnabled()) return CRON_SKIPPED();
     const data: any = (event as any)?.data ?? {};
     const projectId: string | null = typeof data.projectId === 'string' ? data.projectId : null;
     const limit = Math.min(1000, Math.max(1, Number(data.limit ?? 120)));
