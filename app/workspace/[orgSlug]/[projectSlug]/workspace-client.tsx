@@ -19,6 +19,7 @@ import type { AgentRun, Organization, Project, ScanPoint } from '@/lib/workspace
 import { trendExtras } from '@/lib/trend';
 import { traceAffectedEngines, mostlyEmptyEngines } from '@/lib/engines/ingest';
 import { NOTES_PATH, NOTES_LINK_LABEL } from '@/lib/notes/paths';
+import { DeliverableBody, Typeset, dl, refineText } from './deliverables';
 
 interface Props {
   project: Project;
@@ -1601,8 +1602,7 @@ function RunResult({ agentId, output, projectId, runId, versions, onVersions, on
         <ArtifactSandbox o={output} projectId={projectId} runId={runId} versions={versions} onVersions={onVersions}
           title="Content sandbox" artifactType="content_draft"
           subtitle={output.targetQuery ? <>targets: <span className="text-gold">{output.targetQuery}</span></> : undefined}
-          quick={['更口语自然', '更简短', '加入联系方式与报价', '更突出竞争优势']}
-          structured={<ContentResult o={output} />} />
+          quick={['更口语自然', '更简短', '加入联系方式与报价', '更突出竞争优势']} />
       ) : agentId === 'site' ? (
         <ArtifactSandbox o={output} projectId={projectId} runId={runId} versions={versions} onVersions={onVersions}
           title="Homepage sandbox" artifactType="site_optimization"
@@ -1613,8 +1613,7 @@ function RunResult({ agentId, output, projectId, runId, versions, onVersions, on
         <ArtifactSandbox o={output} projectId={projectId} runId={runId} versions={versions} onVersions={onVersions}
           title="Distribution sandbox" artifactType="distribution_kit"
           subtitle={`${(output.targets || []).length} placements, tiered`}
-          quick={['更贴合该媒体调性', '更简短', '更突出差异化', '增加数据支撑']}
-          structured={<DistributionResult o={output} />} />
+          quick={['更贴合该媒体调性', '更简短', '更突出差异化', '增加数据支撑']} />
       ) : agentId === 'encyclopedia' ? (
         <ArtifactSandbox o={output} projectId={projectId} runId={runId} versions={versions} onVersions={onVersions}
           title="Encyclopedia sandbox" artifactType="encyclopedia_entry"
@@ -1743,6 +1742,8 @@ function ArtifactSandbox({ o, projectId, runId, versions: extVersions, onVersion
   };
   const [active, setActive] = useState(() => (extVersions && extVersions.length ? extVersions.length - 1 : 0));
   const [editing, setEditing] = useState(false);
+  // The typeset layout is the default; the Markdown source stays one click away.
+  const [showSource, setShowSource] = useState(false);
   const [instr, setInstr] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -1797,9 +1798,11 @@ function ArtifactSandbox({ o, projectId, runId, versions: extVersions, onVersion
           <h3 className="text-sm font-semibold text-ink">{t(title)}</h3>
           {subtitle && <p className="text-[11px] text-faint mt-0.5">{subtitle}</p>}
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div className="flex flex-wrap justify-end gap-2 shrink-0">
           {savedNote && <span className="self-center text-[10px] text-gold">{savedNote}</span>}
-          <MarkPublished projectId={projectId} runId={runId} artifactType={artifactType} title={o.title} targetPrompts={o.targetQuery ? [String(o.targetQuery)] : undefined} lang={UI_LANG} t={t} />
+          {/* A distribution kit is published placement by placement — each card has its own button. */}
+          {artifactType !== 'distribution_kit' && <MarkPublished projectId={projectId} runId={runId} artifactType={artifactType} title={o.title} targetPrompts={o.targetQuery ? [String(o.targetQuery)] : undefined} lang={UI_LANG} t={t} />}
+          {!editing && <button onClick={() => setShowSource((s) => !s)} className="text-[11px] px-2 py-0.5 rounded mc-chip-inset text-dim hover:border-brand/50 hover:text-brand transition">{dl(UI_LANG, showSource ? 'viewLayout' : 'viewSource')}</button>}
           <button onClick={() => (editing ? finishEditing() : setEditing(true))} className="text-[11px] px-2 py-0.5 rounded mc-chip-inset text-dim hover:border-brand/50 hover:text-brand transition">{editing ? t('Done') : t('Edit')}</button>
           <button onClick={() => navigator.clipboard?.writeText(current.content).catch(() => {})} className="text-[11px] px-2 py-0.5 rounded mc-chip-inset text-dim hover:border-brand/50 hover:text-brand transition">{t('Copy')}</button>
         </div>
@@ -1807,7 +1810,7 @@ function ArtifactSandbox({ o, projectId, runId, versions: extVersions, onVersion
 
       {structured && (
         <details className="rounded mc-chip-inset bg-surface">
-          <summary className="cursor-pointer px-3 py-2 text-[11px] uppercase tracking-widest text-faint select-none hover:text-dim">Structured view</summary>
+          <summary className="cursor-pointer px-3 py-2 text-[11px] uppercase tracking-widest text-faint select-none hover:text-dim">{dl(UI_LANG, 'atAGlance')}</summary>
           <div className="px-3 pb-3 pt-1 border-t border-edge">{structured}</div>
         </details>
       )}
@@ -1826,8 +1829,10 @@ function ArtifactSandbox({ o, projectId, runId, versions: extVersions, onVersion
           onChange={(e) => setVersions((vs) => vs.map((v, i) => (i === active ? { ...v, content: e.target.value } : v)))}
           className="w-full h-72 mc-chip-inset mc-chip-inset rounded-md p-3 text-[12px] text-ink font-mono leading-relaxed focus:outline-none focus:border-blue-400/50"
         />
+      ) : showSource ? (
+        <pre className="text-[12px] text-dim font-mono leading-relaxed whitespace-pre-wrap break-words max-h-[55vh] overflow-y-auto mc-chip-inset rounded-md p-3">{current.content}</pre>
       ) : (
-        <div className="text-[13px] text-ink leading-relaxed whitespace-pre-wrap max-h-[55vh] overflow-y-auto mc-chip-inset rounded-md p-3 mc-chip-inset">{current.content}</div>
+        <DeliverableBody artifactType={artifactType} source={current.content} output={o} projectId={projectId} runId={runId} lang={UI_LANG} t={t} />
       )}
 
       {/* Refine dialogue — scoped to this artifact */}
@@ -1838,69 +1843,22 @@ function ArtifactSandbox({ o, projectId, runId, versions: extVersions, onVersion
             value={instr}
             onChange={(e) => setInstr(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && instr.trim()) { e.preventDefault(); refineWith(instr); } }}
-            placeholder='e.g. "更口语，加入我们的报价"'
+            placeholder={dl(UI_LANG, 'refinePlaceholder')}
             disabled={busy}
             className="flex-1 mc-input rounded-md px-3 py-2 text-[13px] focus:outline-none focus:border-blue-400/50"
           />
           <button onClick={() => refineWith(instr)} disabled={busy || !instr.trim()} className="px-3 py-2 text-[13px] rounded-md bg-brand text-on-brand hover:brightness-110 disabled:mc-chip-inset disabled:text-faint transition">
-            {busy ? '改写中…' : '改写'}
+            {dl(UI_LANG, busy ? 'rewriting' : 'rewrite')}
           </button>
         </div>
         <div className="flex flex-wrap gap-1.5">
           {QUICK.map((q) => (
-            <button key={q} onClick={() => refineWith(q)} disabled={busy} className="text-[10px] px-2 py-0.5 rounded-full mc-chip-inset text-dim hover:border-brand/50 hover:text-brand disabled:opacity-40 transition">{q}</button>
+            <button key={q} onClick={() => refineWith(refineText(UI_LANG, q))} disabled={busy} className="text-[10px] px-2 py-0.5 rounded-full mc-chip-inset text-dim hover:border-brand/50 hover:text-brand disabled:opacity-40 transition">{refineText(UI_LANG, q)}</button>
           ))}
         </div>
         {err && <div className="text-[11px] text-gold">{err}</div>}
-        <p className="text-[10px] text-faint">Versions live in this session · the original deliverable is unchanged. Copy/Edit to keep a version.</p>
+        <p className="text-[10px] text-faint">{dl(UI_LANG, 'versionsNote')}</p>
       </div>
-    </div>
-  );
-}
-
-function ContentResult({ o }: { o: Record<string, any> }) {
-  const faq: any[] = o.faq || [];
-  const copy = (text?: string) => { if (text) navigator.clipboard?.writeText(text).catch(() => {}); };
-  return (
-    <div className="mc-card p-5 space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-ink">Content draft</h3>
-          {o.targetQuery && (
-            <p className="text-[11px] text-faint mt-0.5">
-              targets: <span className="text-gold">{o.targetQuery}</span>
-              {o.stage && <span className="text-faint"> · {o.stage}</span>}
-            </p>
-          )}
-        </div>
-        <div className="flex gap-2 shrink-0">
-          <button onClick={() => copy(o.fullMarkdown)} className="text-[11px] px-2 py-0.5 rounded mc-chip-inset text-dim hover:border-brand/50 hover:text-brand transition">{t('Copy page')}</button>
-          <button onClick={() => copy(JSON.stringify(o.schemaJsonLd, null, 2))} className="text-[11px] px-2 py-0.5 rounded mc-chip-inset text-dim hover:border-brand/50 hover:text-brand transition">{t('Copy schema')}</button>
-        </div>
-      </div>
-
-      {o.title && <div className="text-[15px] font-semibold text-ink leading-snug">{o.title}</div>}
-      {o.metaDescription && <div className="text-[12px] text-faint italic">{o.metaDescription}</div>}
-
-      {o.articleMarkdown && (
-        <div className="text-[13px] text-dim leading-relaxed whitespace-pre-wrap max-h-80 overflow-y-auto mc-chip-inset rounded-md p-3 mc-chip-inset">
-          {o.articleMarkdown}
-        </div>
-      )}
-
-      {faq.length > 0 && (
-        <div>
-          <div className="text-[10px] uppercase tracking-widest text-faint mb-1.5">FAQ ({faq.length}) · FAQPage schema generated</div>
-          <ul className="space-y-2">
-            {faq.map((f, i) => (
-              <li key={i} className="text-[12px] leading-snug">
-                <div className="text-ink font-medium">{f.question}</div>
-                <div className="text-faint">{f.answer}</div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
     </div>
   );
 }
@@ -1994,11 +1952,11 @@ function EncyclopediaResult({ o }: { o: Record<string, any> }) {
       {da.title && (
         <div>
           <SectionLabel>Draft — {da.title}</SectionLabel>
-          {da.lead && <p className="text-[12px] text-dim leading-relaxed">{da.lead}</p>}
+          {da.lead && <Typeset source={String(da.lead)} lang={UI_LANG} size="sm" />}
           {(da.sections || []).map((s: any, i: number) => (
             <div key={i} className="mt-1.5">
               <div className="text-[12px] text-ink font-medium">{s.heading}</div>
-              <div className="text-[12px] text-dim leading-snug">{s.content}</div>
+              <Typeset source={String(s.content ?? '')} lang={UI_LANG} size="sm" />
             </div>
           ))}
         </div>
@@ -2032,45 +1990,6 @@ function EncyclopediaResult({ o }: { o: Record<string, any> }) {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function DistributionResult({ o }: { o: Record<string, any> }) {
-  const targets: any[] = o.targets || [];
-  const copy = (t?: string) => { if (t) navigator.clipboard?.writeText(t).catch(() => {}); };
-  const tierLabel: Record<number, string> = { 1: 'Tier 1 · National / mainstream', 2: 'Tier 2 · Industry / trade', 3: 'Tier 3 · Directories (quick wins)' };
-  const tierColor: Record<number, string> = { 1: 'text-garnet', 2: 'text-gold', 3: 'text-sage' };
-  const tiers = Array.from(new Set(targets.map((t) => t.tier || 3))).sort((a, b) => a - b);
-  return (
-    <div className="mc-card p-5 space-y-3">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-semibold text-ink">Distribution kit</h3>
-          <p className="text-[11px] text-faint mt-0.5">{targets.length} ready-to-send placements, tiered by authority · get cited where AI engines look</p>
-        </div>
-        <button onClick={() => copy(o.fullMarkdown)} className="text-[11px] px-2 py-0.5 rounded mc-chip-inset text-dim hover:border-brand/50 hover:text-brand transition shrink-0">{t('Copy kit')}</button>
-      </div>
-      {tiers.map((tier) => (
-        <div key={tier}>
-          <div className={`text-[10px] uppercase tracking-widest mb-1.5 ${tierColor[tier] || 'text-dim'}`}>{tierLabel[tier] || `Tier ${tier}`}</div>
-          <div className="space-y-2">
-            {targets.filter((t) => (t.tier || 3) === tier).map((t, i) => (
-              <div key={i} className="mc-card mc-card-sm p-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[12px] font-medium text-ink truncate">{t.domain}</span>
-                  <span className="text-[9px] px-1.5 py-0.5 rounded mc-chip-inset mc-chip-inset text-dim uppercase tracking-wide shrink-0">{(t.channelType || '').replace(/_/g, ' ')}</span>
-                  {t.effort && <span className="text-[9px] text-faint shrink-0">{t.effort}</span>}
-                  <button onClick={() => copy(t.draft)} className="ml-auto text-[10px] text-faint hover:text-brand shrink-0">copy</button>
-                </div>
-                {t.title && <div className="text-[12px] text-dim font-medium mb-1">{t.title}</div>}
-                {t.draft && <div className="text-[12px] text-dim leading-snug whitespace-pre-wrap">{t.draft}</div>}
-                {t.why && <div className="text-[10px] text-sage mt-1.5">↳ {t.why}</div>}
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
     </div>
   );
 }
@@ -2115,8 +2034,8 @@ function SiteResult({ o }: { o: Record<string, any> }) {
           <div className="space-y-1.5">
             {edits.map((e, i) => (
               <div key={i} className="text-[12px] leading-snug">
-                <span className="text-dim font-medium">{e.section}: </span>
-                <span className="text-dim">{e.change}</span>
+                <div className="text-dim font-medium">{e.section}</div>
+                <Typeset source={String(e.change ?? '')} lang={UI_LANG} size="sm" />
               </div>
             ))}
           </div>
