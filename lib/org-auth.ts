@@ -96,3 +96,35 @@ export async function isOperator(supabase: any, userId: string): Promise<boolean
     .from('organization_members').select('role').eq('organization_id', root.id).eq('user_id', userId).maybeSingle();
   return !!mem;
 }
+
+/** May this account put its own name to a client-side record — confirm a
+ *  suggested action (lib/suggestions)? Admin or editor of the project's org or
+ *  its parent. MemeCMO operators (root-org members) only on the root org's own
+ *  projects: anywhere else their confirmation would stand in for the client's,
+ *  and collaboration alignment counts the client's accounts only. */
+export async function canSignForOrg(
+  authed: SupabaseClient,
+  userId: string,
+  org: { id: string; parent_org_id: string | null },
+): Promise<boolean> {
+  const { data: root } = await authed.from('organizations').select('id').eq('type', 'root').maybeSingle();
+  if (root) {
+    const { data: rmem } = await authed
+      .from('organization_members')
+      .select('role')
+      .eq('organization_id', root.id)
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (rmem) return org.id === root.id && (rmem.role === 'admin' || rmem.role === 'editor');
+  }
+  const ids = [org.id];
+  if (org.parent_org_id) ids.push(org.parent_org_id);
+  const { data: mems } = await authed
+    .from('organization_members')
+    .select('organization_id')
+    .eq('user_id', userId)
+    .in('organization_id', ids)
+    .in('role', ['admin', 'editor'])
+    .limit(1);
+  return !!(mems && mems.length);
+}

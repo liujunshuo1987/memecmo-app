@@ -86,6 +86,16 @@ export async function larkReply(messageId: string, msg: { text: string } | { car
   return d?.message_id ?? null;
 }
 
+/** A new message in a chat (not a reply); returns its message_id. Every call
+ *  is a message to the client's group — callers send only on a named person's approval. */
+export async function larkSend(chatId: string, msg: { text: string } | { card: object }): Promise<string | null> {
+  const body = 'text' in msg
+    ? { receive_id: chatId, msg_type: 'text', content: JSON.stringify({ text: msg.text }) }
+    : { receive_id: chatId, msg_type: 'interactive', content: JSON.stringify(msg.card) };
+  const d = await larkApi('/im/v1/messages?receive_id_type=chat_id', { method: 'POST', body });
+  return d?.message_id ?? null;
+}
+
 /** Sender's email (needs contact:user.email:readonly and the sender inside the app's contact scope). */
 export async function larkUserEmail(openId: string): Promise<string | null> {
   const d = await larkApi(`/contact/v3/users/${encodeURIComponent(openId)}?user_id_type=open_id`);
@@ -135,6 +145,15 @@ export interface HanhdongDraft {
   dateGuessed: boolean;
 }
 
+// A date as people type it in the group: YYYY-MM-DD, or DD/MM with an optional year.
+function takeDate(text: string, today: string): { date: string | null; rest: string } {
+  const iso = text.match(/\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/);
+  if (iso) return { date: `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`, rest: text.replace(iso[0], ' ') };
+  const dmy = text.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(20\d{2}))?\b/);
+  if (dmy) return { date: `${dmy[3] || today.slice(0, 4)}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`, rest: text.replace(dmy[0], ' ') };
+  return { date: null, rest: text };
+}
+
 /** Parse "/hanhdong <url> <date> [kind] [Q3,Q5] [note]" (order-free after the command). */
 export function parseHanhdong(text: string, today: string, brandHosts: string[] = []): HanhdongDraft {
   let rest = text.replace(/(^|\s)\/hanhdong\b/i, ' ');
@@ -142,19 +161,10 @@ export function parseHanhdong(text: string, today: string, brandHosts: string[] 
   const url = urlM ? urlM[0].replace(/[),.;]+$/, '') : null;
   if (urlM) rest = rest.replace(urlM[0], ' ');
 
-  let date = today;
-  let dateGuessed = true;
-  const iso = rest.match(/\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/);
-  const dmy = rest.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(20\d{2}))?\b/);
-  if (iso) {
-    date = `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
-    rest = rest.replace(iso[0], ' ');
-    dateGuessed = false;
-  } else if (dmy) {
-    date = `${dmy[3] || today.slice(0, 4)}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
-    rest = rest.replace(dmy[0], ' ');
-    dateGuessed = false;
-  }
+  const found = takeDate(rest, today);
+  const date = found.date ?? today;
+  const dateGuessed = !found.date;
+  rest = found.rest;
 
   const targets = [...rest.matchAll(/\bQ0?(\d{1,2})\b/gi)].map((m) => Number(m[1])).filter((n) => n >= 1 && n <= 20);
   rest = rest.replace(/\bQ0?\d{1,2}\b[,，]?/gi, ' ');
@@ -207,6 +217,51 @@ export function hanhdongCard(d: HanhdongDraft, core: string[], ctx: { senderOpen
   }
   return { config: { wide_screen_mode: true, update_multi: true }, header: { template, title: { tag: 'plain_text', content: header } }, elements };
 }
+
+// ─── Suggested actions (lib/suggestions) ─────────────────────────────────────
+export interface XacnhanDraft { n: number | null; date: string | null; targets: number[] | null }
+
+/** Parse "/xacnhan <n> [date] [Q3,Q5]": confirm suggestion number n. A missing
+ *  date keeps the suggestion's own guess; `targets` is null when no Q was typed. */
+export function parseXacnhan(text: string, today: string): XacnhanDraft {
+  const found = takeDate(text.replace(/(^|\s)\/xacnhan\b/i, ' '), today);
+  let rest = found.rest;
+  const targets = [...rest.matchAll(/\bQ0?(\d{1,2})\b/gi)].map((m) => Number(m[1])).filter((n) => n >= 1 && n <= 20);
+  rest = rest.replace(/\bQ0?\d{1,2}\b[,，]?/gi, ' ');
+  const n = rest.match(/(?:^|\s)#?(\d{1,5})(?=\s|$)/);
+  return { n: n ? Number(n[1]) : null, date: found.date, targets: targets.length ? [...new Set(targets)] : null };
+}
+
+const GUESS_LABEL: Record<string, string> = {
+  page_meta: 'ngày ghi trên trang · 页面标注',
+  sitemap_lastmod: 'ngày trong sitemap · sitemap 日期',
+  first_seen: 'ngày nền tảng thấy lần đầu · 平台首次发现',
+};
+
+/** The pending suggestions as one group message. Numbers are the suggestions'
+ *  own (they never change), so a reply still means the same page days later. */
+export function suggestionListText(list: { seq: number; url: string; title: string | null; published_guess: string; guess_source: string; target_candidates: { n: number; strong: boolean }[]; evidence?: { cites?: number } }[]): string {
+  const items = list.map((s) => {
+    const qs = s.target_candidates.map((c) => `Q${c.n}${c.strong ? ' ✓' : ''}`).join(', ');
+    return [
+      `#${s.seq} · ${s.title ?? s.url}`,
+      `   ${s.url}`,
+      `   Ngày đăng (ước tính) · 发布日期(估计): ${s.published_guess} — ${GUESS_LABEL[s.guess_source] ?? s.guess_source}${s.evidence?.cites ? ` · AI đã trích dẫn ${s.evidence.cites} lần · 已被引用 ${s.evidence.cites} 次` : ''}`,
+      ...(qs ? [`   Câu hỏi gợi ý · 建议目标问题: ${qs}`] : []),
+    ].join('\n');
+  });
+  return [
+    `Nền tảng phát hiện ${list.length} trang mới trên website, chưa được ghi thành hành động · 平台在官网上发现 ${list.length} 个新页面，尚未登记为行动:`,
+    '',
+    items.join('\n\n'),
+    '',
+    'Xác nhận · 确认: @bot /xacnhan <số> [ngày đăng] [Q1–Q20]   — ví dụ · 例: /xacnhan 3 17/09 Q5',
+    'Không ghi ngày thì dùng ngày ước tính; không ghi Q thì dùng các câu có dấu ✓ · 不写日期则用估计日期；不写 Q 则采用带 ✓ 的问题。',
+    'Chỉ khi thành viên đội ngũ xác nhận mới được ghi, và ghi dưới tên người xác nhận · 团队成员确认后才登记，并记在确认人名下。',
+  ].join('\n');
+}
+
+export const XACNHAN_HELP = '• /xacnhan <số> [ngày đăng] [Q1–Q20] — xác nhận một trang nền tảng đã phát hiện · 确认平台发现的页面';
 
 export const HELP_TEXT = [
   'GEO Assistant (MemeCMO) — lệnh · 指令:',

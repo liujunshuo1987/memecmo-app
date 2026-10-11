@@ -18,8 +18,12 @@
 // question direction; they count as participation, not direction.
 // Only the client org's own people count. MemeCMO operators (root-org members)
 // and operator/proxy rows are excluded — an update we typed is not theirs.
+// Pages the platform found on the client's site (lib/suggestions) are not
+// updates either until a client account confirms them: they are reported as a
+// separate count (awaitingConfirmation) and carry no weight in w_k.
 
 import { unitHash } from '@/lib/edits';
+import { loadPendingSuggestions } from '@/lib/suggestions';
 
 const normPrompt = (s: string) =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[?？.!,\s]+/g, ' ').trim();
@@ -99,6 +103,9 @@ export interface CollabAlignment extends AlignmentResult {
     setEdits: number;        // attributed prompt / competitor-set edits (governance)
     clientPeople: number;    // accounts counted as the client team
   };
+  // Pages found on the client's site, not yet confirmed by anyone. A notice,
+  // not participation. null = could not be read.
+  awaitingConfirmation: number | null;
 }
 
 /** Load the period's data for one project and compute the alignment. */
@@ -185,6 +192,10 @@ export async function loadCollabAlignment(sb: any, projectId: string, from: Date
     (Array.isArray(meta.promptEditLog) ? meta.promptEditLog : []).filter((l: any) => inPeriod(l.at) && isClient(l.by)).length +
     (Array.isArray(meta.competitorSetLog) ? meta.competitorSetLog : []).filter((l: any) => inPeriod(l.at) && isClient(l.by)).length;
 
+  // Unlike the reads above this one may fail quietly: it only adds a notice,
+  // and without it the block says what it said before.
+  const awaitingConfirmation = await loadPendingSuggestions(sb, projectId).then((l) => l.length).catch(() => null);
+
   const result = computeAlignment({
     core,
     baselineSamples: ((baseline as any)?.rawSamples ?? []) as { prompt: string; brandPresent?: boolean }[],
@@ -197,5 +208,6 @@ export async function loadCollabAlignment(sb: any, projectId: string, from: Date
     to: toIso.slice(0, 10),
     baselineRunId: baseline?.id ?? null,
     participation: { actions, answerEdits, factEdits, setEdits, clientPeople: people.size },
+    awaitingConfirmation,
   };
 }

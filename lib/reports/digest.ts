@@ -119,6 +119,8 @@ const UI = {
     collabSection: '协作一致度(近 28 天)',
     collabValue: (trust: number, n: number, on: number) => `${trust.toFixed(2)} · 贵方署名更新 ${n} 条,其中 ${Math.round(on * 100)}% 落在重点 20 题上`,
     collabNone: '近 28 天平台上没有贵方署名的行动或答案修改,暂无法计算。每次发布后在平台上点"记一条行动"记录一次,即可计入。',
+    collabNoneYet: '近 28 天平台上还没有贵方署名的行动或答案修改,暂无法计算。',
+    collabAwaiting: (n: number) => `平台在贵方网站上检测到 ${n} 个新页面,正等待贵方确认:在平台"行动"栏点"确认"即可登记(发布日期可改),无需手动填写链接。未确认的页面不算行动,也不计入一致度。`,
     collabGovernance: (f: number, s: number) => `另有治理类更新:事实修改 ${f} 条、问题/竞品集修改 ${s} 条(计入参与,不计入方向)。`,
     collabNeglected: '差距最大、本期尚无行动的问题',
     collabNote: '口径:以本期开始前最近一次扫描为基准,重点 20 题上每题的差距 = 1 − 提到品牌的回答 ÷ 该题回答数;贵方本期署名的行动与答案修改按题计量;两者的余弦相似度,负值记为 0(0 = 方向无关,1 = 完全一致)。仅计贵方账号,不含 MemeCMO 代录。',
@@ -193,6 +195,8 @@ const UI = {
     collabSection: 'Collaboration alignment (last 28 days)',
     collabValue: (trust: number, n: number, on: number) => `${trust.toFixed(2)} · ${n} update(s) signed by your team, ${Math.round(on * 100)}% on the Core 20 questions`,
     collabNone: 'No actions or answer edits signed by your team on the platform in the last 28 days, so alignment cannot be computed yet. Logging each publication once ("Log an action") makes it count.',
+    collabNoneYet: 'No actions or answer edits signed by your team on the platform in the last 28 days yet, so alignment cannot be computed.',
+    collabAwaiting: (n: number) => `The platform detected ${n} new page${n === 1 ? '' : 's'} on your site, waiting for your confirmation: "Confirm" under Actions in the workspace logs ${n === 1 ? 'it' : 'each one'} (the publish date can be corrected) — there is no link to type. Unconfirmed pages are not counted as actions or in the alignment score.`,
     collabGovernance: (f: number, s: number) => `Governance updates: ${f} fact edit(s), ${s} prompt/competitor-set edit(s) (count as participation, not direction).`,
     collabNeglected: 'Largest gaps with no action yet',
     collabNote: 'Method: baseline = the last scan before the period; per Core 20 question, gap = 1 − answers naming the brand ÷ answers on that question; your team\'s signed actions and answer edits are counted per question; the score is the cosine of the two, negatives set to 0 (0 = unrelated direction, 1 = fully aligned). Your accounts only; MemeCMO proxy entries excluded.',
@@ -267,6 +271,8 @@ const UI = {
     collabSection: 'Mức đồng hướng phối hợp (28 ngày gần nhất)',
     collabValue: (trust: number, n: number, on: number) => `${trust.toFixed(2)} · ${n} cập nhật có ghi tên đội ngũ Quý công ty, ${Math.round(on * 100)}% thuộc 20 câu hỏi trọng tâm`,
     collabNone: 'Trong 28 ngày qua chưa có hành động hay chỉnh sửa câu trả lời nào do đội ngũ Quý công ty ghi trên nền tảng, nên chưa tính được. Mỗi lần đăng bài, ghi lại một lần ("Ghi một hành động") là được tính.',
+    collabNoneYet: 'Trong 28 ngày qua chưa có hành động hay chỉnh sửa câu trả lời nào do đội ngũ Quý công ty ghi trên nền tảng, nên chưa tính được.',
+    collabAwaiting: (n: number) => `Nền tảng đã phát hiện ${n} trang mới trên website của Quý công ty, đang chờ Quý công ty xác nhận: chỉ cần bấm "Xác nhận" trong mục Hành động trên nền tảng (có thể sửa ngày đăng), không cần nhập link. Trang chưa xác nhận không được tính là hành động và không tính vào mức đồng hướng.`,
     collabGovernance: (f: number, s: number) => `Cập nhật quản trị: ${f} chỉnh sửa dữ kiện, ${s} chỉnh sửa bộ câu hỏi/đối thủ (tính vào mức tham gia, không tính vào hướng).`,
     collabNeglected: 'Các câu hỏi có khoảng trống lớn nhất nhưng chưa có hành động',
     collabNote: 'Chuẩn đo: lấy lần quét gần nhất trước kỳ làm mốc; với mỗi câu trong 20 câu trọng tâm, khoảng trống = 1 − số câu trả lời nhắc thương hiệu ÷ số câu trả lời của câu đó; hành động và chỉnh sửa có ghi tên của Quý công ty được tính theo từng câu; điểm là cosin giữa hai vectơ, giá trị âm tính là 0 (0 = không cùng hướng, 1 = hoàn toàn cùng hướng). Chỉ tính tài khoản của Quý công ty, không tính phần MemeCMO ghi hộ.',
@@ -1335,7 +1341,11 @@ function digestHtml(g: GatherResult, interp: Interpretation | null): string {
     ? `<div style="margin-top:22px;"><div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#8A7F78;margin-bottom:8px;">${esc(t.collabSection)}</div>` +
       (c.trust != null
         ? `<div style="font-size:13px;color:#2B2B2B;"><strong>${esc(t.collabValue(c.trust, c.participation.actions + c.participation.answerEdits, c.onPlanShare ?? 0))}</strong></div>`
-        : `<div style="font-size:12.5px;color:#4A4A4A;">${esc(t.collabNone)}</div>`) +
+        : `<div style="font-size:12.5px;color:#4A4A4A;">${esc(c.awaitingConfirmation ? t.collabNoneYet : t.collabNone)}</div>`) +
+      // Found on the client's site, not yet confirmed: said as a count, never added to the figures above.
+      (c.awaitingConfirmation
+        ? `<div style="font-size:12.5px;color:#4A4A4A;margin-top:4px;">${esc(t.collabAwaiting(c.awaitingConfirmation))}</div>`
+        : '') +
       (c.participation.factEdits || c.participation.setEdits
         ? `<div style="font-size:12px;color:#4A4A4A;margin-top:4px;">${esc(t.collabGovernance(c.participation.factEdits, c.participation.setEdits))}</div>`
         : '') +

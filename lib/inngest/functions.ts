@@ -9,8 +9,9 @@ import { applyMonthlyGrant, applyPlanAllowance } from '@/lib/credits';
 import { sendEmail } from '@/lib/email';
 import { runEnginePatrol } from '@/lib/engines/health';
 import { dueUrls, fetchBatch, chunk, type DueUrl } from '@/lib/pages/queue';
-import { discoverSitePages, registerSitePages } from '@/lib/pages/sitemap';
+import { discoverSitePagesDated, registerSitePages } from '@/lib/pages/sitemap';
 import { verifyIntervention, verifyDueInterventions } from '@/lib/pages/verify';
+import { runDetection, unreadOwnPages } from '@/lib/suggestions';
 import { handleLarkMessage } from '@/lib/lark-bot';
 import { previewReadyEmail, nurtureD1Email, nurtureD3Email, nurtureD7Email, TrialEmailCtx } from '@/lib/emails/trial';
 
@@ -407,7 +408,7 @@ export const pagesFetch = inngest.createFunction(
           const sb = svc();
           const { data: proj } = await sb.from('projects').select('brand_url').eq('id', projectId).maybeSingle();
           if (!proj?.brand_url) return 0;
-          return registerSitePages(sb, projectId, await discoverSitePages(String(proj.brand_url), 60));
+          return registerSitePages(sb, projectId, await discoverSitePagesDated(String(proj.brand_url), 60));
         })
       : 0;
     // step.run returns a JSON-ified shape (all props optional); the RPC rows are complete.
@@ -420,7 +421,19 @@ export const pagesFetch = inngest.createFunction(
     }
     // Phase 2: re-verify logged actions (new ones, then weekly).
     const verified = await step.run('verify-interventions', () => verifyDueInterventions(svc(), { projectId, limit: 30 }));
-    return { projectId, discovered, queued: due.length, ...totals, verified };
+    // Suggested actions (lib/suggestions): own pages first seen or first cited
+    // lately that nobody has logged, offered to the client team for confirmation.
+    // The queue above goes by citation count, so the brand's own new pages are
+    // read here first. Rules only; a failure never fails the fetch.
+    let suggested: { added?: number; closed?: number; error?: string } = { added: 0, closed: 0 };
+    if (projectId) {
+      const quiet = (e: unknown) => { const error = e instanceof Error ? e.message : String(e); console.warn('[suggestions]', error); return error; };
+      const unread = (await step.run('suggest-unread', () => unreadOwnPages(svc(), projectId, 24).catch((e) => { quiet(e); return []; }))) as DueUrl[];
+      const own = chunk(unread, 12);
+      for (let i = 0; i < own.length; i++) await step.run(`fetch-own-${i}`, () => fetchBatch(svc(), own[i]));
+      suggested = await step.run('suggest-actions', () => runDetection(svc(), projectId).catch((e) => ({ added: 0, closed: 0, error: quiet(e) })));
+    }
+    return { projectId, discovered, queued: due.length, ...totals, verified, suggested };
   },
 );
 

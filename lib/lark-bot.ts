@@ -3,12 +3,13 @@
 // that maps to no platform account (or a read-only one) is never stored as
 // theirs. Nothing the bot parses is written until the sender confirms.
 
-import { canEditOrg } from '@/lib/org-auth';
+import { canEditOrg, canSignForOrg } from '@/lib/org-auth';
 import { notifyOperator } from '@/lib/alerts';
 import { domainOf } from '@/lib/interventions';
 import { unitHash } from '@/lib/edits';
 import { inngest } from '@/lib/inngest/client';
-import { HELP_TEXT, hanhdongCard, larkReply, larkText, larkUserEmail, parseHanhdong, type HanhdongDraft } from '@/lib/lark';
+import { confirmSuggestion, loadPendingSuggestions } from '@/lib/suggestions';
+import { HELP_TEXT, XACNHAN_HELP, hanhdongCard, larkReply, larkSend, larkText, larkUserEmail, parseHanhdong, parseXacnhan, suggestionListText, type HanhdongDraft } from '@/lib/lark';
 
 type Sb = any;
 
@@ -57,6 +58,10 @@ const brandHosts = (p: any): string[] => {
   return [...hosts];
 };
 
+// Suggested actions in the group are off unless the project turns them on
+// (projects.metadata.larkSuggestedActions = true). Off, /xacnhan is an unknown command.
+export const larkSuggestionsOn = (p: any): boolean => p?.metadata?.larkSuggestedActions === true;
+
 const NO_ACCOUNT =
   'Chưa ghi được: email Lark của bạn chưa khớp với tài khoản có quyền chỉnh sửa trên nền tảng MemeCMO. Vui lòng dùng email đã đăng ký, hoặc báo MemeCMO mở quyền. · 未登记：您的 Lark 邮箱未对应到平台上有编辑权限的账号，请联系 MemeCMO 开通。';
 const ASK_ACK =
@@ -64,6 +69,46 @@ const ASK_ACK =
 const LINK_HINT =
   'Nếu link là bài / trang vừa đăng và cần ghi thành hành động: /hanhdong <link> <ngày đăng> · 如果是刚发布的稿件或页面、需要登记为行动：/hanhdong <链接> <发布日期>';
 const UNBOUND ='Nhóm này chưa được gắn với dự án nào trên nền tảng. · 本群尚未绑定平台项目。(MemeCMO: @bot /bind <project-slug>)';
+const NOT_CLIENT =
+  'Chưa ghi được: việc xác nhận phải do thành viên đội ngũ thương hiệu (tài khoản có quyền chỉnh sửa) thực hiện — MemeCMO không xác nhận thay. · 未登记：需由品牌方团队成员（有编辑权限的账号）确认，MemeCMO 不代为确认。';
+
+/**
+ * "/xacnhan <n> [date] [Q..]" from an account that may sign for the project:
+ * confirm suggestion n as that person's action. Database only — the caller has
+ * resolved the sender and sends the reply. Returns the outcome label, the reply
+ * text, and the new intervention's id when one was created.
+ */
+export async function confirmFromLark(sb: Sb, d: { project: any; userId: string; text: string; messageId: string | null; today: string }): Promise<{ outcome: string; reply: string; interventionId?: string }> {
+  const draft = parseXacnhan(d.text, d.today);
+  if (!draft.n) return { outcome: 'xacnhan:no-number', reply: `Thiếu số của trang cần xác nhận · 缺少要确认的页面编号。\n${XACNHAN_HELP}` };
+  const core: string[] = Array.isArray(d.project.metadata?.coreKeyPrompts) ? d.project.metadata.coreKeyPrompts : [];
+  const r = await confirmSuggestion(sb, {
+    projectId: d.project.id, seq: draft.n, userId: d.userId, channel: 'lark', larkMessageId: d.messageId, today: d.today,
+    publishedAt: draft.date ?? undefined,
+    targetPrompts: draft.targets ? draft.targets.map((n) => core[n - 1]).filter(Boolean) : undefined,
+  });
+  if ('error' in r) {
+    const why: Record<string, string> = {
+      'not-found': `Không có trang số #${draft.n} · 没有编号 #${draft.n} 的页面。`,
+      'already-confirmed': `Trang #${draft.n} đã được xác nhận trước đó · #${draft.n} 此前已确认。`,
+      'already-dismissed': `Trang #${draft.n} đã được đánh dấu "không phải hành động" · #${draft.n} 已被标记为"不算行动"。`,
+      'bad-date': 'Ngày đăng không hợp lệ · 发布日期无效。',
+      'future-date': 'Ngày đăng không thể ở tương lai · 发布日期不能晚于今天。',
+    };
+    return { outcome: `xacnhan:${r.error.slice(0, 60)}`, reply: why[r.error] ?? `Lỗi · 出错: ${r.error}` };
+  }
+  const qs = r.intervention.target_prompts.map((t) => { const i = core.indexOf(t.prompt); return i >= 0 ? `Q${i + 1}` : t.prompt.slice(0, 40); });
+  return {
+    outcome: `xacnhan:saved:${draft.n}`,
+    interventionId: r.intervention.id,
+    reply: [
+      `Đã ghi · 已登记 #${draft.n}: ${r.intervention.url}`,
+      `Ngày đăng · 发布日期: ${r.intervention.published_at}${draft.date ? '' : ' (ước tính · 估计)'}`,
+      `Câu hỏi mục tiêu · 目标问题: ${qs.length ? qs.join(', ') : '(chưa chọn · 未指定)'}`,
+      'Lần quét tiếp theo sẽ tự tính thay đổi trước/sau ngày đăng · 下次扫描起自动计算发布前后的变化。',
+    ].join('\n'),
+  };
+}
 
 /** Handle one stored @-message (Inngest worker). Returns the outcome label. */
 export async function handleLarkMessage(sb: Sb, rowId: string): Promise<string> {
@@ -84,7 +129,7 @@ export async function handleLarkMessage(sb: Sb, rowId: string): Promise<string> 
   // A known command may come after a pasted link ("<link> @bot /hanhdong …"), so it
   // is looked for anywhere after whitespace (the "/faq" inside a URL never matches);
   // an unknown one only counts at the start, so "50 /tháng" is not a command.
-  const cmd = (text.match(/(?:^|\s)\/(bind|hanhdong|maau|help)\b/i)?.[1] ?? text.match(/^\/([a-z]+)\b/i)?.[1] ?? '').toLowerCase();
+  const cmd = (text.match(/(?:^|\s)\/(bind|hanhdong|xacnhan|maau|help)\b/i)?.[1] ?? text.match(/^\/([a-z]+)\b/i)?.[1] ?? '').toLowerCase();
 
   if (cmd === 'bind') {
     const who = await senderAccount(sb, row.sender_open_id);
@@ -113,11 +158,32 @@ export async function handleLarkMessage(sb: Sb, rowId: string): Promise<string> 
     return finish('hanhdong:card', await larkReply(row.message_id, { card }));
   }
 
+  if (cmd === 'xacnhan') {
+    const project = await boundProject(sb, row.chat_id);
+    // Flag off (the default): falls through to the unknown-command reply below.
+    if (project && larkSuggestionsOn(project)) {
+      const who = await senderAccount(sb, row.sender_open_id);
+      const org: any = project.organizations;
+      if (!isAccount(who)) return finish(`xacnhan:denied:${who.why}`, await larkReply(row.message_id, { text: NO_ACCOUNT }));
+      if (!(await canSignForOrg(sb, who.userId, { id: org.id, parent_org_id: org.parent_org_id }))) {
+        return finish(`xacnhan:denied:not-client:${who.email}`, await larkReply(row.message_id, { text: NOT_CLIENT }));
+      }
+      const r = await confirmFromLark(sb, { project, userId: who.userId, text, messageId: row.message_id, today: vnToday() });
+      if (r.interventionId) {
+        try { await inngest.send({ name: 'geo/intervention.verify', data: { interventionId: r.interventionId } }); } catch { /* verification is best effort */ }
+      }
+      return finish(r.outcome, await larkReply(row.message_id, { text: r.reply }));
+    }
+  }
+
   if (cmd === 'maau') {
     return finish('maau:not-yet', await larkReply(row.message_id, { text: 'Phiếu yêu cầu MAAU sẽ mở trong đợt tiếp theo · MAAU 需求单将在下一阶段开放。' }));
   }
 
-  if (!text || cmd === 'help') return finish('help', await larkReply(row.message_id, { text: HELP_TEXT }));
+  if (!text || cmd === 'help') {
+    const withConfirm = larkSuggestionsOn(await boundProject(sb, row.chat_id));
+    return finish('help', await larkReply(row.message_id, { text: withConfirm ? `${HELP_TEXT}\n${XACNHAN_HELP}` : HELP_TEXT }));
+  }
   if (cmd) {
     return finish(`unknown:${cmd}`, await larkReply(row.message_id, { text: `Không có lệnh /${cmd} · 没有 /${cmd} 这个指令。\n\n${HELP_TEXT}` }));
   }
@@ -211,4 +277,26 @@ export async function postOperatorAnswer(sb: Sb, d: { rowId: string; text: strin
   const { error } = await sb.from('lark_messages').update({ answered_at: now, answer: { reply_id: replyId, text, approved_by: d.approvedBy.trim(), sent_at: now } }).eq('id', row.id);
   if (error) throw new Error(`answer posted (${replyId}) but not recorded: ${error.message}`);
   return `answered:${replyId}`;
+}
+
+/**
+ * Post the project's pending suggestions to its bound group, numbered for
+ * "/xacnhan <n>". NOT wired to any schedule, route or event: each post is a
+ * message to the client's group and is sent only when a named person approves
+ * that send (same rule as postOperatorAnswer). Refuses unless the project has
+ * turned suggested actions on for Lark.
+ */
+export async function postSuggestionList(sb: Sb, d: { projectId: string; approvedBy: string }): Promise<string> {
+  if (!d.approvedBy.trim()) return 'refused:no-approver';
+  const { data: project } = await sb.from('projects').select('id, metadata').eq('id', d.projectId).maybeSingle();
+  if (!project) return 'refused:no-project';
+  if (!larkSuggestionsOn(project)) return 'refused:flag-off';
+  const { data: binding } = await sb.from('lark_bindings').select('chat_id').eq('project_id', d.projectId).limit(1).maybeSingle();
+  if (!binding?.chat_id) return 'refused:unbound';
+  const list = (await loadPendingSuggestions(sb, d.projectId)).slice(0, 10);
+  if (!list.length) return 'nothing-pending';
+  const messageId = await larkSend(binding.chat_id, { text: suggestionListText(list) });
+  const { error } = await sb.from('intervention_suggestions').update({ lark_posted_at: new Date().toISOString(), lark_posted_by: d.approvedBy.trim() }).in('id', list.map((s) => s.id));
+  if (error) throw new Error(`list posted (${messageId}) but not recorded: ${error.message}`);
+  return `posted:${messageId}:${list.length}`;
 }

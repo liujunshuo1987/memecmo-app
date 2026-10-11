@@ -20,7 +20,25 @@ async function text(url: string): Promise<string | null> {
 
 const locs = (xml: string) => [...xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/gi)].map((m) => m[1].trim());
 
+// <lastmod> per <url> entry. Sites write nonsense here too: a date in the future is not kept.
+function lastmods(xml: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const m of xml.matchAll(/<url\b[^>]*>([\s\S]*?)<\/url>/gi)) {
+    const loc = (m[1].match(/<loc>\s*([^<\s]+)\s*<\/loc>/i) || [])[1];
+    const d = new Date(((m[1].match(/<lastmod>\s*([^<\s]+)\s*<\/lastmod>/i) || [])[1] ?? '').trim());
+    if (loc && !isNaN(d.getTime()) && d.getUTCFullYear() >= 2000 && d.getTime() <= Date.now() + 2 * 86_400_000) out.set(loc.trim(), d.toISOString());
+  }
+  return out;
+}
+
+export interface SitePage { url: string; lastmod: string | null }
+
 export async function discoverSitePages(brandUrl: string, limit = 60): Promise<string[]> {
+  return (await discoverSitePagesDated(brandUrl, limit)).map((p) => p.url);
+}
+
+/** The same pages, each with its sitemap <lastmod> when the sitemap gives one. */
+export async function discoverSitePagesDated(brandUrl: string, limit = 60): Promise<SitePage[]> {
   let origin: URL;
   try { origin = new URL(brandUrl.startsWith('http') ? brandUrl : `https://${brandUrl}`); } catch { return []; }
   const host = domainOf(origin.toString());
@@ -30,6 +48,7 @@ export async function discoverSitePages(brandUrl: string, limit = 60): Promise<s
   candidates.push(`${origin.origin}/sitemap.xml`, `${origin.origin}/sitemap_index.xml`, `${origin.origin}/sitemap-index.xml`);
 
   const pages = new Set<string>();
+  const modified = new Map<string, string>();
   const seenMaps = new Set<string>();
   let mapsRead = 0;
   const readMap = async (u: string, depth: number) => {
@@ -42,6 +61,7 @@ export async function discoverSitePages(brandUrl: string, limit = 60): Promise<s
       for (const c of children) await readMap(c, depth + 1);
     } else {
       for (const l of locs(xml)) if (domainOf(l) === host && !NOISE.test(l)) pages.add(l);
+      for (const [l, d] of lastmods(xml)) modified.set(l, d);
     }
     return;
   };
@@ -57,13 +77,26 @@ export async function discoverSitePages(brandUrl: string, limit = 60): Promise<s
     }
   }
   // Shallow paths first (hubs before leaves), stable order otherwise.
-  return [...pages].map((u, i) => ({ u, i, d: (new URL(u).pathname.match(/\//g) || []).length })).sort((a, b) => a.d - b.d || a.i - b.i).slice(0, limit).map((x) => x.u);
+  return [...pages].map((u, i) => ({ u, i, d: (new URL(u).pathname.match(/\//g) || []).length })).sort((a, b) => a.d - b.d || a.i - b.i).slice(0, limit).map((x) => ({ url: x.u, lastmod: modified.get(x.u) ?? null }));
 }
 
-export async function registerSitePages(sb: SupabaseClient, projectId: string, urls: string[]): Promise<number> {
-  if (!urls.length) return 0;
-  const rows = urls.map((url) => ({ project_id: projectId, url, source: 'sitemap' }));
+export async function registerSitePages(sb: SupabaseClient, projectId: string, pages: (string | SitePage)[]): Promise<number> {
+  if (!pages.length) return 0;
+  const list = pages.map((p) => (typeof p === 'string' ? { url: p, lastmod: null } : p));
+  const rows = list.map((p) => ({ project_id: projectId, url: p.url, source: 'sitemap' }));
   const { error } = await sb.from('project_pages').upsert(rows, { onConflict: 'project_id,url', ignoreDuplicates: true });
   if (error) throw new Error(`project_pages: ${error.message}`);
+  // The lastmod at first sighting is a publish-date guess for suggested actions
+  // (lib/suggestions); later values would be edits, so it is written once.
+  // Best effort — the column arrives with 20261011_intervention_suggestions.sql.
+  const dated = list.filter((p) => p.lastmod);
+  if (dated.length) {
+    try {
+      const { data: blank, error: e } = await sb.from('project_pages').select('url').eq('project_id', projectId).is('lastmod', null).limit(1000);
+      if (e) throw new Error(e.message);
+      const want = new Set((blank ?? []).map((r: any) => String(r.url)));
+      for (const p of dated) if (want.has(p.url)) await sb.from('project_pages').update({ lastmod: p.lastmod }).eq('project_id', projectId).eq('url', p.url).is('lastmod', null);
+    } catch (e) { console.warn('[pages] lastmod not recorded:', e instanceof Error ? e.message : String(e)); }
+  }
   return rows.length;
 }

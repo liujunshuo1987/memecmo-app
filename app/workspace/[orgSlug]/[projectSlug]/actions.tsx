@@ -6,6 +6,11 @@
 // rail for anything the client did on their own (a site update, a directory
 // claim). Outcomes are computed server-side from the scans; the panel shows
 // them as fractions.
+// A third, which asks for no typing: "Suggested actions" — pages the platform
+// itself found on the brand's site (lib/suggestions). The team confirms or
+// sets it aside ("not ours" — worded "Not an action", since the page is always
+// on the brand's own host); only a confirmed one becomes an action, under
+// their name.
 
 import { useCallback, useEffect, useState } from 'react';
 
@@ -126,9 +131,138 @@ export function OutcomeLine({ o, t }: { o?: OutcomeRow; t: (s: string) => string
   );
 }
 
-/** Right-rail panel: list + "Log an action". */
+// ── Suggested actions ────────────────────────────────────────────────────────
+export interface SuggestionItem {
+  id: string; seq: number; url: string; domain: string | null; title: string | null;
+  published_guess: string; guess_source: 'page_meta' | 'sitemap_lastmod' | 'first_seen';
+  target_candidates: { n: number; prompt: string; shared: number; strong: boolean }[];
+  evidence: { cites?: number; engines?: string[] };
+}
+
+// Kept here rather than in the workspace dictionary: these strings belong to this block only.
+const SUGGEST_LABELS = {
+  heading: { en: 'Suggested actions', zh: '建议登记的行动', vi: 'Hành động gợi ý' },
+  intro: {
+    en: 'New pages the platform found on the brand\'s site. Nothing is logged until someone on the team confirms.',
+    zh: '平台在品牌官网上发现的新页面。团队成员确认后才登记,未确认的不算行动。',
+    vi: 'Trang mới nền tảng phát hiện trên website của thương hiệu. Chỉ ghi khi thành viên đội ngũ xác nhận.',
+  },
+  confirm: { en: 'Confirm', zh: '确认', vi: 'Xác nhận' },
+  notOurs: { en: 'Not an action', zh: '不算行动', vi: 'Không phải hành động' },
+  published: { en: 'Published', zh: '发布日期', vi: 'Ngày đăng' },
+  page_meta: { en: 'date stated on the page', zh: '页面标注的日期', vi: 'ngày ghi trên trang' },
+  sitemap_lastmod: { en: 'date in the sitemap', zh: 'sitemap 中的日期', vi: 'ngày trong sitemap' },
+  first_seen: { en: 'first seen by the platform', zh: '平台首次发现的日期', vi: 'ngày nền tảng thấy lần đầu' },
+  fixDate: { en: 'correct it if it is off', zh: '如有出入请修改', vi: 'sửa nếu chưa đúng' },
+  cited: { en: 'cited in the scans', zh: '在扫描中被引用', vi: 'được trích dẫn trong các lần quét' },
+  targets: { en: 'Target questions (optional)', zh: '目标问题(可选)', vi: 'Câu hỏi mục tiêu (tùy chọn)' },
+  waiting: {
+    en: 'Waiting for the client team to confirm — MemeCMO does not confirm on their behalf.',
+    zh: '等待客户团队确认 —— MemeCMO 不代为确认。',
+    vi: 'Đang chờ đội ngũ khách hàng xác nhận — MemeCMO không xác nhận thay.',
+  },
+  more: { en: 'more', zh: '条更多', vi: 'mục nữa' },
+} as const;
+
+export function useSuggestions(projectId: string | undefined) {
+  const [list, setList] = useState<SuggestionItem[]>([]);
+  const [can, setCan] = useState({ confirm: false, dismiss: false });
+  const reload = useCallback(async () => {
+    if (!projectId) return;
+    const res = await fetch(`/api/workspace/suggestions?projectId=${encodeURIComponent(projectId)}`).catch(() => null);
+    const d = res && res.ok ? await res.json() : { suggestions: [] };
+    setList(d.suggestions ?? []); setCan({ confirm: !!d.canConfirm, dismiss: !!d.canDismiss });
+  }, [projectId]);
+  useEffect(() => { reload(); }, [reload]);
+  return { list, can, reload };
+}
+
+async function decideSuggestion(body: Record<string, unknown>): Promise<string | null> {
+  const res = await fetch('/api/workspace/suggestions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const d = await res.json().catch(() => ({}));
+  return res.ok ? null : d.error || 'Failed';
+}
+
+/** One found page: link, where the date guess comes from, Confirm / Not ours. */
+function SuggestionCard({ s, projectId, lang, t, can, onDone }: {
+  s: SuggestionItem; projectId: string; lang: 'en' | 'zh' | 'vi'; t: (s: string) => string; can: { confirm: boolean; dismiss: boolean }; onDone: () => void;
+}) {
+  const L = (k: keyof typeof SUGGEST_LABELS) => SUGGEST_LABELS[k][lang];
+  const [open, setOpen] = useState(false);
+  const [date, setDate] = useState(s.published_guess);
+  const [picked, setPicked] = useState<string[]>(s.target_candidates.filter((c) => c.strong).map((c) => c.prompt));
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const send = async (body: Record<string, unknown>) => {
+    setBusy(true); setErr(null);
+    const e = await decideSuggestion({ projectId, id: s.id, ...body });
+    setBusy(false);
+    if (e) setErr(e); else onDone();
+  };
+  const toggle = (p: string) => setPicked((cur) => (cur.includes(p) ? cur.filter((x) => x !== p) : [...cur, p]));
+  return (
+    <div className="border-t border-edge pt-1.5 space-y-1">
+      <div className="text-[11px] text-ink">{s.title || s.domain || s.url}</div>
+      <a href={s.url} target="_blank" rel="noreferrer" className="block text-[10px] text-brand break-all">{s.url.replace(/^https?:\/\/(www\.)?/, '')}</a>
+      <div className="text-[10px] text-faint">
+        {L('published')} {s.published_guess} · {L(s.guess_source)}
+        {s.evidence?.cites ? ` · ${L('cited')} ${s.evidence.cites}×` : ''}
+      </div>
+      {open ? (
+        <div className="rounded-md mc-chip-inset p-2 space-y-1.5 text-[11px]">
+          <label className="flex flex-wrap items-center gap-1.5 text-dim">
+            {L('published')}
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mc-input rounded px-1.5 py-1 text-ink" />
+            <span className="text-[10px] text-faint">{L(s.guess_source)} — {L('fixDate')}</span>
+          </label>
+          {s.target_candidates.length > 0 && (
+            <div className="space-y-0.5">
+              <div className="text-[10px] text-faint">{L('targets')}</div>
+              {s.target_candidates.map((c) => (
+                <label key={c.n} className="flex items-start gap-1.5 text-[10px] text-dim">
+                  <input type="checkbox" checked={picked.includes(c.prompt)} onChange={() => toggle(c.prompt)} className="mt-0.5" />
+                  <span>Q{c.n} · {c.prompt}</span>
+                </label>
+              ))}
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <button onClick={() => send({ action: 'confirm', publishedAt: date, targetPrompts: picked })} disabled={busy || !date} className="px-2 py-0.5 rounded bg-brand text-on-brand disabled:opacity-50">{L('confirm')}</button>
+            <button onClick={() => setOpen(false)} disabled={busy} className="px-2 py-0.5 rounded mc-chip-inset text-dim">{t('Cancel')}</button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 text-[10px]">
+          {can.confirm && <button onClick={() => setOpen(true)} disabled={busy} className="px-2 py-0.5 rounded bg-brand text-on-brand disabled:opacity-50">{L('confirm')}</button>}
+          {can.dismiss && <button onClick={() => send({ action: 'dismiss' })} disabled={busy} className="px-2 py-0.5 rounded mc-chip-inset text-dim hover:text-brand disabled:opacity-50">{L('notOurs')}</button>}
+        </div>
+      )}
+      {err && <div className="text-[10px] text-garnet">{err}</div>}
+    </div>
+  );
+}
+
+function SuggestedActions({ projectId, lang, t, list, can, onDone }: {
+  projectId: string; lang: 'en' | 'zh' | 'vi'; t: (s: string) => string; list: SuggestionItem[]; can: { confirm: boolean; dismiss: boolean }; onDone: () => void;
+}) {
+  const [all, setAll] = useState(false);
+  if (!list.length) return null;
+  const shown = all ? list : list.slice(0, 4);
+  return (
+    <div className="rounded-md mc-chip-inset p-2 space-y-1.5">
+      <div className="text-[10px] uppercase tracking-widest text-gold">{SUGGEST_LABELS.heading[lang]} · {list.length}</div>
+      <div className="text-[10px] text-faint">{SUGGEST_LABELS.intro[lang]}</div>
+      {!can.confirm && <div className="text-[10px] text-dim">{SUGGEST_LABELS.waiting[lang]}</div>}
+      {shown.map((s) => <SuggestionCard key={s.id} s={s} projectId={projectId} lang={lang} t={t} can={can} onDone={onDone} />)}
+      {!all && list.length > shown.length && <button onClick={() => setAll(true)} className="text-[10px] text-faint hover:text-brand">+ {list.length - shown.length} {SUGGEST_LABELS.more[lang]}</button>}
+    </div>
+  );
+}
+
+/** Right-rail panel: suggested actions, list + "Log an action". */
 export function ActionsPanel({ projectId, lang, t }: { projectId?: string; lang: 'en' | 'zh' | 'vi'; t: (s: string) => string }) {
   const { list, outcomes, citedAfter, reload } = useInterventions(projectId, { withOutcomes: true });
+  const suggested = useSuggestions(projectId);
   const [open, setOpen] = useState(false);
   if (!projectId) return null;
   return (
@@ -137,8 +271,9 @@ export function ActionsPanel({ projectId, lang, t }: { projectId?: string; lang:
         <div className="text-[10px] uppercase tracking-widest text-faint">{t('Actions')}</div>
         {!open && <button onClick={() => setOpen(true)} className="text-[10px] text-faint hover:text-brand">+ {t('Log an action')}</button>}
       </div>
+      <SuggestedActions projectId={projectId} lang={lang} t={t} list={suggested.list} can={suggested.can} onDone={() => { suggested.reload(); reload(); }} />
       {open && <InterventionForm projectId={projectId} lang={lang} t={t} onDone={() => { setOpen(false); reload(); }} onCancel={() => setOpen(false)} />}
-      {list.length === 0 && !open && <div className="text-[10px] text-faint">{t('Nothing logged yet — log what the brand publishes and the next scans show what moved.')}</div>}
+      {list.length === 0 && !open && suggested.list.length === 0 && <div className="text-[10px] text-faint">{t('Nothing logged yet — log what the brand publishes and the next scans show what moved.')}</div>}
       {list.slice(0, 6).map((iv) => (
         <div key={iv.id} className="border-t border-edge pt-1.5">
           <div className="text-[11px] text-ink">{KIND_LABELS[iv.kind]?.[lang] ?? iv.kind}{iv.title ? ` · ${iv.title}` : ''} <span className="text-faint">· {iv.published_at}</span></div>
