@@ -29,6 +29,7 @@ import { loadInterventions, computeOutcomes, outcomeFigures, describeOutcome, ci
 import { loadCollabAlignment, type CollabAlignment } from '@/lib/collab-alignment';
 import { loadBrandProfile } from '@/lib/agents/run';
 import { traceAffectedEngines, mostlyEmptyEngines, fetchRepairedEngines } from '@/lib/engines/ingest';
+import { NOTES_PATH, NOTES_LINK_LABEL } from '@/lib/notes/paths';
 import { brandFactsCorpus, brandProfileBlock } from '@/lib/agents/brand-facts';
 import type { CompetitorGroup } from '@/lib/agents/source-owners';
 import {
@@ -1069,6 +1070,9 @@ function digestHtml(g: GatherResult, interp: Interpretation | null): string {
       (g.ingestIssue?.log ? noteBox(t.ingestNote(g.ingestIssue.log.engines.join(', '), g.ingestIssue.log.scope)) : '') +
       (g.ingestIssue?.empty ? noteBox(t.emptyNote(g.ingestIssue.empty.list.map((x) => t.unread(x.engine, x.answered, x.total)).join('; '), g.ingestIssue.empty.scope)) : '') +
       g.fetchRepaired.map((x) => noteBox(t.fetchNote(x.engine, x.before, x.now, x.total))).join('');
+    const notesLink = ingestBlock || methodBlock
+      ? `<div style="font-size:11.5px;margin:-4px 0 10px;"><a href="${APP_URL}${NOTES_PATH[lang]}" style="color:#7A3B46;">${esc(NOTES_LINK_LABEL[lang])} →</a></div>`
+      : '';
     const engines = (cur.metrics?.perEngine ?? [])
       .map(
         (e: any) =>
@@ -1089,7 +1093,7 @@ function digestHtml(g: GatherResult, interp: Interpretation | null): string {
          <div style="font-size:11px;color:#9C8E8A;margin-top:4px;line-height:1.5;">${esc(t.panelNote(cur?.sampled?.used ?? '–', g.core.questions))}</div>
        </div>` : ''}
        ${g.stage === 'build' ? `<p style="margin:12px 0 0;font-size:12.5px;color:#8A6D3B;background:#FBF3E4;border-radius:8px;padding:10px 12px;line-height:1.55;">${esc(t.baselineNote)}</p>` : ''}
-       ${methodBlock}${ingestBlock}
+       ${methodBlock}${ingestBlock}${notesLink}
        <table style="width:100%;border-collapse:collapse;margin-top:14px;">${engines}</table>
        <div style="font-size:12px;color:#6E625F;margin-top:8px;">${esc(t.highIntent)}: ${hi ? Math.round(hi.aigvr) : '–'} · ${esc(t.topOfMind)}: ${cur.topOfMind?.overallRate != null ? Math.round(cur.topOfMind.overallRate) + '%' : '–'}</div>`,
     );

@@ -12,6 +12,41 @@ import { brandFactsCorpus } from '@/lib/agents/brand-facts';
 import type { CompetitorGroup } from '@/lib/agents/source-owners';
 import { figuresFromScorecard } from '@/lib/reports/verify';
 import { scrub, figureCorpusOf, quarterOf } from '@/lib/reports/audit';
+import { traceAffectedEngines, mostlyEmptyEngines } from '@/lib/engines/ingest';
+import { NOTES_PATH, NOTES_LINK_LABEL, type NotesLang } from '@/lib/notes/paths';
+
+// A report rests on one scan. When an engine in that scan was not read
+// correctly the report says so above everything else, and the model is told
+// not to reason from that engine's figures. Nothing is adjusted.
+const NOTE_TEXT: Record<NotesLang, { title: string; misread: (e: string) => string; unread: (e: string, a: number, n: number) => string }> = {
+  en: {
+    title: 'Measurement note',
+    misread: (e) => `In this scan ${e} was scored on the engine's search log, not on the answer. Its figures, and the totals that include them, are not valid readings.`,
+    unread: (e, a, n) => `In this scan ${e} returned ${a} of ${n} answers. Its figures, and the totals that include them, are not valid readings.`,
+  },
+  vi: {
+    title: 'Lưu ý đo lường',
+    misread: (e) => `Ở lần quét này, ${e} được chấm trên nhật ký tìm kiếm của engine, không phải trên câu trả lời. Số đo của engine này và các số tổng có chứa nó chưa phải là số đo hợp lệ.`,
+    unread: (e, a, n) => `Ở lần quét này, ${e} chỉ trả về ${a}/${n} câu trả lời. Số đo của engine này và các số tổng có chứa nó chưa phải là số đo hợp lệ.`,
+  },
+  zh: {
+    title: '测量说明',
+    misread: (e) => `这次扫描中,${e} 的判分读到的是引擎的搜索记录,不是回答正文。该引擎的数字,以及包含它的各项总数,不是有效读数。`,
+    unread: (e, a, n) => `这次扫描中,${e} 只返回 ${a}/${n} 条回答。该引擎的数字,以及包含它的各项总数,不是有效读数。`,
+  },
+};
+const notesLang = (l?: string | null): NotesLang => (/^vi/i.test(l ?? '') ? 'vi' : /^zh/i.test(l ?? '') ? 'zh' : 'en');
+const NOTES_BASE = 'https://app.memecmo.ai';
+
+function measurementNotes(sc: any, lang: NotesLang): { lines: string[]; engines: string[] } {
+  const misread = traceAffectedEngines(sc);
+  const unread = mostlyEmptyEngines(sc);
+  const t = NOTE_TEXT[lang];
+  return {
+    lines: [...(misread.length ? [t.misread(misread.join(', '))] : []), ...unread.map((u) => t.unread(u.engine, u.answered, u.total))],
+    engines: [...new Set([...misread, ...unread.map((u) => u.engine)])],
+  };
+}
 
 type EventEmitter = (event: {
   event_type:
@@ -84,6 +119,14 @@ function buildMarkdown(input: ReportInput, sc: any, r: ReportJson): string {
   lines.push(`**AIGVR Score: ${sc?.aigvrScore ?? '—'}/100**  ·  ${input.targetCountry}` + (input.industry ? `  ·  ${input.industry}` : ''));
   lines.push('');
   lines.push(`> Measured across ${(sc?.engines || []).join(', ')} — ${sc?.sampled?.queries ?? '—'} live AI queries.`);
+  lines.push('');
+  const nl = notesLang(input.targetLanguage);
+  const notes = measurementNotes(sc, nl);
+  if (notes.lines.length) {
+    lines.push(`> **${NOTE_TEXT[nl].title}.** ${notes.lines.join(' ')}`);
+    lines.push('');
+  }
+  lines.push(`> [${NOTES_LINK_LABEL[nl]}](${NOTES_BASE}${NOTES_PATH[nl]})`);
   lines.push('');
 
   lines.push('## Executive Summary');
@@ -208,6 +251,12 @@ export async function runReportAgent(
     `Market: ${input.targetCountry}` + (input.industry ? ` · ${input.industry}` : ''),
     `Buyer queries are in the local language; keep example queries verbatim.`,
     '',
+    ...(() => {
+      const bad = measurementNotes(sc, 'en').engines;
+      return bad.length
+        ? [`MEASUREMENT ERROR (non-negotiable): the reading of ${bad.join(', ')} is not valid in this scan. Do not quote or reason from any figure for ${bad.join(', ')}. Every all-engine total (the score, the dimensions, stage and benchmark figures) includes it: do not build a finding or a recommendation on such a total, and say once that this scan's totals are not valid readings.`, '']
+        : [];
+    })(),
     'Here is the AIGVR measurement (0-100 dimensions; presence = share of AI answers ' +
       'mentioning the brand; gaps = queries where competitors appear and the brand does not):',
     '```json',
@@ -356,6 +405,7 @@ export async function runReportAgent(
       aigvrScore: sc?.aigvrScore ?? null,
       ...parsed,
       markdown,
+      measurementNotes: measurementNotes(sc, notesLang(input.targetLanguage)).lines,
       siteCoverage: Array.isArray(parsed.siteCoverage) ? parsed.siteCoverage.slice(0, 30) : [],
       contradictions: Array.isArray(parsed.contradictions) ? parsed.contradictions.slice(0, 20) : [],
       siteCorpusSize: input.siteCorpus?.length ?? 0,

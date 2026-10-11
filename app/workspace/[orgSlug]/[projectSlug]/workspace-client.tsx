@@ -17,6 +17,8 @@ import { AGENTS } from '@/lib/agents/registry';
 import { Icon } from '@/components/icons';
 import type { AgentRun, Organization, Project, ScanPoint } from '@/lib/workspace';
 import { trendExtras } from '@/lib/trend';
+import { traceAffectedEngines, mostlyEmptyEngines } from '@/lib/engines/ingest';
+import { NOTES_PATH, NOTES_LINK_LABEL } from '@/lib/notes/paths';
 
 interface Props {
   project: Project;
@@ -1153,10 +1155,37 @@ function ContextPanel({ headlineAigvr, scoreRun, runsByAgent, totalAgents, proje
           <div className="text-[10px] text-faint mt-1">/ 100</div>
         </div>
       )}
+      <MeasurementNote scan={scoreRun?.output} />
       <div className="mc-card mc-card-sm p-3">
         <div className="text-[10px] uppercase tracking-widest text-faint mb-1">{t('Deliverables')}</div>
         <div className="text-sm text-ink">{readyCount} / {totalAgents} {t('ready')}</div>
       </div>
+    </div>
+  );
+}
+
+// Says so when the scan behind the headline score was not read correctly, and
+// always points to the page that explains how the numbers are produced. The
+// score itself is shown as measured — nothing here adjusts it.
+function MeasurementNote({ scan }: { scan: any }) {
+  const misread = traceAffectedEngines(scan);
+  const unread = mostlyEmptyEngines(scan);
+  const lang = UI_LANG;
+  const lines: string[] = [
+    ...(misread.length
+      ? [lang === 'zh' ? `这次扫描中,${misread.join('、')} 的判分读到的是引擎的搜索记录,不是回答正文。该读数不用于比较。`
+        : lang === 'vi' ? `Ở lần quét này, ${misread.join(', ')} được chấm trên nhật ký tìm kiếm của engine, không phải trên câu trả lời. Số đo này chưa dùng để so sánh.`
+        : `In this scan ${misread.join(', ')} was scored on the engine's search log, not on the answer. This reading is not used for comparison.`]
+      : []),
+    ...unread.map((u) =>
+      lang === 'zh' ? `这次扫描中,${u.engine} 只返回 ${u.answered}/${u.total} 条回答。总分无效。`
+      : lang === 'vi' ? `Ở lần quét này, ${u.engine} chỉ trả về ${u.answered}/${u.total} câu trả lời. Điểm tổng chưa hợp lệ.`
+      : `In this scan ${u.engine} returned ${u.answered} of ${u.total} answers. The total is not valid.`),
+  ];
+  return (
+    <div className={`mc-card mc-card-sm p-3 text-[11px] leading-relaxed ${lines.length ? 'border border-gold/40' : ''}`}>
+      {lines.map((l) => <p key={l} className="text-dim mb-1.5">{l}</p>)}
+      <a href={NOTES_PATH[lang]} target="_blank" rel="noopener" className="text-brand hover:underline">{NOTES_LINK_LABEL[lang]} →</a>
     </div>
   );
 }
