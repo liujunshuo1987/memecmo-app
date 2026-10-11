@@ -222,7 +222,8 @@ export function hanhdongCard(d: HanhdongDraft, core: string[], ctx: { senderOpen
 export interface XacnhanDraft { n: number | null; date: string | null; targets: number[] | null }
 
 /** Parse "/xacnhan <n> [date] [Q3,Q5]": confirm suggestion number n. A missing
- *  date keeps the suggestion's own guess; `targets` is null when no Q was typed. */
+ *  date keeps the suggestion's own guess; `targets` is null when no Q was typed
+ *  (the action is then logged without a target question). */
 export function parseXacnhan(text: string, today: string): XacnhanDraft {
   const found = takeDate(text.replace(/(^|\s)\/xacnhan\b/i, ' '), today);
   let rest = found.rest;
@@ -240,14 +241,14 @@ const GUESS_LABEL: Record<string, string> = {
 
 /** The pending suggestions as one group message. Numbers are the suggestions'
  *  own (they never change), so a reply still means the same page days later. */
-export function suggestionListText(list: { seq: number; url: string; title: string | null; published_guess: string; guess_source: string; target_candidates: { n: number; strong: boolean }[]; evidence?: { cites?: number } }[]): string {
+export function suggestionListText(list: { seq: number; url: string; title: string | null; published_guess: string; guess_source: string; target_candidates: { n: number }[]; evidence?: { cites?: number } }[]): string {
   const items = list.map((s) => {
-    const qs = s.target_candidates.map((c) => `Q${c.n}${c.strong ? ' ✓' : ''}`).join(', ');
+    const qs = s.target_candidates.map((c) => `Q${c.n}`).join(', ');
     return [
       `#${s.seq} · ${s.title ?? s.url}`,
       `   ${s.url}`,
       `   Ngày đăng (ước tính) · 发布日期(估计): ${s.published_guess} — ${GUESS_LABEL[s.guess_source] ?? s.guess_source}${s.evidence?.cites ? ` · AI đã trích dẫn ${s.evidence.cites} lần · 已被引用 ${s.evidence.cites} 次` : ''}`,
-      ...(qs ? [`   Câu hỏi gợi ý · 建议目标问题: ${qs}`] : []),
+      ...(qs ? [`   Câu hỏi có thể liên quan · 可能对应的问题: ${qs}`] : []),
     ].join('\n');
   });
   return [
@@ -256,7 +257,7 @@ export function suggestionListText(list: { seq: number; url: string; title: stri
     items.join('\n\n'),
     '',
     'Xác nhận · 确认: @bot /xacnhan <số> [ngày đăng] [Q1–Q20]   — ví dụ · 例: /xacnhan 3 17/09 Q5',
-    'Không ghi ngày thì dùng ngày ước tính; không ghi Q thì dùng các câu có dấu ✓ · 不写日期则用估计日期；不写 Q 则采用带 ✓ 的问题。',
+    'Không ghi ngày thì dùng ngày ước tính; không ghi Q thì hành động không gắn câu hỏi mục tiêu · 不写日期则用估计日期；不写 Q 则不记目标问题。',
     'Chỉ khi thành viên đội ngũ xác nhận mới được ghi, và ghi dưới tên người xác nhận · 团队成员确认后才登记，并记在确认人名下。',
   ].join('\n');
 }

@@ -34,9 +34,9 @@ const core = [
 ok('accents folded, đ → d, short words dropped', JSON.stringify(tokens('Đo lường ở Hà Nội')) === '["do","luong","ha","noi"]', tokens('Đo lường ở Hà Nội'));
 ok('Han text is cut into pairs', JSON.stringify(tokens('电梯广告')) === '["电梯","梯广","广告"]', tokens('电梯广告'));
 const c1 = candidateQuestions('Kênh nào tiếp cận cư dân chung cư hiệu quả nhất? | Lift Media', core, 'Lift Media');
-ok('a title that is the question: that question first, pre-selected', c1[0]?.n === 4 && c1[0].strong, c1);
+ok('a title that is the question: that question first, marked as a strong match', c1[0]?.n === 4 && c1[0].strong, c1);
 const c2 = candidateQuestions('Chi phí quảng cáo màn hình LCD cho doanh nghiệp nhỏ', core, 'Lift Media');
-ok('a partial match is offered but not pre-selected', c2[0]?.n === 2 && !c2[0].strong, c2);
+ok('a partial match is offered, not marked strong', c2[0]?.n === 2 && !c2[0].strong, c2);
 ok('a title sharing only the brand name and common words matches nothing', candidateQuestions('Lift Media quảng cáo', core, 'Lift Media').length === 0);
 ok('an FAQ title matches nothing; at most three are offered', candidateQuestions('Những câu hỏi thường gặp', core, 'Lift Media').length === 0 && candidateQuestions(core.join(' '), core, 'Lift Media').length === 3);
 
@@ -182,6 +182,12 @@ async function main() {
   const iv1 = db.tables.interventions[0];
   ok('confirm creates one content-page action signed by the person, with their date', !('error' in r1) && db.tables.interventions.length === 1 && iv1.logged_by === 'editor' && iv1.published_at === '2026-09-17' && iv1.kind === 'content_page' && iv1.url === `${H}/faq` && iv1.channel === 'web', iv1);
   ok('the suggestion is marked confirmed and linked to it', (() => { const s = db.tables.intervention_suggestions[0]; return s.status === 'confirmed' && s.confirmed_by === 'editor' && !!s.confirmed_at && s.intervention_id === iv1.id; })(), db.tables.intervention_suggestions[0]);
+  const untouched = seed();
+  await confirmSuggestion(untouched, { projectId: 'p1', id: 's2', userId: 'editor', channel: 'web', today: '2026-10-11' });
+  ok('confirming without choosing a question records none — a strong candidate is never applied for the person', untouched.tables.interventions.length === 1 && untouched.tables.interventions[0].target_prompts.length === 0, untouched.tables.interventions[0]);
+  const picked = seed();
+  await confirmSuggestion(picked, { projectId: 'p1', id: 's2', userId: 'editor', channel: 'web', targetPrompts: [core[0], 'not one of the fixed questions'], today: '2026-10-11' });
+  ok('a ticked question is recorded; anything outside the fixed questions is dropped', picked.tables.interventions[0].target_prompts.length === 1 && picked.tables.interventions[0].target_prompts[0].prompt === core[0], picked.tables.interventions[0]);
   const again = await confirmSuggestion(db, { projectId: 'p1', id: 's1', userId: 'editor', channel: 'web', today: '2026-10-11' });
   ok('a second click logs nothing', 'error' in again && again.error === 'already-confirmed' && db.tables.interventions.length === 1, again);
   const future = await confirmSuggestion(db, { projectId: 'p1', id: 's2', userId: 'editor', channel: 'web', publishedAt: '2026-10-20', today: '2026-10-11' });
@@ -206,8 +212,8 @@ async function main() {
   const project = ldb.tables.projects[0];
   const l1 = await confirmFromLark(ldb, { project, userId: 'editor', text: '/xacnhan 2', messageId: 'om_1', today: '2026-10-11' });
   const liv = ldb.tables.interventions[0];
-  ok('/xacnhan 2 logs suggestion 2 for the sender, with the guessed date and the pre-selected question', l1.outcome === 'xacnhan:saved:2' && liv?.logged_by === 'editor' && liv.channel === 'lark' && liv.lark_message_id === 'om_1' && liv.published_at === '2026-09-04' && liv.target_prompts.length === 1 && liv.target_prompts[0].prompt === core[3] && l1.interventionId === liv.id, [l1, liv]);
-  ok('the reply names the page, the date as an estimate, and the question', /#2/.test(l1.reply) && /2026-09-04 \(ước tính/.test(l1.reply) && /Q4/.test(l1.reply), l1.reply);
+  ok('/xacnhan 2 logs suggestion 2 for the sender, with the guessed date and no target question', l1.outcome === 'xacnhan:saved:2' && liv?.logged_by === 'editor' && liv.channel === 'lark' && liv.lark_message_id === 'om_1' && liv.published_at === '2026-09-04' && liv.target_prompts.length === 0 && l1.interventionId === liv.id, [l1, liv]);
+  ok('the reply names the page, the date as an estimate, and that no question was chosen', /#2/.test(l1.reply) && /2026-09-04 \(ước tính/.test(l1.reply) && /chưa chọn/.test(l1.reply) && !/Q4/.test(l1.reply), l1.reply);
   const l2 = await confirmFromLark(ldb, { project, userId: 'editor', text: '/xacnhan 2', messageId: 'om_2', today: '2026-10-11' });
   ok('the same reply delivered twice logs once', l2.outcome === 'xacnhan:already-confirmed' && ldb.tables.interventions.length === 1, l2);
   const l3 = await confirmFromLark(ldb, { project, userId: 'editor', text: '/xacnhan 1 17/09 Q1', messageId: 'om_3', today: '2026-10-11' });
@@ -215,7 +221,7 @@ async function main() {
   ok('an unknown number and a missing number say so and log nothing', (await confirmFromLark(ldb, { project, userId: 'editor', text: '/xacnhan 99', messageId: 'om_4', today: '2026-10-11' })).outcome === 'xacnhan:not-found' && (await confirmFromLark(ldb, { project, userId: 'editor', text: '/xacnhan', messageId: 'om_5', today: '2026-10-11' })).outcome === 'xacnhan:no-number' && ldb.tables.interventions.length === 2);
 
   const text = suggestionListText(seed().tables.intervention_suggestions);
-  ok('the group list numbers each page by its own number and shows the pre-selected question', /#1 · Những câu hỏi thường gặp/.test(text) && /#2 · /.test(text) && /Q4 ✓, Q1/.test(text) && /\/xacnhan/.test(text) && /2026-09-18/.test(text), text);
+  ok('the group list numbers each page by its own number and offers candidate questions without marking any', /#1 · Những câu hỏi thường gặp/.test(text) && /#2 · /.test(text) && /: Q4, Q1/.test(text) && !/✓/.test(text) && /\/xacnhan/.test(text) && /2026-09-18/.test(text), text);
   const pdb = seed();
   ok('posting the list refuses without a named approver', (await postSuggestionList(pdb, { projectId: 'p1', approvedBy: ' ' })) === 'refused:no-approver');
   ok('posting refuses while the project flag is off', (await postSuggestionList(pdb, { projectId: 'p2', approvedBy: 'someone' })) === 'refused:flag-off');

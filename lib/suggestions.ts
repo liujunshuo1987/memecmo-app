@@ -127,7 +127,9 @@ export function tokens(s: string | null | undefined): string[] {
 /** Up to three of the fixed questions, by plain word overlap with the page title.
  *  Words of the brand name and words that occur in more than half of the
  *  questions tell nothing apart and are left out. `strong` marks a title that
- *  covers most of a question — those are offered pre-selected. */
+ *  covers most of a question; it only orders the list. A candidate is an
+ *  offer — which question an action aims at is the confirming person's choice,
+ *  and nothing is recorded that they did not pick. */
 export function candidateQuestions(title: string | null | undefined, core: string[], brandName = ''): TargetCandidate[] {
   if (!title || !core.length) return [];
   const brand = new Set(tokens(brandName));
@@ -443,10 +445,10 @@ export type ConfirmResult =
 /**
  * Turn a pending suggestion into an action signed by `userId`. The caller has
  * already checked that this account may sign for the project (canSignForOrg).
- * `publishedAt` defaults to the stored guess. `targetPrompts`: an explicit
- * choice (possibly empty) is taken as given, limited to the fixed questions;
- * left undefined, the pre-selected (strong) candidates apply — the same ones
- * the person was shown.
+ * `publishedAt` defaults to the stored guess. `targetPrompts` is the person's
+ * own choice, limited to the fixed questions; without one the action carries
+ * no target question — the candidates the matcher found are never applied on
+ * their behalf (the target feeds collaboration alignment).
  */
 export async function confirmSuggestion(sb: Sb, d: {
   projectId: string; id?: string; seq?: number; userId: string; channel: 'web' | 'lark';
@@ -464,10 +466,7 @@ export async function confirmSuggestion(sb: Sb, d: {
 
   const { data: project } = await sb.from('projects').select('metadata').eq('id', d.projectId).maybeSingle();
   const core: string[] = Array.isArray(project?.metadata?.coreKeyPrompts) ? project.metadata.coreKeyPrompts : [];
-  const chosen = d.targetPrompts !== undefined
-    ? core.filter((p) => d.targetPrompts!.includes(p))
-    : ((s.target_candidates ?? []) as TargetCandidate[]).filter((c) => c.strong).map((c) => c.prompt);
-  const targets = chosen.map((p) => ({ hash: unitHash(p), prompt: p }));
+  const targets = core.filter((p) => (d.targetPrompts ?? []).includes(p)).map((p) => ({ hash: unitHash(p), prompt: p }));
 
   // Claim first: a double click (or the same reply delivered twice) must not log the action twice.
   const now = new Date().toISOString();

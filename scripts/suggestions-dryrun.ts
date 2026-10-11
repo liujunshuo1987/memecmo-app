@@ -54,7 +54,7 @@ async function main() {
     console.log(`    targets: ${s.targetCandidates.length ? s.targetCandidates.map((c) => `Q${c.n}${c.strong ? '*' : ''} (${c.shared} words)`).join(' · ') : '–'}`);
     if (e.aliases.length) console.log(`    also seen as: ${e.aliases.join(' · ')}`);
   });
-  console.log(`\n(* = pre-selected on confirm)\n\nLEFT OUT — known before the window: ${r.seenBeforeWindow} pages`);
+  console.log(`\n(* = the title covers most of that question; nothing is pre-selected)\n\nLEFT OUT — known before the window: ${r.seenBeforeWindow} pages`);
   for (const [why, urls] of Object.entries(r.skipped)) {
     if (urls.length) console.log(`LEFT OUT — ${why}: ${urls.length}\n${urls.map((u) => `    ${u}`).join('\n')}`);
   }

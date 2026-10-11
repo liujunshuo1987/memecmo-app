@@ -190,7 +190,8 @@ function SuggestionCard({ s, projectId, lang, t, can, onDone }: {
   const L = (k: keyof typeof SUGGEST_LABELS) => SUGGEST_LABELS[k][lang];
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(s.published_guess);
-  const [picked, setPicked] = useState<string[]>(s.target_candidates.filter((c) => c.strong).map((c) => c.prompt));
+  // Candidates start unticked: the target question is the confirming person's choice, not the matcher's.
+  const [picked, setPicked] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const send = async (body: Record<string, unknown>) => {
