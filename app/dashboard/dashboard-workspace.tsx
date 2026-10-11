@@ -97,6 +97,7 @@ export default function DashboardClient({ groups, latest = {}, userEmail, isRoot
   const [modalOrg, setModalOrg] = useState<Organization | null>(null);
   const [newClientFor, setNewClientFor] = useState<Organization | null>(null);
   const [inviteOrg, setInviteOrg] = useState<Organization | null>(null);
+  const [connectorOrg, setConnectorOrg] = useState<Organization | null>(null);
   const [billingOrg, setBillingOrg] = useState<Organization | null>(null);
   const [busyApprove, setBusyApprove] = useState<string | null>(null);
 
@@ -246,6 +247,15 @@ export default function DashboardClient({ groups, latest = {}, userEmail, isRoot
                         Invite
                       </button>
                     )}
+                    {(role === 'admin' || isRootAdmin) && active && (
+                      <button
+                        onClick={() => setConnectorOrg(org)}
+                        title="MCP 连接器密钥:在 Claude、Zapier 等环境里读取数据、登记行动 · Connector keys"
+                        className="text-xs px-3 py-1.5 rounded-lg mc-btn-soft text-dim hover:text-ink transition"
+                      >
+                        连接器
+                      </button>
+                    )}
                     {canAddClient && (
                       <button
                         onClick={() => setNewClientFor(org)}
@@ -328,6 +338,7 @@ export default function DashboardClient({ groups, latest = {}, userEmail, isRoot
         />
       )}
       {inviteOrg && <InviteModal org={inviteOrg} onClose={() => setInviteOrg(null)} />}
+      {connectorOrg && <ConnectorModal org={connectorOrg} onClose={() => setConnectorOrg(null)} />}
       {billingOrg && (
         <BillingModal
           org={billingOrg}
@@ -497,6 +508,125 @@ function BillingModal({ org, bill, plans, stripeReady, onClose }: {
           ) : <span className="text-[11px] text-faint">订阅后可在此管理付款方式与发票</span>}
           <button onClick={onClose} className="text-sm px-3 py-2 rounded-md border border-edge text-dim hover:text-ink transition">关闭</button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Connector keys — the org's credentials for the MCP connector (/api/mcp).
+// The key is shown once; afterwards only its prefix is visible.
+function ConnectorModal({ org, onClose }: { org: Organization; onClose: () => void }) {
+  type KeyRow = { id: string; name: string; keyPrefix: string; scopes: string[]; createdAt: string; lastUsedAt: string | null; revokedAt: string | null };
+  const [keys, setKeys] = useState<KeyRow[] | null>(null);
+  const [name, setName] = useState('');
+  const [readOnly, setReadOnly] = useState(false);
+  const [fresh, setFresh] = useState<{ key: string; name: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+  const base = typeof window !== 'undefined' ? window.location.origin : 'https://app.memecmo.ai';
+  const url = `${base}/api/mcp`;
+
+  const load = async () => {
+    const res = await fetch(`/api/workspace/connector-keys?orgId=${org.id}`);
+    const d = await res.json();
+    if (!res.ok) { setError(d.error || 'Load failed'); return; }
+    setKeys(d.keys);
+  };
+  useEffect(() => { void load(); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [org.id]);
+
+  const create = async () => {
+    if (!name.trim() || busy) return;
+    setBusy(true); setError(null);
+    try {
+      const res = await fetch('/api/workspace/connector-keys', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orgId: org.id, name: name.trim(), scopes: readOnly ? ['read'] : ['read', 'write'] }),
+      });
+      const d = await res.json();
+      if (!res.ok) { setError(d.error || 'Create failed'); setBusy(false); return; }
+      setFresh({ key: d.key, name: name.trim() }); setName(''); await load();
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    setBusy(false);
+  };
+  const revoke = async (id: string) => {
+    if (!confirm('撤销后用这把密钥的集成会立即失效。确定?')) return;
+    const res = await fetch(`/api/workspace/connector-keys?orgId=${org.id}&id=${id}`, { method: 'DELETE' });
+    if (!res.ok) { const d = await res.json(); setError(d.error || 'Revoke failed'); return; }
+    await load();
+  };
+  const copy = async (what: string, value: string) => {
+    try { await navigator.clipboard.writeText(value); setCopied(what); setTimeout(() => setCopied(null), 1500); } catch { /* ignore */ }
+  };
+  const keyShown = fresh?.key ?? 'mc_<your-key>';
+  const claudeCode = `claude mcp add --transport http memecmo ${url} --header "Authorization: Bearer ${keyShown}"`;
+  const jsonCfg = JSON.stringify({ mcpServers: { memecmo: { url, headers: { Authorization: `Bearer ${keyShown}` } } } }, null, 2);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" onClick={onClose}>
+      <div className="w-full max-w-2xl mc-card p-6 space-y-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div>
+          <h3 className="text-sm font-semibold text-ink">连接器 · MCP Connector</h3>
+          <p className="text-xs text-faint">{org.name} · 让 Claude、Cursor、Zapier 等环境读取本组织的测量数据与交付物,并在内容发布后登记行动。密钥只显示一次。</p>
+        </div>
+
+        {fresh && (
+          <div className="rounded-lg border border-sage/50 bg-sage/10 p-3 space-y-2">
+            <div className="text-[11px] text-sage font-semibold">新密钥「{fresh.name}」— 现在复制,关闭后不再显示</div>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-[11px] break-all mc-chip-inset rounded px-2 py-1.5">{fresh.key}</code>
+              <button onClick={() => copy('key', fresh.key)} className="text-[11px] px-2 py-1 rounded mc-btn-soft text-dim hover:text-ink">{copied === 'key' ? '已复制' : '复制'}</button>
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-2 items-end">
+          <label className="flex-1 block">
+            <span className="text-[11px] uppercase tracking-wider text-faint mb-1 block">新密钥名称(给谁用)</span>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="例如:Claude · 市场部 / Zapier · 发布流程" className="w-full mc-input rounded-md px-3 py-2 text-sm" />
+          </label>
+          <label className="flex items-center gap-1.5 text-[11px] text-dim pb-2.5 whitespace-nowrap">
+            <input type="checkbox" checked={readOnly} onChange={(e) => setReadOnly(e.target.checked)} /> 只读
+          </label>
+          <button disabled={!name.trim() || busy} onClick={create} className="text-xs px-3 py-2 rounded-md mc-btn-brand font-semibold disabled:opacity-50">{busy ? '生成中…' : '生成密钥'}</button>
+        </div>
+
+        <div className="space-y-1.5">
+          <div className="text-[11px] uppercase tracking-wider text-faint">已有密钥</div>
+          {keys === null ? <div className="text-[11px] text-faint">加载中…</div> : keys.length === 0 ? <div className="text-[11px] text-faint">还没有密钥。</div> : (
+            <ul className="divide-y divide-edge rounded-lg border border-edge">
+              {keys.map((k) => (
+                <li key={k.id} className="flex items-center justify-between gap-3 px-3 py-2 text-[12px]">
+                  <div className="min-w-0">
+                    <span className={`font-medium ${k.revokedAt ? 'line-through text-faint' : 'text-ink'}`}>{k.name}</span>
+                    <span className="ml-2 font-mono text-faint">{k.keyPrefix}…</span>
+                    <span className="ml-2 text-faint">{k.scopes.includes('write') ? '读 + 登记行动' : '只读'}</span>
+                    <span className="ml-2 text-faint">{k.lastUsedAt ? `最近使用 ${k.lastUsedAt.slice(0, 10)}` : '未使用'}</span>
+                  </div>
+                  {!k.revokedAt && <button onClick={() => revoke(k.id)} className="text-[11px] text-garnet hover:underline whitespace-nowrap">撤销</button>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <div className="text-[11px] uppercase tracking-wider text-faint">接入方式</div>
+          <div className="text-[11px] text-dim">服务器地址 <code className="mc-chip-inset rounded px-1.5 py-0.5">{url}</code> · 工具:list_projects · get_scorecard · get_gaps · get_sources · get_deliverables · get_actions · log_action</div>
+          <div className="rounded-lg border border-edge p-3 space-y-1">
+            <div className="flex items-center justify-between"><span className="text-[11px] text-ink font-medium">Claude Code</span><button onClick={() => copy('cc', claudeCode)} className="text-[11px] text-dim hover:text-ink">{copied === 'cc' ? '已复制' : '复制'}</button></div>
+            <pre className="text-[10.5px] whitespace-pre-wrap break-all text-dim">{claudeCode}</pre>
+          </div>
+          <div className="rounded-lg border border-edge p-3 space-y-1">
+            <div className="flex items-center justify-between"><span className="text-[11px] text-ink font-medium">Cursor · Claude Desktop(经 mcp-remote)· 其他支持 HTTP 头的客户端</span><button onClick={() => copy('json', jsonCfg)} className="text-[11px] text-dim hover:text-ink">{copied === 'json' ? '已复制' : '复制'}</button></div>
+            <pre className="text-[10.5px] whitespace-pre-wrap break-all text-dim">{jsonCfg}</pre>
+          </div>
+          <p className="text-[11px] text-faint">Claude.ai 网页版与 ChatGPT 需要 OAuth 登录,正在接入。完整说明见 <a href="/connector" target="_blank" rel="noreferrer" className="text-brand underline underline-offset-2">/connector</a>。</p>
+        </div>
+
+        {error && <div className="text-xs text-garnet bg-garnet/10 border border-garnet/40 rounded px-3 py-2">{error}</div>}
+        <div className="text-right"><button onClick={onClose} className="text-sm px-3 py-2 rounded-md border border-edge text-dim hover:text-ink transition">关闭</button></div>
       </div>
     </div>
   );

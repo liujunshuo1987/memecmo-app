@@ -179,6 +179,7 @@ const T: Record<Lang, any> = {
       ['开客户', '渠道商管理员在工作台点「+ New client」→ 总部审批队列 Approve → 客户组织激活并自动获得订阅。'],
       ['邀请成员', '组织标题行「Invite」→ 填邮箱与角色 → 自动发邮件(或复制链接);对方用被邀邮箱登录即入组。admin:组织、邀请、账单;editor:可运行智能体、记录行动、编辑交付物;viewer:只读、导出 PDF、就结果提问。席位免费不限量。'],
       ['扫描额度', '每月计量扫描(完整扫描 / 监测)上限:Starter 4 · Growth 12 · Scale 30,定期扫描计入;总部与渠道商不计量。超额返回明确提示,下期重置。'],
+      ['连接器(MCP)', '组织管理员在工作台点「连接器」生成密钥,把 MemeCMO 接进 Claude、Cursor、Zapier 等环境:读取评分卡、缺口、信源与交付物,内容在你自己的渠道发布后用 log_action 登记,平台自动核验并在下次扫描归因。一把密钥只能看自己组织;平台不发布内容、不保管社媒令牌。说明见 /connector。'],
       ['自动周报邮件', '配置收件人后按项目的周报日(默认周二)自动发送:精简数字区(指数 / 分引擎 / 本期交付)+ 效果归因与策略建议 + 「行动与变化」;解读口径随项目阶段自动切换(建设期不解读分数波动)。完整数据始终在工作台下载 PDF。掉分 ≥5 或某引擎归零会即时告警,不等周期。'],
     ],
     plansRows: [
@@ -341,6 +342,7 @@ const T: Record<Lang, any> = {
       ['Provision a client', 'A partner admin clicks "+ New client" on the dashboard → head-office approval queue → the client organization is activated with a subscription.'],
       ['Invite members', '"Invite" in the organization title row → email and role → email sent automatically (or copy the link); they join by signing in with that email. admin: organization, invites, billing; editor: runs agents, logs actions, edits deliverables; viewer: read-only, PDF export, questions on results. Seats are free and unlimited.'],
       ['Scan quota', 'Metered scans per month (full scan / monitor): Starter 4 · Growth 12 · Scale 30, scheduled scans included; head office and partners are not metered. Over quota returns a clear message and resets next period.'],
+      ['Connector (MCP)', 'An organization admin creates a key under "连接器" on the dashboard and plugs MemeCMO into Claude, Cursor, Zapier or any MCP client: read the scorecard, gaps, sources and deliverables, publish in your own channels, then log the action with log_action; the platform verifies the page and attributes it in the next scan. A key sees its own organization only; the platform never publishes and never holds social tokens. See /connector.'],
       ['Automated digest email', 'With recipients configured, sent on the project\'s digest day (default Tuesday): a concise numbers block (index / per engine / this period\'s deliverables) + attribution and strategy + "Actions and what moved"; the reading switches with the project stage (no score-noise reading during the build phase). Full data is always the workspace PDF. A drop ≥5 or an engine going to zero alerts immediately, not on the schedule.'],
     ],
     plansRows: [
@@ -503,6 +505,7 @@ const T: Record<Lang, any> = {
       ['Mở khách hàng', 'Admin đối tác bấm "+ New client" trên bảng điều khiển → hàng đợi duyệt của trụ sở → tổ chức khách được kích hoạt kèm đăng ký.'],
       ['Mời thành viên', '"Mời" ở hàng tiêu đề tổ chức → email và vai trò → tự gửi email (hoặc sao chép liên kết); họ tham gia bằng cách đăng nhập với email đó. admin: tổ chức, lời mời, thanh toán; editor: chạy agent, ghi hành động, sửa sản phẩm; viewer: chỉ đọc, xuất PDF, hỏi về kết quả. Tài khoản miễn phí và không giới hạn.'],
       ['Hạn mức quét', 'Số lần quét tính phí mỗi tháng (quét đầy đủ / giám sát): Starter 4 · Growth 12 · Scale 30, gồm quét định kỳ; trụ sở và đối tác không tính. Vượt hạn mức trả về thông báo rõ và đặt lại kỳ sau.'],
+      ['Connector (MCP)', 'Admin tổ chức tạo khóa ở nút "连接器" trên bảng điều khiển để nối MemeCMO vào Claude, Cursor, Zapier hoặc bất kỳ client MCP nào: đọc bảng điểm, khoảng trống, nguồn và sản phẩm, đăng trên kênh của chính bạn rồi ghi hành động bằng log_action; nền tảng xác minh trang và quy kết ở lần quét sau. Một khóa chỉ thấy tổ chức của mình; nền tảng không đăng bài và không giữ token mạng xã hội. Xem /connector.'],
       ['Email bản tin tự động', 'Khi đã cấu hình người nhận, gửi vào ngày bản tin của dự án (mặc định thứ Ba): khối số liệu gọn (chỉ số / theo engine / sản phẩm kỳ này) + quy kết và chiến lược + "Hành động và điều đã thay đổi"; cách đọc đổi theo giai đoạn dự án (giai đoạn xây dựng không diễn giải dao động điểm). Dữ liệu đầy đủ luôn ở PDF trong workspace. Sụt ≥5 điểm hoặc một engine về 0 sẽ cảnh báo ngay, không chờ lịch.'],
     ],
     plansRows: [
