@@ -21,7 +21,7 @@ import { runSiteAgent } from './site';
 import { runEncyclopediaAgent } from './encyclopedia';
 import { runProfileAgent } from './profile';
 import { runStandardAnswersAgent } from './answers';
-import { planPolicyForProject } from '@/lib/commerce';
+import { planPolicyForProject, recordUsage, isMeteredKind } from '@/lib/commerce';
 import { refundFailedRun } from '@/lib/credits';
 import { NonRetriableError } from 'inngest';
 import { poeChat, DEFAULT_MODEL, isCapacityError, isNonRetriable, runMeter, newMeter, type UsageMeter } from '@/lib/llm/poe';
@@ -53,7 +53,7 @@ async function loadStandardAnswers(sb: any, projectId: string): Promise<{ prompt
 
 // Load the latest canonical brand profile (if any) so execution agents share
 // consistent facts. Returns null when none exists yet.
-async function loadBrandProfile(sb: ReturnType<typeof svc>, projectId: string): Promise<any | null> {
+export async function loadBrandProfile(sb: ReturnType<typeof svc>, projectId: string): Promise<any | null> {
   const { data } = await sb
     .from('assets')
     .select('content')
@@ -474,6 +474,48 @@ async function persistGoldenPool(
 }
 
 // Run the agent end-to-end: emit events, finalize status, persist assets.
+const TRANSIENT_RE = /aborted due to timeout|timed? ?out|ETIMEDOUT|ECONNRESET|ENOTFOUND|EAI_AGAIN|socket hang up|fetch failed|network/i;
+function isTransient(err: unknown): boolean {
+  const e = err as any;
+  return e?.name === 'TimeoutError' || e?.name === 'AbortError' || TRANSIENT_RE.test(String(e?.message ?? err)) || TRANSIENT_RE.test(String(e?.cause?.message ?? ''));
+}
+
+const RETRY_DELAY_MS = 10 * 60_000;
+
+async function afterScheduledFailure(
+  sb: ReturnType<typeof svc>,
+  f: { runId: string; agentId: string; project: ProjectLite; message: string; transient: boolean },
+): Promise<void> {
+  const { data: row } = await sb.from('agent_runs').select('trigger_method, options').eq('id', f.runId).maybeSingle();
+  if (row?.trigger_method !== 'schedule') return;
+  const isRetry = !!(row.options as any)?.retryOf;
+  let requeued: string | null = null;
+  if (f.transient && !isRetry) {
+    const { data: next } = await sb
+      .from('agent_runs')
+      .insert({ project_id: f.project.id, agent_id: f.agentId, trigger_method: 'schedule', status: 'queued', options: { retryOf: f.runId } })
+      .select('id')
+      .single();
+    if (next?.id) {
+      await inngest.send({ name: 'agent/run.requested', data: { runId: next.id, agentId: f.agentId, projectId: f.project.id }, ts: Date.now() + RETRY_DELAY_MS });
+      if (isMeteredKind(f.agentId)) {
+        const { data: p } = await sb.from('projects').select('organization_id').eq('id', f.project.id).maybeSingle();
+        if (p?.organization_id) await recordUsage({ orgId: p.organization_id, projectId: f.project.id, agentRunId: next.id, kind: f.agentId });
+      }
+      requeued = next.id;
+    }
+  }
+  await notifyOperator({
+    kind: 'run_failed',
+    title: `Scheduled ${f.agentId} failed${isRetry ? ' again (after one retry)' : ''} — ${f.project.brand_name}`,
+    detail: `${f.message}. ${requeued ? `Queued again as run ${requeued.slice(0, 8)}, starting in ${RETRY_DELAY_MS / 60_000} minutes.` : isRetry ? 'This was the retry; nothing further is queued. Re-run it by hand once the cause is known.' : 'Not retried: the error does not look transient.'}`,
+    runId: f.runId,
+    projectId: f.project.id,
+    projectSlug: (f.project as any).slug,
+    brand: f.project.brand_name,
+  });
+}
+
 export async function executeAgentRun(
   runId: string,
   agentId: string,
@@ -733,7 +775,7 @@ export async function executeAgentRun(
         const mon = await runMonitorStep();
         const rep = await runStep('phase-report', async () => {
           await persistAndEmit({ event_type: 'milestone', payload: { label: 'Phase 3/3 · Report', step: 3, totalSteps: 3 } });
-          const r = await runReportAgent({ ...base, targetLanguage: await loadDeliverableLanguage(sb, project), scorecard: mon.output, brandProfile: await loadBrandProfile(sb, project.id), citationBrief: await loadCitationBriefSafe(sb, project.id), siteCorpus: await loadSiteCorpus(sb, project) }, bandedEmit(66, 34));
+          const r = await runReportAgent({ ...base, targetLanguage: await loadDeliverableLanguage(sb, project), scorecard: mon.output, brandProfile: await loadBrandProfile(sb, project.id), citationBrief: await loadCitationBriefSafe(sb, project.id), siteCorpus: await loadSiteCorpus(sb, project), competitorSet: await loadCompetitorSet(sb, project.id) }, bandedEmit(66, 34));
           await sb.from('assets').insert({
             project_id: project.id, agent_run_id: runId, type: 'geo_report',
             title: `${project.brand_name} — GEO visibility report`, format: 'markdown',
@@ -882,6 +924,7 @@ export async function executeAgentRun(
           brandProfile: await loadBrandProfile(sb, project.id),
           citationBrief: await loadCitationBriefSafe(sb, project.id),
           siteCorpus: await loadSiteCorpus(sb, project),
+          competitorSet: await loadCompetitorSet(sb, project.id),
         },
         persistAndEmit,
       );
@@ -1209,6 +1252,16 @@ export async function executeAgentRun(
         projectSlug: (project as any).slug,
         brand: project.brand_name,
       }).catch((e) => console.error('[alerts] notifyOperator failed:', e));
+    }
+    // A scheduled run has nobody watching it. Until 2026-10-03 its failure was
+    // caught here, marked on the row, and told to no one: the 10-01 monthly
+    // report timed out on one slow model call and it took two days to notice.
+    // Every failed scheduled run now pages the operator, and one that died of a
+    // timeout or a network error is queued again once, ten minutes later, in a
+    // fresh invocation (the same invocation has no time budget left for it).
+    if (!capacity && !outage) {
+      await afterScheduledFailure(sb, { runId, agentId, project, message: msg, transient: isTransient(err) })
+        .catch((e) => console.error('[run] scheduled-failure handling failed:', e instanceof Error ? e.message : e));
     }
     // Failed runs never keep the client's credits (idempotent, pool-mirroring).
     try {

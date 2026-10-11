@@ -52,6 +52,8 @@ export interface VerificationReport {
   demoted: number;
   dropped: number;
   verdicts: ClaimVerdict[];
+  /** Sentences removed before the gate: an ungrounded figure, outside research, or a past period. */
+  removedSentences?: number;
 }
 
 // Evidence tags as the model writes them, in every language we ship.
@@ -90,11 +92,15 @@ export function demoteTag(text: string): string {
 // requiring a known-shaped label and a 2+ letter final segment.
 const DOMAIN_RE = /\b((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.){1,3}[a-z]{2,24})\b/gi;
 // Sentence punctuation and common abbreviations that match the shape above.
-const DOMAIN_STOPLIST = new Set(['v.v', 'vv.vn', 'e.g', 'i.e', 'etc.co', 'a.m', 'p.m']);
+const DOMAIN_STOPLIST = new Set(['v.v', 'vv.vn', 'e.g', 'i.e', 'etc.co', 'a.m', 'p.m', 'tp.hcm', 'tp.hn']);
 
 export function extractDomains(text: string): string[] {
   const out = new Set<string>();
   for (const m of String(text).matchAll(DOMAIN_RE)) {
+    // An all-capitals token is an abbreviation, not a host: "TP.HCM" read as the
+    // domain tp.hcm dropped the digest's whole fixed-questions paragraph as a
+    // hallucinated source (2026-10-03 preview).
+    if (!/[a-z]/.test(m[1])) continue;
     const d = m[1].toLowerCase().replace(/^www\./, '').replace(/\.$/, '');
     if (!d.includes('.') || DOMAIN_STOPLIST.has(d)) continue;
     // Require a plausible TLD segment (letters only, no all-numeric labels).

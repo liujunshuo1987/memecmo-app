@@ -8,6 +8,10 @@
 
 import { poeChat, parseJsonFromLLM, DEFAULT_MODEL, assertComplete } from '@/lib/llm/poe';
 import { languageName, outputTokenBudget } from '@/lib/markets';
+import { brandFactsCorpus } from '@/lib/agents/brand-facts';
+import type { CompetitorGroup } from '@/lib/agents/source-owners';
+import { figuresFromScorecard } from '@/lib/reports/verify';
+import { scrub, figureCorpusOf, quarterOf } from '@/lib/reports/audit';
 
 type EventEmitter = (event: {
   event_type:
@@ -31,6 +35,7 @@ interface ReportInput {
   brandProfile?: any | null; // canonical facts incl. USAGE RULES — recommendations must obey them
   citationBrief?: string;     // lib/pages/profile — what the engines cite in this market (measured)
   siteCorpus?: { url: string; title: string | null; excerpt: string | null; date: string | null; words: number | null }[]; // the client's own read pages
+  competitorSet?: { groups?: CompetitorGroup[] } | null; // who is the brand itself and who is a competitor
 }
 
 interface Recommendation {
@@ -183,9 +188,22 @@ export async function runReportAgent(
     '"[Projection]" and phrased as a target, never as a measurement. Never invent numbers ' +
     'that look like measurements (percentages, query volumes, journey shares) unless they ' +
     'appear in the provided scan data. A report that mixes forecasts into findings is a ' +
-    'defective report.';
+    'defective report. ' +
+    'CLOSED WORLD (hard rule): facts come ONLY from this message — the scan data, the brand profile and the client pages. ' +
+    'Do not use the web or your own knowledge for any market share, screen count, study, award, client name or event, about the brand ' +
+    'or about a competitor, and never cite third-party research (Kantar, Nielsen, Mordor Intelligence, Statista or similar) unless the ' +
+    'exact statement is in the brand profile.';
 
+  const now = new Date();
+  const groups = input.competitorSet?.groups ?? [];
+  const self = groups.filter((g) => g.relationship === 'self').map((g) => [g.canonical, ...(g.aliases ?? [])].join(' / '));
+  const rivals = groups.filter((g) => g.relationship !== 'self' && g.relationship !== 'directory').map((g) => g.canonical);
   const user = [
+    `TODAY is ${now.toISOString().slice(0, 10)} (${quarterOf(now).label}). Any period you name must be this quarter or later.`,
+    groups.length
+      ? `ENTITIES — the brand itself (never a competitor): ${[input.brandName, ...self].join('; ')}. Competitors: ${rivals.join('; ') || 'n/a'}. ` +
+        'These are different companies even when names overlap; never move a fact from one to another.'
+      : '',
     `Brand: ${input.brandName}` + (input.brandUrl ? ` (${input.brandUrl})` : ''),
     `Market: ${input.targetCountry}` + (input.industry ? ` · ${input.industry}` : ''),
     `Buyer queries are in the local language; keep example queries verbatim.`,
@@ -226,10 +244,13 @@ export async function runReportAgent(
     ...(input.siteCorpus && input.siteCorpus.length
       ? [
           'CLIENT\'S OWN PUBLIC PAGES (read by our fetcher — the fact source for coverage and contradictions; url · date · words · title — excerpt):',
-          ...input.siteCorpus.slice(0, 40).map((p) => `- ${p.url}${p.date ? ` · ${p.date}` : ''}${p.words ? ` · ${p.words}w` : ''}${p.title ? ` · ${p.title}` : ''}${p.excerpt ? ` — ${p.excerpt.slice(0, 350)}` : ''}`),
+          // 25 pages × 220 characters: the 40 × 350 version made a ~60k-token
+          // prompt and a reply that ran 138–174 s against a 250 s ceiling — one
+          // slow call (2026-10-01) and the monthly report was gone.
+          ...input.siteCorpus.slice(0, 25).map((p) => `- ${p.url}${p.date ? ` · ${p.date}` : ''}${p.words ? ` · ${p.words}w` : ''}${p.title ? ` · ${p.title}` : ''}${p.excerpt ? ` — ${p.excerpt.slice(0, 220)}` : ''}`),
           '',
           'Because the client\'s pages are provided, ALSO return two more arrays in the JSON:',
-          '  "siteCoverage": [{ "prompt": "a buyer question from the gaps/key prompts", "status": "covered|vacuum", "page": "url of the page that answers it, or null", "note": "one sentence" }]  — one entry per gap query and key prompt (max 20). "vacuum" = no page on the client\'s site addresses it.',
+          '  "siteCoverage": [{ "prompt": "a buyer question from the gaps/key prompts", "status": "covered|vacuum", "page": "url of the page that answers it, or null", "note": "one sentence" }]  — one entry per gap query and key prompt (max 12, the gaps first). "vacuum" = no page on the client\'s site addresses it.',
           '  "contradictions": [{ "prompt": "...", "engine": "...", "aiClaim": "what the AI answer states about the brand", "sitePage": "url", "siteFact": "what the client\'s page states" }]  — ONLY where an AI answer excerpt conflicts with a client page; empty array if none. Never infer facts that are not in the excerpts.',
           '',
         ]
@@ -275,6 +296,36 @@ export async function runReportAgent(
     throw new Error(`Report model returned unparseable output: ${e instanceof Error ? e.message : String(e)}`);
   }
   if (!parsed.recommendations?.length) throw new Error('Report produced no recommendations.');
+
+  // The rules above, enforced: a sentence with a figure found in neither the
+  // scan nor the client's own material, with outside research the client never
+  // supplied, or (in advice) with a period already past is removed. A sentence
+  // labelled [Projection] may keep its own target figures.
+  const figureCorpus = figureCorpusOf(figuresFromScorecard(sc));
+  const factsCorpus = [
+    brandFactsCorpus(input.brandProfile),
+    input.citationBrief ?? '',
+    (input.siteCorpus ?? []).map((p) => `${p.title ?? ''} ${p.excerpt ?? ''}`).join('\n'),
+  ].join('\n');
+  const removedSentences: string[] = [];
+  const clean = (text: unknown, forwardLooking: boolean): string => {
+    const r = scrub(String(text ?? ''), figureCorpus, factsCorpus, input.targetLanguage ?? 'en', now, { forwardLooking, allowProjection: true });
+    removedSentences.push(...r.removed);
+    return r.text;
+  };
+  parsed.executiveSummary = clean(parsed.executiveSummary, false);
+  parsed.keyFindings = (parsed.keyFindings ?? []).map((f) => ({ finding: clean(f.finding, false), evidence: clean(f.evidence, false) })).filter((f) => f.finding);
+  parsed.recommendations = parsed.recommendations
+    // The rationale argues from the scan, so it may quote scan figures; the
+    // title, actions and expected impact are advice (client-material figures only).
+    .map((r) => ({ ...r, title: clean(r.title, true), rationale: clean(r.rationale, false), actions: (r.actions ?? []).map((a) => clean(a, true)).filter(Boolean), expectedImpact: clean(r.expectedImpact, true) }))
+    .filter((r) => r.title);
+  parsed.quickWins = (parsed.quickWins ?? []).map((q) => clean(q, true)).filter(Boolean);
+  if (!parsed.recommendations.length) throw new Error('Report recommendations did not survive the fact check — nothing usable remained.');
+  if (removedSentences.length) {
+    await emit({ event_type: 'log', payload: { text: `Fact check removed ${removedSentences.length} sentence(s) that carried an unsupported figure, outside research or a past period.` } });
+    console.warn('[report] scrub removed:', removedSentences.map((x) => x.slice(0, 140)));
+  }
 
   await emit({ event_type: 'milestone', payload: { label: 'Composing report', step: 2, totalSteps: 3 } });
 
