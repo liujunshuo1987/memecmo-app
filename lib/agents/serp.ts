@@ -6,10 +6,22 @@
 
 const SERP_URL = 'https://serpapi.com/search.json';
 
+// What came back for one question. The three are different facts and are
+// recorded as such: until 2026-10 a follow-up that returned nothing, a timeout
+// and "Google shows no overview" were all stored as an empty answer, and an
+// empty answer is scored as "brand absent" (re-scans of 2026-10-09: 17, 11 and
+// 7 of 24 lost that way in one evening).
+export type AioOutcome = 'answered' | 'no_overview' | 'failed';
+
 export interface AioResult {
   text: string;
   citations: string[]; // reference links
-  triggered: boolean;  // whether an AI Overview was shown for this query
+  triggered: boolean;  // whether Google showed, or announced, an AI Overview for this query
+  outcome: AioOutcome;
+  reason?: string;     // why it failed — set only when outcome is 'failed'
+  searchId?: string;   // the provider's id of the last request; it keeps the raw response
+  ms: number;          // wall time spent on this question, retries included
+  attempts: number;
 }
 
 interface AioBlock {
@@ -30,45 +42,110 @@ function refsToLinks(refs: { link?: string }[] | undefined): string[] {
   return Array.from(new Set(refs.map((r) => r.link).filter((l): l is string => !!l)));
 }
 
-// Fetch the AI Overview for one query in a given locale. Returns triggered=false
-// when Google showed no AI Overview (a real signal: no AI surface for that query).
-export async function fetchGoogleAio(
-  query: string,
-  opts: { gl: string; hl: string; key: string; location?: string; signal?: AbortSignal },
-): Promise<AioResult> {
-  const params = new URLSearchParams({
-    engine: 'google',
-    q: query,
-    gl: opts.gl,
-    hl: opts.hl,
-    api_key: opts.key,
-  });
-  if (opts.location) params.set('location', opts.location);
-  const res = await fetch(`${SERP_URL}?${params.toString()}`, {
-    signal: opts.signal ?? AbortSignal.timeout(50_000),
-  });
+type Attempt = Omit<AioResult, 'ms' | 'attempts'>;
+const failed = (reason: string, searchId?: string, triggered = false): Attempt =>
+  ({ text: '', citations: [], triggered, outcome: 'failed', reason: reason.slice(0, 160), searchId });
+
+interface AioOptions {
+  gl: string; hl: string; key: string; location?: string;
+  signal?: AbortSignal;    // the caller's overall deadline
+  callTimeoutMs?: number;  // each request gets its own clock (default 25 s)
+  retries?: number;        // further attempts after a failed one (default 1)
+}
+
+async function getJson(params: URLSearchParams, opts: AioOptions): Promise<any> {
+  const own = AbortSignal.timeout(opts.callTimeoutMs ?? 25_000);
+  const res = await fetch(`${SERP_URL}?${params.toString()}`, { signal: opts.signal ? AbortSignal.any([opts.signal, own]) : own });
   if (!res.ok) throw new Error(`SerpApi ${res.status}`);
-  const json: any = await res.json();
+  return res.json();
+}
+
+async function attemptAio(query: string, opts: AioOptions): Promise<Attempt> {
+  // Always a fresh search. The provider caches a result page for an hour, and
+  // a cached page carries an overview token that has long expired — the
+  // follow-up then returns nothing for a question Google does answer.
+  const params = new URLSearchParams({ engine: 'google', q: query, gl: opts.gl, hl: opts.hl, api_key: opts.key, no_cache: 'true' });
+  if (opts.location) params.set('location', opts.location);
+  const json = await getJson(params, opts);
+  const id: string | undefined = json?.search_metadata?.id;
   const aio = json?.ai_overview;
-  if (!aio) return { text: '', citations: [], triggered: false };
+  if (!aio) return { text: '', citations: [], triggered: false, outcome: 'no_overview', searchId: id };
+
+  const answered = (a: any, searchId?: string): Attempt => {
+    const text = blocksToText(a.text_blocks);
+    return text
+      ? { text, citations: refsToLinks(a.references), triggered: true, outcome: 'answered', searchId }
+      : failed('overview returned without readable text', searchId, true);
+  };
 
   // Inline AI Overview.
-  if (aio.text_blocks) {
-    return { text: blocksToText(aio.text_blocks), citations: refsToLinks(aio.references), triggered: true };
-  }
+  if (aio.text_blocks) return answered(aio, id);
 
-  // Collapsed AI Overview → second call with its page_token.
+  // Deferred AI Overview: Google generates it after the page, and its text has
+  // to be asked for separately with the page's token. Timed on its own clock —
+  // the two requests used to share 30 s and either can take 15–20 s.
   if (aio.page_token) {
-    const p2 = new URLSearchParams({ engine: 'google_ai_overview', page_token: aio.page_token, api_key: opts.key });
-    const r2 = await fetch(`${SERP_URL}?${p2.toString()}`, { signal: opts.signal ?? AbortSignal.timeout(50_000) });
-    if (r2.ok) {
-      const j2: any = await r2.json();
-      const a2 = j2?.ai_overview;
-      if (a2?.text_blocks) return { text: blocksToText(a2.text_blocks), citations: refsToLinks(a2.references), triggered: true };
-    }
+    const j2 = await getJson(new URLSearchParams({ engine: 'google_ai_overview', page_token: aio.page_token, api_key: opts.key, no_cache: 'true' }), opts);
+    const a2 = j2?.ai_overview;
+    const id2: string | undefined = j2?.search_metadata?.id ?? id;
+    if (a2?.text_blocks) return answered(a2, id2);
+    return failed(`overview announced, text not returned: ${a2?.error || j2?.error || 'empty response'}`, id2, true);
   }
 
-  return { text: '', citations: [], triggered: false };
+  return aio.error ? failed(`overview error: ${aio.error}`, id, true) : { text: '', citations: [], triggered: false, outcome: 'no_overview', searchId: id };
+}
+
+// Fetch the AI Overview for one query in a given locale. Never throws: a
+// request that could not be completed comes back as outcome 'failed' with its
+// reason. 'no_overview' is a real signal — no AI surface for that query.
+export async function fetchGoogleAio(query: string, opts: AioOptions): Promise<AioResult> {
+  const t0 = Date.now();
+  const max = 1 + Math.max(0, opts.retries ?? 1);
+  let last: Attempt = failed('not attempted');
+  let attempts = 0;
+  while (attempts < max && !opts.signal?.aborted) {
+    attempts++;
+    try {
+      last = await attemptAio(query, opts);
+    } catch (e) {
+      last = failed(opts.signal?.aborted ? 'time budget for this engine ran out' : e instanceof Error ? e.message : String(e));
+    }
+    if (last.outcome !== 'failed') break;
+  }
+  if (!attempts) last = failed('time budget for this engine ran out');
+  return { ...last, ms: Date.now() - t0, attempts };
+}
+
+// The whole panel for one scan, inside one time budget. Every question gets a
+// first attempt before any question gets a second one, so a slow evening costs
+// retries, not coverage of the later questions.
+export async function fetchAioPanel(
+  queries: string[],
+  opts: AioOptions & { concurrency: number; budgetMs: number },
+): Promise<AioResult[]> {
+  const budget = AbortSignal.timeout(opts.budgetMs);
+  const signal = opts.signal ? AbortSignal.any([opts.signal, budget]) : budget;
+  const pool = async <T, R>(items: T[], fn: (x: T) => Promise<R>): Promise<R[]> => {
+    const out: R[] = new Array(items.length);
+    let next = 0;
+    await Promise.all(Array.from({ length: Math.min(opts.concurrency, items.length) }, async () => {
+      while (next < items.length) { const i = next++; out[i] = await fn(items[i]); }
+    }));
+    return out;
+  };
+  const one = (q: string) => fetchGoogleAio(q, { ...opts, signal, retries: 0 });
+  const results = await pool(queries, one);
+  const again = results.map((r, i) => (r.outcome === 'failed' ? i : -1)).filter((i) => i >= 0);
+  if (again.length && !signal.aborted) {
+    const second = await pool(again, (i) => one(queries[i]));
+    second.forEach((r, k) => {
+      const i = again[k], first = results[i];
+      results[i] = r.outcome === 'failed'
+        ? { ...first, reason: r.attempts ? r.reason : first.reason, searchId: r.searchId ?? first.searchId, ms: first.ms + r.ms, attempts: first.attempts + r.attempts }
+        : { ...r, ms: first.ms + r.ms, attempts: first.attempts + r.attempts };
+    });
+  }
+  return results;
 }
 
 // Country → Google gl/hl locale.

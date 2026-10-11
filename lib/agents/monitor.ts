@@ -11,7 +11,8 @@
 // doesn't). This is the measurement that turns prompts into a deliverable.
 
 import { poeChat, parseJsonFromLLM, EngineCapacityError, EngineOutageError, isCapacityError } from '@/lib/llm/poe';
-import { fetchGoogleAio, localeFor } from './serp';
+import { fetchAioPanel, localeFor, type AioResult } from './serp';
+import { stripSearchTrace } from '@/lib/engines/ingest';
 import { classifyIntent, type PromptIntent } from './intent';
 
 type EventEmitter = (event: {
@@ -138,7 +139,11 @@ const AIO_ENGINE: Engine = { key: 'google_aio', label: 'Google AI Overview', mod
 const SAMPLE_CAP = 24;
 const QUERY_CONCURRENCY = 5;     // per Poe engine (×4 engines in parallel ≈ 20 concurrent Poe calls)
 const SERP_CONCURRENCY = 6;      // Google AI Overview via SerpApi
-const SERP_TIMEOUT_MS = 30_000;  // bound the slowest engine: 24/6 × 30s ≈ 120s worst case
+// Each of the two requests behind one AI Overview has its own clock, and the
+// engine as a whole has one budget: the scan runs inside a single 300 s
+// invocation and needs ~90 s after the engines for judging and scoring.
+const SERP_CALL_TIMEOUT_MS = 25_000;
+const SERP_BUDGET_MS = 150_000;
 
 // AIGVR composite weights (sum = 1.0).
 const WEIGHTS = { presence: 0.3, prominence: 0.25, sentiment: 0.15, citation: 0.1, competitiveShare: 0.2 };
@@ -398,6 +403,20 @@ interface RawAnswer {
   brandPresentStr: boolean; // string-match fallback
   citations: string[];
   brandCited: boolean;
+  fetch?: FetchRecord;
+}
+
+// How an answer was obtained, where the engine tells us (Google AI Overview).
+// 'no_answer' = the engine showed none for this question; 'failed' = one exists
+// or may exist and could not be fetched. Both carry empty text, and scoring is
+// unchanged by this record: an empty answer still counts in every denominator.
+// Whether a failed fetch should leave the sample is a method decision, not one
+// taken here.
+interface FetchRecord {
+  status: 'answered' | 'no_answer' | 'failed';
+  failReason?: string;
+  ref?: string; // the provider's request id — its raw response can be pulled from it
+  ms?: number;
 }
 
 interface Sample {
@@ -413,6 +432,10 @@ interface Sample {
   citations: string[];
   brandCited: boolean;
   snippet: string;
+  status?: FetchRecord['status'];
+  failReason?: string;
+  ref?: string;
+  ms?: number;
 }
 
 const SENTIMENT_VALUE: Record<Sentiment, number> = { positive: 1, neutral: 0.5, negative: 0, none: 0 };
@@ -506,6 +529,10 @@ export async function runMonitorAgent(
   // 2. Query engines — collect raw answers (full text in-memory only).
   const rawByEngine = new Map<string, RawAnswer[]>();
   const engineErrors = new Map<string, unknown>();
+  // Answers per engine that arrived with the engine's search log in front.
+  const traceStripped = new Map<string, number>();
+  // Per engine: answers that could not be fetched, and questions the engine did not answer.
+  const notReturned = new Map<string, { failed: number; noAnswer: number; retried: number }>();
   const totalQueries = sampled.length * engines.length;
   let done = 0;
 
@@ -526,21 +553,24 @@ export async function runMonitorAgent(
       const conc = engine.kind === 'serp' ? SERP_CONCURRENCY : QUERY_CONCURRENCY;
       let failed = 0;
       let lastErr: unknown = null;
-      const answers = await mapLimit(sampled, conc, async (s) => {
+      // Google AI Overview: the whole panel inside one time budget — a first
+      // attempt for every question, then a second for the ones that failed.
+      const aio: AioResult[] | null = engine.kind === 'serp'
+        ? await fetchAioPanel(sampled.map((s) => s.prompt), {
+            gl: loc.gl, hl: loc.hl, location: loc.location, key: serpKey!, signal: abort.signal,
+            concurrency: SERP_CONCURRENCY, budgetMs: SERP_BUDGET_MS, callTimeoutMs: SERP_CALL_TIMEOUT_MS,
+          })
+        : null;
+      const answers = await mapLimit(sampled, conc, async (s, i) => {
         if (abort.signal.aborted) return null;
         let text = '';
         let citations: string[];
+        let fetched: FetchRecord | undefined;
         if (engine.kind === 'serp') {
-          // Per-query resilience: one slow/failed AIO fetch must not sink the
-          // whole engine. A timeout = "no AI Overview shown for this query".
-          try {
-            const aio = await fetchGoogleAio(s.prompt, { gl: loc.gl, hl: loc.hl, location: loc.location, key: serpKey!, signal: AbortSignal.timeout(SERP_TIMEOUT_MS) });
-            text = aio.text;
-            citations = aio.citations;
-          } catch {
-            text = '';
-            citations = [];
-          }
+          const r = aio![i];
+          text = r.text;
+          citations = r.citations;
+          fetched = { status: r.outcome === 'answered' ? 'answered' : r.outcome === 'no_overview' ? 'no_answer' : 'failed', failReason: r.reason, ref: r.searchId, ms: r.ms };
         } else {
           // Per-query resilience for Poe engines too (the AIO path always had
           // it): one failed prompt is dropped from the sample, not counted as
@@ -557,7 +587,13 @@ export async function runMonitorAgent(
               retries: 1,
               signal: AbortSignal.any([abort.signal, AbortSignal.timeout(90_000)]),
             });
-            text = resp.content || '';
+            // An engine's own search log is not its answer (see lib/engines/ingest).
+            const body = stripSearchTrace(resp.content || '');
+            // Log and nothing else: the reply was cut off before the answer
+            // began. A dropped sample, never a "brand absent".
+            if (body.stripped && !body.text) throw new Error(`${engine.label}: reply contained a search log and no answer`);
+            if (body.stripped) traceStripped.set(engine.label, (traceStripped.get(engine.label) ?? 0) + 1);
+            text = body.text;
             citations = extractUrls(text);
           } catch (err) {
             if (isCapacityError(err)) throw err;
@@ -576,6 +612,7 @@ export async function runMonitorAgent(
           brandPresentStr: mentions(text, brandName),
           citations,
           brandCited: !!brandDomain && citations.some((u) => domainOf(u) === brandDomain),
+          fetch: fetched,
         };
         done++;
         if (done % 5 === 0 || done === totalQueries) {
@@ -590,6 +627,13 @@ export async function runMonitorAgent(
         throw new EngineOutageError(`${engine.label} answered ${ok.length}/${sampled.length} prompts (${cause})`, [engine.label]);
       }
       if (failed) await emit({ event_type: 'log', payload: { text: `${engine.label}: ${failed} of ${sampled.length} queries failed and were dropped from the sample.` } });
+      if (aio) {
+        const lost = aio.filter((r) => r.outcome === 'failed');
+        notReturned.set(engine.label, { failed: lost.length, noAnswer: aio.filter((r) => r.outcome === 'no_overview').length, retried: aio.filter((r) => r.attempts > 1).length });
+        if (lost.length) {
+          await emit({ event_type: 'log', payload: { text: `${engine.label}: ${lost.length} of ${aio.length} answers could not be fetched after a retry (${[...new Set(lost.map((r) => r.reason))].slice(0, 3).join('; ')}). They are recorded as failed, not as "no overview".` } });
+        }
+      }
       rawByEngine.set(engine.label, ok);
       await emit({
         event_type: 'tool_result',
@@ -794,6 +838,7 @@ export async function runMonitorAgent(
         citations: a.citations,
         brandCited: a.brandCited,
         snippet: a.text.slice(0, 400),
+        ...(a.fetch ?? {}),
       });
       goldenCandidates.push({
         engine: a.engine, stage: a.stage, intent: a.intent, prompt: a.prompt, key: a.key, text: a.text,
@@ -970,6 +1015,8 @@ export async function runMonitorAgent(
     plannedEngines: poolLabels,
     missingEngines: partial ? notMeasured : missing,
     engineIssues,
+    // Provenance: how many answers per engine had a search log removed before scoring.
+    ingest: { searchLogRemoved: Object.fromEntries(traceStripped), notReturned: Object.fromEntries(notReturned) },
     surfaces: { realSurfaces: serpKey ? ['Google AI Overview'] : [], proxySurfaces: ENGINES.map((e) => e.label) },
     sampled: { total: totalPrompts, used: sampled.length, queries: samples.length, keyUsed, keyTotal: keyPrompts.length },
     metrics: { overall, perEngine, perStage, perIntent, keySet },
