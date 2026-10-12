@@ -39,7 +39,31 @@ export interface FetchedSite {
   metaDesc: string;
   existingSchema: string[];
   text: string;
+  // What the page was seen to carry, by rule. The audit may not call "missing"
+  // something listed here as present.
+  observed?: { metaDescription: boolean; faqBlock: boolean; faqSchema: boolean; phone: boolean; addressSchema: boolean; chars: number; omitted: number };
   error?: string;
+}
+
+// The audit used to read the first 4,000 characters of a homepage and report
+// whatever sat below them as missing. On focusmedia.vn (9,700 characters,
+// 2026-10-12) that was the FAQ block at ~6,000 and the footer with address and
+// hotline at ~9,500: the client was told to add what was already there. The
+// page is now read top to footer; only a very long middle is left out, and
+// then it is marked.
+const PAGE_HEAD = 12_000;
+const PAGE_TAIL = 4_000;
+export function pageText(html: string): { text: string; chars: number; omitted: number } {
+  const all = html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&[a-z]+;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (all.length <= PAGE_HEAD + PAGE_TAIL) return { text: all, chars: all.length, omitted: 0 };
+  const omitted = all.length - PAGE_HEAD - PAGE_TAIL;
+  return { text: `${all.slice(0, PAGE_HEAD)}\n[… ${omitted} characters in the middle of the page not shown …]\n${all.slice(-PAGE_TAIL)}`, chars: all.length, omitted };
 }
 
 export async function fetchSite(url: string): Promise<FetchedSite> {
@@ -52,15 +76,17 @@ export async function fetchSite(url: string): Promise<FetchedSite> {
     const title = (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || '').trim();
     const metaDesc = (html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/i)?.[1] || '').trim();
     const existingSchema = Array.from(new Set([...html.matchAll(/"@type"\s*:\s*"([^"]+)"/g)].map((m) => m[1])));
-    const text = html
-      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/&[a-z]+;/gi, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 4000);
-    return { ok: true, title, metaDesc, existingSchema, text };
+    const page = pageText(html);
+    const observed = {
+      metaDescription: !!metaDesc,
+      faqBlock: /câu hỏi thường gặp|frequently asked|\bFAQs?\b|常见问题|常見問題|คำถามที่พบบ่อย|pertanyaan umum/i.test(page.text),
+      faqSchema: existingSchema.includes('FAQPage'),
+      phone: /(?:\+?\d[\d .()-]{7,}\d)/.test(page.text),
+      addressSchema: existingSchema.includes('PostalAddress'),
+      chars: page.chars,
+      omitted: page.omitted,
+    };
+    return { ok: true, title, metaDesc, existingSchema, text: page.text, observed };
   } catch (e) {
     return { ok: false, title: '', metaDesc: '', existingSchema: [], text: '', error: e instanceof Error ? e.message : String(e) };
   }
@@ -113,7 +139,13 @@ export async function runSiteAgent(
         `Homepage title: ${site.title}`,
         `Meta description: ${site.metaDesc || '(none)'}`,
         `Existing JSON-LD @types: ${site.existingSchema.length ? site.existingSchema.join(', ') : 'NONE'}`,
-        `Homepage text (truncated):`,
+        site.observed
+          ? `Observed on the page by rule (${site.observed.chars} characters read, top to footer${site.observed.omitted ? `, ${site.observed.omitted} in the middle not shown` : ''}): ` +
+            `meta description ${site.observed.metaDescription ? 'PRESENT' : 'absent'}; FAQ block ${site.observed.faqBlock ? 'PRESENT' : 'not found'}; FAQPage schema ${site.observed.faqSchema ? 'PRESENT' : 'absent'}; ` +
+            `a phone number in the page text ${site.observed.phone ? 'PRESENT' : 'not found'}; PostalAddress schema ${site.observed.addressSchema ? 'PRESENT' : 'absent'}.`
+          : '',
+        'An item may be marked "missing" ONLY when it is absent from the observations above AND from the page text below. Something that is on the page — anywhere, the footer included — is "ok" or, if it needs work, "weak" with what exactly is weak. Never tell the client to add what the page already has.',
+        `Homepage text:`,
         site.text,
       ].join('\n')
     : '(homepage could not be fetched — base recommendations on the brand/industry)';

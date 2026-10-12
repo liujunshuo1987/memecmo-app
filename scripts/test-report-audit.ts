@@ -6,6 +6,7 @@
 import { selfNames, isBrandedPrompt, coreSplit, classifySource, sourceLane, stalePeriods, sentences, scrub, figureCorpusOf, quarterOf } from '../lib/reports/audit';
 import { extractDomains } from '../lib/reports/verify';
 import { stripSearchTrace, traceAffectedEngines, mostlyEmptyEngines, fetchRepairedEngines } from '../lib/engines/ingest';
+import { pageText } from '../lib/agents/site';
 
 let bad = 0;
 const ok = (name: string, cond: boolean, got?: unknown) => { if (!cond) bad++; console.log(cond ? 'ok  ' : 'FAIL', name, cond ? '' : JSON.stringify(got)); };
@@ -114,6 +115,16 @@ const prevScan = { rawSamples: [...mk('Google AI Overview', 21, 24), ...mk('Chat
 const curScan = { rawSamples: [...rec(0, 0, 24), ...mk('ChatGPT', 24, 24)] };
 ok('first scan with fetch records after one without: that engine only, with both counts', JSON.stringify(fetchRepairedEngines(curScan, prevScan)) === '[{"engine":"Google AI Overview","before":21,"now":24,"total":24}]');
 ok('two recorded scans, or no previous scan: nothing to note', fetchRepairedEngines(curScan, curScan).length === 0 && fetchRepairedEngines(curScan, null).length === 0);
+
+// --- the site audit reads the page to its footer (lib/agents/site) ---
+const filler = (n: number) => 'x'.repeat(n);
+const shortPage = `<html><body><h1>Brand</h1><p>${filler(6000)}</p><h2>Câu hỏi thường gặp</h2><footer>Hotline 1900 5111</footer></body></html>`;
+const sp = pageText(shortPage);
+ok('a 6,000-character page is read whole: the FAQ heading and the footer hotline are in the text', sp.omitted === 0 && /Câu hỏi thường gặp/.test(sp.text) && /1900 5111/.test(sp.text));
+const longPage = `<html><body><h1>Brand</h1><p>${filler(30000)}</p><footer>Hotline 1900 5111</footer></body></html>`;
+const lp = pageText(longPage);
+ok('a very long page keeps its top and its footer, and says how much of the middle is left out', lp.omitted > 0 && lp.text.startsWith('Brand') && /1900 5111/.test(lp.text) && lp.text.includes(`${lp.omitted} characters in the middle`));
+ok('scripts and styles are not page text', !/secret/.test(pageText('<script>var secret=1</script><style>.secret{}</style><p>Visible</p>').text));
 
 console.log(bad ? `\n${bad} failing` : '\nall passing');
 process.exit(bad ? 1 : 0);
