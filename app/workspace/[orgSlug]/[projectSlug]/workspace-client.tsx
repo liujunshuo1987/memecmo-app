@@ -1880,6 +1880,13 @@ function ProfileResult({ o, projectId }: { o: Record<string, any>; projectId?: s
     <div className="mc-card p-5 space-y-3">
       <div>
         <h3 className="text-sm font-semibold text-ink">Canonical brand profile</h3>
+        <p className="text-[11px] text-dim mt-1 mb-1 pl-2 border-l-2 border-gold/50 leading-relaxed">
+          {UI_LANG === 'zh'
+            ? 'AI 读不到这一页。这份档案只供平台的报告和建议使用;要让 AI 说对,这些事实必须写在官网或公开的媒体上。'
+            : UI_LANG === 'vi'
+              ? 'AI không đọc trang này. Hồ sơ này chỉ dùng cho báo cáo và gợi ý của nền tảng; muốn AI nói đúng, các dữ kiện phải có trên website hoặc trên báo chí công khai.'
+              : 'AI does not read this page. The profile is used only by the platform\'s reports and suggestions; for AI to get a fact right, it has to be on your website or in public media.'}
+        </p>
         <p className="text-[11px] text-faint mt-0.5">{o.sourcedFromHomepage ? 'verified against homepage' : 'from brand knowledge'} · reused by all execution agents · {t('your edits are kept when the agent re-runs')}</p>
       </div>
       {val('definition') && <EditableUnit {...unit('definition')} rows={2}><div className="text-[13px] text-ink font-medium leading-snug">{val('definition')}</div></EditableUnit>}
@@ -2370,10 +2377,13 @@ function KpiTile({ label, value, sub, accent, tip }: { label: string; value: str
   );
 }
 
+const GAPS_SHOWN = 8;
+
 function MonitorResult({ o, projectId, history }: { o: Record<string, any>; projectId?: string; history?: ScanPoint[] }) {
   // Per-engine view (SVP feedback: each LLM matters differently) — slicing is
   // display-level; benchmark and gaps stay whole-scan.
   const [engineView, setEngineView] = useState<string | null>(null);
+  const [allGaps, setAllGaps] = useState(false);
   const allEngines: any[] = o.metrics?.perEngine || [];
   const engSel = engineView ? allEngines.find((e) => e.engine === engineView) : null;
   const d = engSel ?? (o.dimensions || {});
@@ -2566,7 +2576,7 @@ function MonitorResult({ o, projectId, history }: { o: Record<string, any>; proj
         <div>
           <SectionLabel>High-intent gaps ({gaps.length})</SectionLabel>
           <ul className="space-y-2">
-            {gaps.slice(0, 8).map((g, i) => (
+            {(allGaps ? gaps : gaps.slice(0, GAPS_SHOWN)).map((g, i) => (
               <li key={i} className="rounded-md mc-chip-inset border-l-2 border-l-garnet/50 bg-garnet/10 pl-2.5 pr-2 py-1.5">
                 <div className="text-[12px] text-ink leading-snug">{g.prompt}</div>
                 <div className="mt-1 flex items-center gap-1.5 flex-wrap">
@@ -2579,6 +2589,14 @@ function MonitorResult({ o, projectId, history }: { o: Record<string, any>; proj
               </li>
             ))}
           </ul>
+          {/* The header counts every gap; the list used to stop at 8 without saying so. */}
+          {gaps.length > GAPS_SHOWN && (
+            <button type="button" onClick={() => setAllGaps((v) => !v)} className="mt-2 text-[11px] text-brand hover:underline">
+              {allGaps
+                ? (UI_LANG === 'zh' ? '收起' : UI_LANG === 'vi' ? 'Thu gọn' : 'Show fewer')
+                : (UI_LANG === 'zh' ? `显示全部 ${gaps.length} 条(还有 ${gaps.length - GAPS_SHOWN} 条)` : UI_LANG === 'vi' ? `Hiện tất cả ${gaps.length} (còn ${gaps.length - GAPS_SHOWN})` : `Show all ${gaps.length} (${gaps.length - GAPS_SHOWN} more)`)}
+            </button>
+          )}
         </div>
       )}
 

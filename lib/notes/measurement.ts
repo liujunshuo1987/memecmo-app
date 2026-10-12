@@ -170,6 +170,7 @@ const vi: Notes = {
       id: 'help',
       h: '5. Hai việc giúp phép đo phản ánh đúng công sức của Quý công ty',
       blocks: [
+        { t: 'p', text: 'MemeCMO không đăng nội dung lên bất kỳ AI nào. AI chỉ đọc các trang web công khai. Những gì ghi hoặc chỉnh sửa trên nền tảng (hồ sơ thương hiệu, bản nháp, bản ghi hành động) chỉ thay đổi bản ghi và gợi ý của chúng tôi; muốn AI nhìn thấy, nội dung phải được đăng trên website hoặc báo chí.' },
         {
           t: 'ul',
           items: [
@@ -309,6 +310,7 @@ const zh: Notes = {
       id: 'help',
       h: '5. 两件事能让测量更如实地反映贵方的工作',
       blocks: [
+        { t: 'p', text: 'MemeCMO 不向任何 AI 发布内容。AI 只读公开的网页。在平台上登记或修改的东西(品牌档案、草稿、行动记录)只改变我们的记录和建议;要让 AI 看到,内容必须发布在官网或媒体上。' },
         {
           t: 'ul',
           items: [
@@ -463,6 +465,7 @@ const en: Notes = {
       id: 'help',
       h: "5. Two things that let the measurement reflect your team's work",
       blocks: [
+        { t: 'p', text: 'MemeCMO does not publish content to any AI. AI reads public web pages only. What is logged or edited on the platform (the brand profile, drafts, the record of actions) changes our records and suggestions and nothing else; for AI to see something, it has to be published on your website or in the media.' },
         {
           t: 'ul',
           items: [

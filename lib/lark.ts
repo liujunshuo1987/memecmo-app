@@ -191,6 +191,12 @@ const KIND_LABEL: Record<InterventionKind, string> = {
   other: 'Khác · 其他',
 };
 
+// Logging is bookkeeping, not publishing. Said on every card and in the help,
+// because a command with a confirm button reads like "submit this to AI"
+// (2026-09-30: a link sent to the bot with "check that AI can index it").
+export const NOT_PUBLISHING =
+  'MemeCMO không đăng nội dung lên AI nào: AI chỉ đọc các trang web công khai. Thao tác này chỉ ghi lại bài đã đăng. · MemeCMO 不向任何 AI 发布内容：AI 只读公开的网页。这一步只是登记已发布的内容。';
+
 /** Confirmation card. Nothing is written until the sender presses Xác nhận. */
 export function hanhdongCard(d: HanhdongDraft, core: string[], ctx: { senderOpenId: string; chatId: string; messageId: string }, state: 'pending' | 'saved' | 'cancelled' = 'pending'): object {
   const targets = d.targets.map((n) => `Q${n} · ${core[n - 1] ?? '—'}`);
@@ -215,6 +221,7 @@ export function hanhdongCard(d: HanhdongDraft, core: string[], ctx: { senderOpen
     });
     elements.push({ tag: 'note', elements: [{ tag: 'plain_text', content: 'Chỉ người gửi mới xác nhận được · 仅发送人可确认。Sau khi ghi, lần quét tiếp theo sẽ tự tính thay đổi trước/sau ngày đăng.' }] });
   }
+  if (state !== 'cancelled') elements.push({ tag: 'note', elements: [{ tag: 'plain_text', content: NOT_PUBLISHING }] });
   return { config: { wide_screen_mode: true, update_multi: true }, header: { template, title: { tag: 'plain_text', content: header } }, elements };
 }
 
@@ -268,6 +275,7 @@ export const HELP_TEXT = [
   'GEO Assistant (MemeCMO) — lệnh · 指令:',
   '• /hanhdong <link> <YYYY-MM-DD> [loại] [Q1–Q20] [ghi chú] — ghi một bài đã đăng · 登记一次发布',
   '  Ví dụ · 例: /hanhdong https://vnexpress.net/... 2026-10-02 Q1 bài tiêu chuẩn đánh giá',
+  `  ${NOT_PUBLISHING}`,
   '• /maau — phiếu yêu cầu MAAU (sắp mở · 即将开放)',
   '• Góp ý / câu hỏi cho MemeCMO: @bot kèm nội dung (có thể kèm ảnh) — bot xác nhận và chuyển ngay · 给 MemeCMO 的反馈或问题：@机器人 + 内容（可附截图），机器人确认并即时转交',
   'Bot chỉ đọc tin nhắn có @ bot · 机器人只读 @ 它的消息。',
