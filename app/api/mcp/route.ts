@@ -15,7 +15,8 @@ import { createMcpHandler } from 'mcp-handler';
 import { z } from 'zod';
 import { serviceClient } from '@/lib/commerce';
 import { rateLimit } from '@/lib/api-guard';
-import { verifyConnectorKey, logConnectorEvent, type ConnectorPrincipal } from '@/lib/connector/auth';
+import { verifyBearer, logConnectorEvent, type ConnectorPrincipal } from '@/lib/connector/auth';
+import { CORS_HEADERS, ISSUER } from '@/lib/oauth/server';
 import {
   DELIVERABLE_TYPES, envelope, getDeliverable, latestScorecard, listActions, listDeliverables, listProjects, logAction,
   resolveProject, sourcesRanking, workspaceUrl, type OrgRef,
@@ -48,15 +49,15 @@ function buildHandler(principal: ConnectorPrincipal) {
     const t0 = Date.now();
     const hit = await resolveProject(sb, principal.orgId, ref);
     if (!hit) {
-      logConnectorEvent({ keyId: principal.keyId, orgId: principal.orgId, tool, ok: false, ms: Date.now() - t0 });
+      logConnectorEvent({ principal, tool, ok: false, ms: Date.now() - t0 });
       return fail(`Project "${ref}" is not in this organization. Call list_projects to see the slugs you can use.`);
     }
     try {
       const out = await fn(hit);
-      logConnectorEvent({ keyId: principal.keyId, orgId: principal.orgId, projectId: hit.project.id, tool, ok: true, ms: Date.now() - t0 });
+      logConnectorEvent({ principal, projectId: hit.project.id, tool, ok: true, ms: Date.now() - t0 });
       return text(out);
     } catch (e) {
-      logConnectorEvent({ keyId: principal.keyId, orgId: principal.orgId, projectId: hit.project.id, tool, ok: false, ms: Date.now() - t0 });
+      logConnectorEvent({ principal, projectId: hit.project.id, tool, ok: false, ms: Date.now() - t0 });
       return fail(e instanceof Error ? e.message : String(e));
     }
   };
@@ -75,7 +76,7 @@ function buildHandler(principal: ConnectorPrincipal) {
           const t0 = Date.now();
           try {
             const { projects } = await listProjects(sb, principal.orgId);
-            logConnectorEvent({ keyId: principal.keyId, orgId: principal.orgId, tool: 'list_projects', ok: true, ms: Date.now() - t0 });
+            logConnectorEvent({ principal, tool: 'list_projects', ok: true, ms: Date.now() - t0 });
             return text(envelope(org, null, {
               projects: projects.map((p) => ({
                 slug: p.slug, brand: p.brand_name, market: p.target_country, language: p.target_language, industry: p.industry, organization: p.org.name,
@@ -84,7 +85,7 @@ function buildHandler(principal: ConnectorPrincipal) {
               docs: DOCS,
             }));
           } catch (e) {
-            logConnectorEvent({ keyId: principal.keyId, orgId: principal.orgId, tool: 'list_projects', ok: false, ms: Date.now() - t0 });
+            logConnectorEvent({ principal, tool: 'list_projects', ok: false, ms: Date.now() - t0 });
             return fail(e instanceof Error ? e.message : String(e));
           }
         },
@@ -181,7 +182,7 @@ function buildHandler(principal: ConnectorPrincipal) {
             const r = await logAction(sb, p, {
               kind: args.kind, url: args.url, publishedAt: args.published_at, title: args.title, note: args.note,
               targetPrompts: args.target_prompts, sourceRunId: args.source_run_id,
-            }, { loggedBy: principal.createdBy, keyId: principal.keyId });
+            }, { loggedBy: principal.createdBy, keyId: principal.keyId, tokenId: principal.tokenId });
             return envelope(o, p, {
               logged: !r.duplicate, duplicate: r.duplicate, verificationQueued: r.verificationQueued,
               action: { id: r.intervention.id, kind: r.intervention.kind, url: r.intervention.url, publishedAt: r.intervention.published_at, targetPrompts: r.intervention.target_prompts.map((t) => t.prompt) },
@@ -198,21 +199,31 @@ function buildHandler(principal: ConnectorPrincipal) {
   );
 }
 
+const withCors = (res: Response): Response => {
+  for (const [k, v] of Object.entries(CORS_HEADERS)) res.headers.set(k, v);
+  return res;
+};
+
 async function handle(req: Request): Promise<Response> {
   const header = req.headers.get('authorization') || '';
   const token = header.replace(/^Bearer\s+/i, '').trim();
-  const principal = token ? await verifyConnectorKey(token) : null;
+  const principal = token ? await verifyBearer(token) : null;
   if (!principal) {
-    return new Response(
-      JSON.stringify({ error: 'unauthorized', message: `Send a MemeCMO connector key as "Authorization: Bearer mc_…". Keys are issued by an organization admin in the dashboard. Docs: ${DOCS}` }),
-      { status: 401, headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': 'Bearer realm="MemeCMO Connector", error="invalid_token"' } },
-    );
+    // RFC 9728: tell OAuth-capable clients where the protected-resource metadata lives.
+    return withCors(new Response(
+      JSON.stringify({ error: 'unauthorized', message: `Sign in through OAuth (Claude.ai, ChatGPT and other directory clients do this automatically) or send a MemeCMO connector key as "Authorization: Bearer mc_…". Docs: ${DOCS}` }),
+      { status: 401, headers: { 'Content-Type': 'application/json', 'WWW-Authenticate': `Bearer realm="MemeCMO Connector", resource_metadata="${ISSUER}/.well-known/oauth-protected-resource", error="invalid_token"` } },
+    ));
   }
-  const rl = await rateLimit(`mcp:${principal.keyId}`, { scope: 'mcp', limit: 120, windowMs: 60_000 });
+  const rl = await rateLimit(`mcp:${principal.keyId ?? principal.tokenId}`, { scope: 'mcp', limit: 120, windowMs: 60_000 });
   if (!rl.allowed) {
-    return Response.json({ error: 'rate_limited', retryAfterSeconds: Math.ceil(rl.resetMs / 1000) }, { status: 429, headers: { 'Retry-After': String(Math.ceil(rl.resetMs / 1000)) } });
+    return withCors(Response.json({ error: 'rate_limited', retryAfterSeconds: Math.ceil(rl.resetMs / 1000) }, { status: 429, headers: { 'Retry-After': String(Math.ceil(rl.resetMs / 1000)) } }));
   }
-  return buildHandler(principal)(req);
+  return withCors(await buildHandler(principal)(req));
 }
 
-export { handle as GET, handle as POST, handle as DELETE };
+function options(): Response {
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
+}
+
+export { handle as GET, handle as POST, handle as DELETE, options as OPTIONS };

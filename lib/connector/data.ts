@@ -250,7 +250,7 @@ export async function logAction(
   sb: SupabaseClient,
   project: ProjectRef,
   input: LogActionInput,
-  who: { loggedBy: string | null; keyId: string },
+  who: { loggedBy: string | null; keyId: string | null; tokenId: string | null },
 ): Promise<{ intervention: Intervention; duplicate: boolean; verificationQueued: boolean }> {
   if (!(INTERVENTION_KINDS as readonly string[]).includes(input.kind)) throw new Error(`kind must be one of ${INTERVENTION_KINDS.join(', ')}`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.publishedAt)) throw new Error('published_at must be YYYY-MM-DD');
@@ -270,7 +270,7 @@ export async function logAction(
     .insert({
       project_id: project.id, kind: input.kind as InterventionKind, url, domain: domainOf(url), title: input.title || null, note: input.note || null,
       target_prompts: targets, source_asset_type: input.sourceAssetType || null, source_run_id: input.sourceRunId || null,
-      published_at: input.publishedAt, logged_by: who.loggedBy, channel: 'connector', connector_key_id: who.keyId,
+      published_at: input.publishedAt, logged_by: who.loggedBy, channel: 'connector', connector_key_id: who.keyId, oauth_token_id: who.tokenId,
     })
     .select('*')
     .single();

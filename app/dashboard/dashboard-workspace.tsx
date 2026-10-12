@@ -622,7 +622,7 @@ function ConnectorModal({ org, onClose }: { org: Organization; onClose: () => vo
             <div className="flex items-center justify-between"><span className="text-[11px] text-ink font-medium">Cursor · Claude Desktop(经 mcp-remote)· 其他支持 HTTP 头的客户端</span><button onClick={() => copy('json', jsonCfg)} className="text-[11px] text-dim hover:text-ink">{copied === 'json' ? '已复制' : '复制'}</button></div>
             <pre className="text-[10.5px] whitespace-pre-wrap break-all text-dim">{jsonCfg}</pre>
           </div>
-          <p className="text-[11px] text-faint">Claude.ai 网页版与 ChatGPT 需要 OAuth 登录,正在接入。完整说明见 <a href="/connector" target="_blank" rel="noreferrer" className="text-brand underline underline-offset-2">/connector</a>。</p>
+          <p className="text-[11px] text-faint">Claude.ai、ChatGPT 等支持 OAuth 的客户端不需要密钥:直接添加 {url} 为自定义连接器,登录 MemeCMO 并选择组织即可。完整说明见 <a href="/connector" target="_blank" rel="noreferrer" className="text-brand underline underline-offset-2">/connector</a>。</p>
         </div>
 
         {error && <div className="text-xs text-garnet bg-garnet/10 border border-garnet/40 rounded px-3 py-2">{error}</div>}

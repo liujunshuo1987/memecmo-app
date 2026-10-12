@@ -58,7 +58,10 @@ export default function ConnectorPage() {
               <div className="text-[11px] text-ink font-medium">Cursor · Claude Desktop(经 mcp-remote)· 其他支持 HTTP 头的客户端</div>
               <pre className="text-[11px] whitespace-pre-wrap break-all text-dim">{json}</pre>
             </div>
-            <p className="text-[12px] text-faint">Claude.ai 网页版与 ChatGPT 需要 OAuth 登录,正在接入,届时无需复制密钥。 <span>Claude.ai and ChatGPT need OAuth; that is being added.</span></p>
+            <div className="mc-card-soft p-4 space-y-1">
+              <div className="text-[11px] text-ink font-medium">Claude.ai · ChatGPT · 其他支持 OAuth 的客户端 — 不需要密钥</div>
+              <p className="text-[12px] text-dim leading-relaxed">在客户端里"添加自定义连接器 / MCP 服务器",填 <code className="mc-chip-inset rounded px-1">{URL}</code>,客户端会自动注册并跳到 MemeCMO 登录与授权页;你选择授权哪个组织,登记行动需要该组织的 editor 或 admin 角色。令牌 24 小时有效、自动刷新,可随时在授权页撤销。 <span className="text-faint">Add it as a custom connector; the client discovers OAuth, you sign in and choose an organization.</span></p>
+            </div>
           </section>
 
           <section className="space-y-3">
