@@ -282,3 +282,71 @@ export async function logAction(
   }
   return { intervention: data as Intervention, duplicate: false, verificationQueued };
 }
+
+// ── feeds for polling clients (Zapier / Make): newest first, stable ids ────────
+export async function recentScans(sb: SupabaseClient, orgId: string, limit = 25) {
+  const { projects } = await listProjects(sb, orgId);
+  if (!projects.length) return [];
+  const byId = new Map(projects.map((p) => [p.id, p]));
+  const { data } = await sb
+    .from('agent_runs')
+    .select('id, project_id, agent_id, completed_at, s1:output->>aigvrScore, s2:output->scorecard->>aigvrScore, d1:output->dimensions, d2:output->scorecard->dimensions, g1:output->gaps, g2:output->scorecard->gaps, x1:output->>partial, x2:output->scorecard->>partial, q1:output->sampled, q2:output->scorecard->sampled')
+    .in('project_id', projects.map((p) => p.id))
+    .in('agent_id', ['monitor', 'full_scan'])
+    .eq('status', 'completed')
+    .neq('trigger_method', 'diagnostic')
+    .order('completed_at', { ascending: false })
+    .limit(Math.min(limit * 2, 100));
+  const out: Record<string, unknown>[] = [];
+  for (const r of (data ?? []) as any[]) {
+    if (r.x1 === 'true' || r.x2 === 'true') continue;
+    const p = byId.get(r.project_id); if (!p) continue;
+    const dims = (r.d2 ?? r.d1 ?? {}) as Record<string, number>;
+    const gaps = ((r.g2 ?? r.g1 ?? []) as any[]);
+    const sampled = (r.q2 ?? r.q1 ?? {}) as Record<string, number>;
+    out.push({
+      id: r.id, project: p.slug, brand: p.brand_name, market: p.target_country, organization: p.org.name,
+      scanned_at: r.completed_at, agent: r.agent_id,
+      ai_mindset_index: r.s2 != null ? Number(r.s2) : r.s1 != null ? Number(r.s1) : null,
+      presence_pct: dims.presence ?? null, share_of_voice_pct: dims.competitiveShare ?? null, citation_pct: dims.citation ?? null,
+      queries: sampled.queries ?? null, gap_count: gaps.length,
+      top_gaps: gaps.slice(0, 5).map((g) => g.prompt),
+      workspace_url: workspaceUrl(p.org.slug, p.slug),
+    });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+export async function recentDeliverables(sb: SupabaseClient, orgId: string, opts: { types?: string[]; limit?: number } = {}) {
+  const { projects } = await listProjects(sb, orgId);
+  if (!projects.length) return [];
+  const byId = new Map(projects.map((p) => [p.id, p]));
+  const types = (opts.types?.length ? opts.types : ['content_draft', 'distribution_kit', 'site_optimization', 'encyclopedia_entry', 'geo_report']).filter((t) => (DELIVERABLE_TYPES as readonly string[]).includes(t));
+  const limit = Math.max(1, Math.min(opts.limit ?? 25, 50));
+  const { data } = await sb
+    .from('assets')
+    .select('id, project_id, type, title, format, agent_run_id, created_at, content')
+    .in('project_id', projects.map((p) => p.id))
+    .in('type', types)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  const rows = (data ?? []) as any[];
+  // The client's own edits win — one batched read for every (project, type) in the page.
+  const { data: edits } = rows.length
+    ? await sb.from('asset_edits').select('project_id, asset_type, unit_key, value').in('project_id', Array.from(new Set(rows.map((r) => r.project_id)))).in('asset_type', types)
+    : { data: [] as any[] };
+  const editMap = new Map<string, any>();
+  for (const e of (edits ?? []) as any[]) editMap.set(`${e.project_id}|${e.asset_type}|${e.unit_key}`, e.value);
+  return rows.map((a) => {
+    const p = byId.get(a.project_id)!;
+    const v = a.agent_run_id ? editMap.get(`${a.project_id}|${a.type}|doc:${a.agent_run_id}`) : undefined;
+    const content = v === undefined ? a.content : (typeof v === 'string' ? v : (v?.content ?? v?.text ?? v?.markdown ?? a.content));
+    return {
+      id: a.id, project: p.slug, brand: p.brand_name, market: p.target_country, organization: p.org.name,
+      type: a.type, title: a.title, format: a.format, run_id: a.agent_run_id, created_at: a.created_at, edited: v !== undefined,
+      words: String(content ?? '').split(/\s+/).filter(Boolean).length, content: content ?? '',
+      workspace_url: workspaceUrl(p.org.slug, p.slug),
+    };
+  });
+}

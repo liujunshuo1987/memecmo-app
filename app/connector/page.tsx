@@ -82,6 +82,33 @@ export default function ConnectorPage() {
           </section>
 
           <section className="space-y-3">
+            <h2 className="text-lg font-semibold border-b border-edge pb-2">Zapier · 在客户自己的发布环境里闭环</h2>
+            <p className="text-[13px] text-dim leading-relaxed">MemeCMO 的 Zapier 集成用同一套 OAuth 登录。触发器:<b>New Scan</b>(扫描完成:指数、出现率、缺口数)、<b>New Deliverable</b>(内容稿 / 分发包 / 官网改造 / 百科 / 报告就绪,含人工修改);动作:<b>Log Published Action</b>(登记已发布的 URL);搜索:最新交付物、当前缺口。一个 Zap 就能把内容稿发到 Facebook 主页或 LinkedIn 公司页,再把帖子 URL 回写成行动。 <span className="text-faint">Same OAuth; triggers New Scan and New Deliverable, action Log Published Action, searches for the latest deliverable and current gaps. Publish with Zapier's Facebook Pages / LinkedIn actions, then log the post URL.</span></p>
+            <p className="text-[12px] text-faint">集成以私有邀请方式提供,联系 samchan@memecmo.ai 获取邀请链接。 <span>Private integration; ask for the invite link.</span></p>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-lg font-semibold border-b border-edge pb-2">REST · 同一套凭证的 HTTP 接口</h2>
+            <div className="mc-card overflow-hidden">
+              <table className="w-full text-[12px]">
+                <tbody>
+                  {[
+                    ['GET /api/connector/v1/me', '凭证对应的组织与权限 · who this credential is'],
+                    ['GET /api/connector/v1/projects', '项目列表 · projects'],
+                    ['GET /api/connector/v1/projects/{slug}/scorecard · /gaps · /sources', '评分卡、缺口、信源 · scorecard, gaps, sources'],
+                    ['GET /api/connector/v1/projects/{slug}/deliverables[?type=]', '交付物列表或某一类的全文 · deliverables'],
+                    ['GET|POST /api/connector/v1/projects/{slug}/actions', '行动台账;POST 登记行动 · the action ledger; POST logs one'],
+                    ['GET /api/connector/v1/events/scans · /events/deliverables', '跨项目的最新扫描与交付物,供轮询 · polling feeds'],
+                  ].map(([path, desc]) => (
+                    <tr key={path} className="border-t border-edge first:border-0 align-top"><td className="px-3 py-2 font-mono text-ink text-[11px]">{path}</td><td className="px-3 py-2 text-dim">{desc}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-[12px] text-faint">Bearer 为连接器密钥或 OAuth 访问令牌;每分钟 120 次。 <span>Bearer = connector key or OAuth access token; 120 calls per minute.</span></p>
+          </section>
+
+          <section className="space-y-3">
             <h2 className="text-lg font-semibold border-b border-edge pb-2">典型流程 · A typical loop</h2>
             <ol className="text-[13px] text-dim leading-relaxed list-decimal ml-5 space-y-1">
               <li><code className="mc-chip-inset rounded px-1">get_gaps</code> 看哪些买家问题 AI 点了竞品没点你。</li>

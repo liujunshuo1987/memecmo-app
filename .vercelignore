@@ -1,0 +1,3 @@
+
+# Zapier integration lives in its own package; never ship it with the app
+integrations/

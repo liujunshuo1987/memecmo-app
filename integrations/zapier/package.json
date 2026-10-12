@@ -1,0 +1,22 @@
+{
+  "name": "memecmo-zapier",
+  "version": "1.0.0",
+  "description": "MemeCMO connector for Zapier: scans and deliverables as triggers, log_action as an action.",
+  "main": "index.js",
+  "private": true,
+  "scripts": {
+    "test": "jest --testTimeout 60000",
+    "validate": "zapier validate"
+  },
+  "engines": {
+    "node": ">=20",
+    "npm": ">=9"
+  },
+  "dependencies": {
+    "zapier-platform-core": "19.2.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "zapier-platform-cli": "19.2.0"
+  }
+}
