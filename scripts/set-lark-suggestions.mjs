@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // Turn suggested actions in the Lark group on or off for one project
 // (projects.metadata.larkSuggestedActions — lib/lark-bot.ts, off by default).
-//   node scripts/set-lark-suggestions.mjs <projectId|projectSlug> <on|off>
-// On: "@bot /xacnhan <n>" confirms suggestion n for the sender. It does NOT post
-// anything to the group — posting the list (postSuggestionList) is a separate,
-// approved send.
+//   node scripts/set-lark-suggestions.mjs <projectId|projectSlug> <on|off> [--auto on|off]
+// On: "@bot /xacnhan <n>" and the card buttons confirm suggestions for the sender.
+// --auto on: after each scan's page fetch, NEW suggestions are posted to the group
+// automatically as an interactive card (projects.metadata.larkSuggestionsAutoPost);
+// without it, posting is a separate send (scripts/post-suggestions-card.ts).
 import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,8 +23,10 @@ if (existsSync(ENV)) {
 }
 
 const [, , project, state] = process.argv;
-if (!project || !['on', 'off'].includes(state || '')) {
-  console.error('Usage: node scripts/set-lark-suggestions.mjs <projectId|projectSlug> <on|off>');
+const autoAt = process.argv.indexOf('--auto');
+const auto = autoAt >= 0 ? process.argv[autoAt + 1] : null;
+if (!project || !['on', 'off'].includes(state || '') || (auto !== null && !['on', 'off'].includes(auto))) {
+  console.error('Usage: node scripts/set-lark-suggestions.mjs <projectId|projectSlug> <on|off> [--auto on|off]');
   process.exit(1);
 }
 
@@ -36,10 +39,11 @@ await c.connect();
 await c.query('BEGIN');
 const r = await c.query(
   `UPDATE projects
-     SET metadata = jsonb_set(coalesce(metadata,'{}'::jsonb), '{larkSuggestedActions}', to_jsonb($1::boolean), true)
+     SET metadata = jsonb_set(jsonb_set(coalesce(metadata,'{}'::jsonb), '{larkSuggestedActions}', to_jsonb($1::boolean), true),
+                              '{larkSuggestionsAutoPost}', to_jsonb(coalesce($3::boolean, (coalesce(metadata,'{}'::jsonb)->>'larkSuggestionsAutoPost')::boolean, false)), true)
    WHERE id::text = $2 OR slug = $2
    RETURNING id, slug, brand_name, metadata->>'larkSuggestedActions' AS lark_suggested_actions`,
-  [state === 'on', project],
+  [state === 'on', project, auto === null ? null : auto === 'on'],
 );
 if (r.rowCount !== 1) {
   await c.query('ROLLBACK');

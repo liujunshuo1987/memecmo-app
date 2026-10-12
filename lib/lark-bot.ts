@@ -8,8 +8,8 @@ import { notifyOperator } from '@/lib/alerts';
 import { domainOf } from '@/lib/interventions';
 import { unitHash } from '@/lib/edits';
 import { inngest } from '@/lib/inngest/client';
-import { confirmSuggestion, loadPendingSuggestions } from '@/lib/suggestions';
-import { HELP_TEXT, XACNHAN_HELP, hanhdongCard, larkReply, larkSend, larkText, larkUserEmail, parseHanhdong, parseXacnhan, suggestionListText, type HanhdongDraft } from '@/lib/lark';
+import { confirmSuggestion, dismissSuggestion, loadPendingSuggestions } from '@/lib/suggestions';
+import { HELP_TEXT, XACNHAN_HELP, hanhdongCard, larkReply, larkSend, larkText, larkUserEmail, parseHanhdong, parseXacnhan, suggestionCard, suggestionListText, type HanhdongDraft } from '@/lib/lark';
 
 type Sb = any;
 
@@ -223,9 +223,10 @@ export async function handleLarkCardAction(sb: Sb, event: any): Promise<object> 
   const ctx = { senderOpenId: String(v.s || ''), chatId: String(v.c || event?.context?.open_chat_id || ''), messageId: String(v.m || '') };
   const toast = (type: 'success' | 'error' | 'info', content: string) => ({ type, content });
 
-  if (!operator || operator !== ctx.senderOpenId) return { toast: toast('error', 'Chỉ người gửi mới xác nhận được · 仅发送人可确认') };
   const project = await boundProject(sb, ctx.chatId);
   if (!project) return { toast: toast('error', 'Nhóm chưa được gắn dự án · 本群未绑定项目') };
+  if (v.a === 'sugg_confirm' || v.a === 'sugg_dismiss') return handleSuggestionClick(sb, event, project, operator, toast);
+  if (!operator || operator !== ctx.senderOpenId) return { toast: toast('error', 'Chỉ người gửi mới xác nhận được · 仅发送人可确认') };
   const core: string[] = Array.isArray(project.metadata?.coreKeyPrompts) ? project.metadata.coreKeyPrompts : [];
 
   if (v.a === 'hanhdong_cancel') {
@@ -300,3 +301,96 @@ export async function postSuggestionList(sb: Sb, d: { projectId: string; approve
   if (error) throw new Error(`list posted (${messageId}) but not recorded: ${error.message}`);
   return `posted:${messageId}:${list.length}`;
 }
+
+// ─── Suggested actions: the card and its buttons ─────────────────────────────
+
+/** The rows posted on one card, newest decision first, with the deciders' emails for display. */
+async function cardRows(sb: Sb, projectId: string, messageId: string, fallbackIds: string[]): Promise<Parameters<typeof suggestionCard>[0]> {
+  let q = sb.from('intervention_suggestions').select('*').eq('project_id', projectId);
+  q = messageId ? q.eq('lark_message_id', messageId) : q.in('id', fallbackIds);
+  const { data } = await q.order('seq', { ascending: true }).limit(12);
+  const rows = (data ?? []) as any[];
+  const ids = Array.from(new Set(rows.flatMap((r) => [r.confirmed_by, r.dismissed_by]).filter(Boolean))) as string[];
+  const email = new Map<string, string>();
+  await Promise.all(ids.map(async (id) => { try { const { data: u } = await sb.auth.admin.getUserById(id); if (u?.user?.email) email.set(id, u.user.email); } catch { /* display only */ } }));
+  const ivIds = rows.map((r) => r.intervention_id).filter(Boolean);
+  const targetN = new Map<string, number | null>(); const pub = new Map<string, string>();
+  if (ivIds.length) {
+    const { data: project } = await sb.from('projects').select('metadata').eq('id', projectId).maybeSingle();
+    const core: string[] = Array.isArray(project?.metadata?.coreKeyPrompts) ? project.metadata.coreKeyPrompts : [];
+    const { data: ivs } = await sb.from('interventions').select('id, target_prompts, published_at').in('id', ivIds);
+    for (const iv of (ivs ?? []) as any[]) {
+      const first = (iv.target_prompts ?? [])[0]?.prompt; const n = first ? core.indexOf(first) + 1 : 0;
+      targetN.set(iv.id, n > 0 ? n : null); pub.set(iv.id, iv.published_at);
+    }
+  }
+  return rows.map((r) => ({
+    id: r.id, seq: r.seq, url: r.url, title: r.title, published_guess: r.published_guess, guess_source: r.guess_source,
+    target_candidates: r.target_candidates ?? [], evidence: r.evidence ?? {}, status: r.status,
+    decidedBy: email.get(r.confirmed_by ?? r.dismissed_by ?? '') ?? null,
+    targetN: r.intervention_id ? targetN.get(r.intervention_id) ?? null : null,
+    publishedAt: r.intervention_id ? pub.get(r.intervention_id) ?? null : null,
+  }));
+}
+
+/** A click on a suggestion card: confirm (optionally with a target question) or dismiss, under the clicker's account. */
+async function handleSuggestionClick(sb: Sb, event: any, project: any, operator: string, toast: (t: 'success' | 'error' | 'info', c: string) => object): Promise<object> {
+  const v = event?.action?.value ?? {};
+  const messageId = String(event?.context?.open_message_id ?? '');
+  if (!larkSuggestionsOn(project)) return { toast: toast('error', 'Tính năng chưa bật cho dự án này · 本项目未开启') };
+  const who = await senderAccount(sb, operator);
+  const org: any = project.organizations;
+  if (!isAccount(who)) return { toast: toast('error', 'Email Lark chưa khớp tài khoản MemeCMO · Lark 邮箱未匹配平台账号') };
+  if (!(await canSignForOrg(sb, who.userId, { id: org.id, parent_org_id: org.parent_org_id }))) {
+    return { toast: toast('error', 'Việc xác nhận phải do thành viên đội ngũ thương hiệu thực hiện · 须由品牌团队成员确认') };
+  }
+  const core: string[] = Array.isArray(project.metadata?.coreKeyPrompts) ? project.metadata.coreKeyPrompts : [];
+  let msg = '';
+  if (v.a === 'sugg_dismiss') {
+    const r = await dismissSuggestion(sb, { projectId: project.id, id: String(v.id), userId: who.userId });
+    msg = r.ok ? 'Đã đánh dấu: không phải hành động · 已标为不算行动' : (r.error === 'not-pending' ? 'Trang này đã được xử lý · 此页已处理过' : `Lỗi · 出错: ${r.error}`);
+  } else {
+    const qn = Number(v.q || 0);
+    const r = await confirmSuggestion(sb, {
+      projectId: project.id, id: String(v.id), userId: who.userId, channel: 'lark', larkMessageId: messageId || null, today: vnToday(),
+      targetPrompts: qn >= 1 && core[qn - 1] ? [core[qn - 1]] : undefined,
+    });
+    if (!('error' in r)) {
+      msg = `Đã ghi · 已登记${qn ? ` · Q${qn}` : ''}`;
+      try { await inngest.send({ name: 'geo/intervention.verify', data: { interventionId: r.intervention.id } }); } catch { /* best effort */ }
+    } else {
+      const why: Record<string, string> = { 'not-found': 'Không tìm thấy trang · 未找到此页', 'already-confirmed': 'Đã được xác nhận trước đó · 此前已确认', 'already-dismissed': 'Đã bị đánh dấu "không phải hành động" · 已标为不算行动', 'future-date': 'Ngày đăng ở tương lai · 发布日期在未来' };
+      msg = why[r.error] ?? `Lỗi · 出错: ${r.error}`;
+    }
+  }
+  const rows = await cardRows(sb, project.id, messageId, [String(v.id)]);
+  return { toast: toast(msg.startsWith('Lỗi') ? 'error' : 'success', msg), card: { type: 'raw', data: suggestionCard(rows, { brand: project.brand_name }) } };
+}
+
+/**
+ * Post pending suggestions to the project's bound group as an interactive card.
+ * `onlyNew` posts only rows never posted before (the per-scan automatic post);
+ * without it every pending row is re-posted (an operator re-listing). Refuses
+ * unless the project has suggested actions on for Lark.
+ */
+export async function postSuggestionCard(sb: Sb, d: { projectId: string; approvedBy: string; onlyNew?: boolean }): Promise<string> {
+  if (!d.approvedBy.trim()) return 'refused:no-approver';
+  const { data: project } = await sb.from('projects').select('id, brand_name, metadata').eq('id', d.projectId).maybeSingle();
+  if (!project) return 'refused:no-project';
+  if (!larkSuggestionsOn(project)) return 'refused:flag-off';
+  const { data: binding } = await sb.from('lark_bindings').select('chat_id').eq('project_id', d.projectId).limit(1).maybeSingle();
+  if (!binding?.chat_id) return 'refused:unbound';
+  let list = await loadPendingSuggestions(sb, d.projectId);
+  if (d.onlyNew) list = list.filter((s) => !s.lark_posted_at);
+  list = list.slice(0, 8);
+  if (!list.length) return 'nothing-pending';
+  const rows = list.map((s) => ({ id: s.id, seq: s.seq, url: s.url, title: s.title, published_guess: s.published_guess, guess_source: s.guess_source, target_candidates: s.target_candidates ?? [], evidence: s.evidence ?? {}, status: 'pending' as const }));
+  const messageId = await larkSend(binding.chat_id, { card: suggestionCard(rows, { brand: project.brand_name }) });
+  if (!messageId) return 'send-failed';
+  const { error } = await sb.from('intervention_suggestions').update({ lark_posted_at: new Date().toISOString(), lark_posted_by: d.approvedBy.trim(), lark_message_id: messageId }).in('id', list.map((s) => s.id));
+  if (error) throw new Error(`card posted (${messageId}) but not recorded: ${error.message}`);
+  return `posted:${messageId}:${list.length}`;
+}
+
+/** Automatic post after a scan's page fetch — only when the project opted in to it explicitly. */
+export const larkAutoPostOn = (p: any): boolean => p?.metadata?.larkSuggestionsAutoPost === true;
