@@ -96,6 +96,16 @@ export async function larkSend(chatId: string, msg: { text: string } | { card: o
   return d?.message_id ?? null;
 }
 
+/** Replace an interactive card in place (no new message, no notification). */
+export async function larkUpdateCard(messageId: string, card: object): Promise<void> {
+  await larkApi(`/im/v1/messages/${encodeURIComponent(messageId)}`, { method: 'PATCH', body: { content: JSON.stringify(card) } });
+}
+
+/** Delete one of the bot's own messages; false when Lark refuses (then the caller archives the card instead). */
+export async function larkDeleteMessage(messageId: string): Promise<boolean> {
+  try { await larkApi(`/im/v1/messages/${encodeURIComponent(messageId)}`, { method: 'DELETE' }); return true; } catch { return false; }
+}
+
 /** Sender's email (needs contact:user.email:readonly and the sender inside the app's contact scope). */
 export async function larkUserEmail(openId: string): Promise<string | null> {
   const d = await larkApi(`/contact/v3/users/${encodeURIComponent(openId)}?user_id_type=open_id`);
@@ -290,45 +300,68 @@ export interface SuggestionCardRow {
   decidedBy?: string | null; targetN?: number | null; publishedAt?: string | null;
 }
 
+export interface SuggestionCardOptions {
+  brand?: string | null;
+  /** Pending pages NOT on this card (they wait in the workspace). */
+  moreCount?: number;
+  workspaceUrl?: string | null;
+  /** 14-day state: the header gets a ⏰, nothing else changes. */
+  reminder?: boolean;
+  /** 30-day state: the card is archived (short text, no buttons). */
+  retired?: boolean;
+  /** Pages shown with buttons; the rest of this card's pending rows queue behind them (default 5). */
+  capacity?: number;
+}
+
+const mdLink = (title: string | null, url: string) => `[${(title ?? url).replace(/[\[\]]/g, ' ').slice(0, 90)}](${url})`;
+
 /**
- * One card per batch of suggestions. Every suggestion has its own buttons:
- * "✓ Q<n>" confirms it with that target question, "✓" confirms without one,
- * "✗" marks it as not an action. The card uses update_multi so the decision
- * shows for everyone; nothing is pre-selected on the person's behalf.
+ * The ONE living card of a project. Compact by design: three buttons per page
+ * (✓ with the most likely target question, ✓ without one, ✗ not an action),
+ * processed pages folded into one line, the overflow pointed to the workspace.
+ * update_multi so a decision shows for everyone; nothing is pre-selected.
  */
-export function suggestionCard(rows: SuggestionCardRow[], opts: { brand?: string | null } = {}): object {
-  const pending = rows.filter((r) => r.status === 'pending').length;
-  const header = pending
-    ? `Trang mới trên website · 官网新页面 — ${pending} chờ xác nhận · 待确认`
+export function suggestionCard(rows: SuggestionCardRow[], opts: SuggestionCardOptions = {}): object {
+  const pending = rows.filter((r) => r.status === 'pending');
+  const done = rows.filter((r) => r.status !== 'pending');
+  const confirmed = done.filter((r) => r.status === 'confirmed').length;
+  const dismissed = done.length - confirmed;
+  if (opts.retired) {
+    return {
+      config: { wide_screen_mode: true, update_multi: true },
+      header: { template: 'grey', title: { tag: 'plain_text', content: 'Trang mới trên website · 官网新页面 — đã lưu trữ · 已归档' } },
+      elements: [{ tag: 'div', text: { tag: 'lark_md', content: `Các trang chưa xác nhận vẫn nằm trong workspace · 未确认的页面仍在工作区${opts.workspaceUrl ? `: ${opts.workspaceUrl}` : ''}。${done.length ? ` ✅ ${confirmed} · ➖ ${dismissed}` : ''}` } }],
+    };
+  }
+  const n = pending.length;
+  const shown = pending.slice(0, opts.capacity ?? 5);
+  const overflow = (n - shown.length) + Math.max(0, opts.moreCount ?? 0);
+  const header = n
+    ? `${opts.reminder ? '⏰ ' : ''}Trang mới trên website · 官网新页面 — còn ${n} chờ xác nhận · 待确认 ${n}`
     : 'Trang mới trên website · 官网新页面 — đã xử lý · 已处理';
-  const elements: any[] = [
-    { tag: 'div', text: { tag: 'lark_md', content: `Nền tảng phát hiện các trang mới trên website${opts.brand ? ` của ${opts.brand}` : ''}, chưa được ghi thành hành động. Bấm để xác nhận — ghi dưới tên người bấm. · 平台在官网上发现以下新页面，尚未登记为行动。点按钮即确认，记在点击人名下。` } },
-  ];
-  rows.forEach((r, i) => {
-    const cites = r.evidence?.cites ? ` · AI đã trích dẫn ${r.evidence.cites} lần · AI 已引用 ${r.evidence.cites} 次` : '';
-    const lines = [
-      `**#${r.seq} · ${r.title ?? r.url}**`,
-      r.url,
-      `Ngày đăng (ước tính) · 估计发布日期: ${r.published_guess} — ${GUESS_LABEL[r.guess_source] ?? r.guess_source}${cites}`,
-    ];
-    if (r.status === 'confirmed') lines.push(`✅ Đã xác nhận · 已确认${r.decidedBy ? ` — ${r.decidedBy}` : ''}${r.targetN ? ` · Q${r.targetN}` : ''}${r.publishedAt ? ` · ${r.publishedAt}` : ''}`);
-    if (r.status === 'dismissed') lines.push(`➖ Không phải hành động · 不算行动${r.decidedBy ? ` — ${r.decidedBy}` : ''}`);
-    if (i > 0) elements.push({ tag: 'hr' });
-    elements.push({ tag: 'div', text: { tag: 'lark_md', content: lines.join('\n') } });
-    if (r.status === 'pending') {
-      const qs = (r.target_candidates ?? []).slice(0, 3);
-      const actions: any[] = qs.map((c) => ({
-        tag: 'button', type: c.strong ? 'primary' : 'default',
-        text: { tag: 'plain_text', content: `✓ Q${c.n}` },
-        value: { a: 'sugg_confirm', id: r.id, q: c.n },
-      }));
-      actions.push({ tag: 'button', type: qs.length ? 'default' : 'primary', text: { tag: 'plain_text', content: qs.length ? '✓ Không gắn Q · 不指定问题' : '✓ Xác nhận · 确认' }, value: { a: 'sugg_confirm', id: r.id } });
-      actions.push({ tag: 'button', type: 'danger', text: { tag: 'plain_text', content: '✗ Không phải hành động · 不算行动' }, value: { a: 'sugg_dismiss', id: r.id } });
-      elements.push({ tag: 'action', actions });
-      if (qs.length) elements.push({ tag: 'note', elements: [{ tag: 'plain_text', content: `Q = câu hỏi mục tiêu có thể liên quan · 可能对应的目标问题: ${qs.map((c) => `Q${c.n}${c.prompt ? ` ${c.prompt.slice(0, 60)}` : ''}`).join(' | ')}` }] });
-    }
+  const elements: any[] = [];
+  if (n) elements.push({ tag: 'div', text: { tag: 'lark_md', content: `Bấm để xác nhận, ghi dưới tên người bấm · 点按钮即确认，记在点击人名下${opts.brand ? ` · ${opts.brand}` : ''}` } });
+  if (done.length) {
+    const who = done.slice(0, 3).map((r) => `${r.status === 'confirmed' ? '✅' : '➖'} #${r.seq}${r.decidedBy ? ` ${r.decidedBy.split('@')[0]}` : ''}${r.targetN ? ` Q${r.targetN}` : ''}`).join(' · ');
+    elements.push({ tag: 'note', elements: [{ tag: 'plain_text', content: `Đã xử lý · 已处理 ${done.length}: ✅ ${confirmed} · ➖ ${dismissed}${who ? `  (${who}${done.length > 3 ? ' …' : ''})` : ''}` }] });
+  }
+  shown.forEach((r, i) => {
+    const cites = r.evidence?.cites ? ` · AI đã trích dẫn ${r.evidence.cites} lần · 已引用 ${r.evidence.cites} 次` : '';
+    if (i > 0 || done.length) elements.push({ tag: 'hr' });
+    elements.push({ tag: 'div', text: { tag: 'lark_md', content: `**#${r.seq} · ${mdLink(r.title, r.url)}**\n${r.published_guess} — ${GUESS_LABEL[r.guess_source] ?? r.guess_source}${cites}` } });
+    const cands = r.target_candidates ?? [];
+    const top = cands.find((c) => c.strong) ?? cands[0] ?? null;
+    const actions: any[] = [];
+    if (top) actions.push({ tag: 'button', type: 'primary', text: { tag: 'plain_text', content: `✓ Q${top.n}` }, value: { a: 'sugg_confirm', id: r.id, q: top.n } });
+    actions.push({ tag: 'button', type: top ? 'default' : 'primary', text: { tag: 'plain_text', content: top ? '✓ Không gắn Q · 不指定' : '✓ Xác nhận · 确认' }, value: { a: 'sugg_confirm', id: r.id } });
+    actions.push({ tag: 'button', type: 'danger', text: { tag: 'plain_text', content: '✗ Không phải · 不算' }, value: { a: 'sugg_dismiss', id: r.id } });
+    elements.push({ tag: 'action', actions });
+    if (top?.prompt) elements.push({ tag: 'note', elements: [{ tag: 'plain_text', content: `Q${top.n} = ${top.prompt.slice(0, 80)}` }] });
   });
-  elements.push({ tag: 'note', elements: [{ tag: 'plain_text', content: 'Chỉ thành viên đội ngũ thương hiệu (tài khoản có quyền chỉnh sửa) mới xác nhận được; ngày đăng dùng ngày ước tính, sửa được trong workspace. · 仅品牌团队成员（有编辑权限的账号）可确认；发布日期按估计值，可在工作区修改。' }] });
-  elements.push({ tag: 'note', elements: [{ tag: 'plain_text', content: NOT_PUBLISHING }] });
-  return { config: { wide_screen_mode: true, update_multi: true }, header: { template: pending ? 'blue' : 'green', title: { tag: 'plain_text', content: header } }, elements };
+  if (overflow > 0) {
+    elements.push({ tag: 'hr' });
+    elements.push({ tag: 'div', text: { tag: 'lark_md', content: `Còn ${overflow} trang khác · 还有 ${overflow} 页${opts.workspaceUrl ? ` — xem trong workspace · 在工作区查看: ${opts.workspaceUrl}` : ''}` } });
+  }
+  if (n) elements.push({ tag: 'note', elements: [{ tag: 'plain_text', content: 'Chỉ thành viên đội ngũ thương hiệu xác nhận được; ngày đăng là ước tính, sửa được trong workspace. MemeCMO không đăng nội dung lên AI nào. · 仅品牌团队成员可确认；日期为估计值，可在工作区修改。MemeCMO 不向任何 AI 发布内容。' }] });
+  return { config: { wide_screen_mode: true, update_multi: true }, header: { template: n ? (opts.reminder ? 'orange' : 'blue') : 'green', title: { tag: 'plain_text', content: header } }, elements };
 }

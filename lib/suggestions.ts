@@ -81,6 +81,8 @@ export interface SuggestionRow {
   channel: 'web' | 'lark' | null;
   lark_posted_at: string | null;
   lark_posted_by: string | null;
+  /** The living Lark card this row sits on (null = never posted / waiting in the workspace). */
+  lark_message_id: string | null;
 }
 
 // ─── URL identity ────────────────────────────────────────────────────────────

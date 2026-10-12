@@ -12,7 +12,7 @@ import { dueUrls, fetchBatch, chunk, type DueUrl } from '@/lib/pages/queue';
 import { discoverSitePagesDated, registerSitePages } from '@/lib/pages/sitemap';
 import { verifyIntervention, verifyDueInterventions } from '@/lib/pages/verify';
 import { runDetection, unreadOwnPages } from '@/lib/suggestions';
-import { larkAutoPostOn, postSuggestionCard } from '@/lib/lark-bot';
+import { larkAutoPostOn, keepSuggestionCard } from '@/lib/lark-bot';
 import { handleLarkMessage } from '@/lib/lark-bot';
 import { previewReadyEmail, nurtureD1Email, nurtureD3Email, nurtureD7Email, TrialEmailCtx } from '@/lib/emails/trial';
 
@@ -433,18 +433,6 @@ export const pagesFetch = inngest.createFunction(
       const own = chunk(unread, 12);
       for (let i = 0; i < own.length; i++) await step.run(`fetch-own-${i}`, () => fetchBatch(svc(), own[i]));
       suggested = await step.run('suggest-actions', () => runDetection(svc(), projectId).catch((e) => ({ added: 0, closed: 0, error: quiet(e) })));
-      // New suggestions go to the project's Lark group as a card with one-tap
-      // confirm / dismiss buttons — only for projects that opted in to the
-      // automatic post (projects.metadata.larkSuggestionsAutoPost). Best effort.
-      {
-        const posted = await step.run('post-suggestions', async () => {
-          const sb = svc();
-          const { data: p } = await sb.from('projects').select('metadata').eq('id', projectId).maybeSingle();
-          if (!larkAutoPostOn(p)) return 'skipped:auto-post-off';
-          return postSuggestionCard(sb, { projectId, approvedBy: 'auto:scan', onlyNew: true }).catch((e) => `error:${quiet(e)}`);
-        });
-        (suggested as any).posted = posted;
-      }
     }
     return { projectId, discovered, queued: due.length, ...totals, verified, suggested };
   },
@@ -476,4 +464,27 @@ export const larkMessage = inngest.createFunction(
   },
 );
 
-export const functions = [runAgent, scheduledWeekly, scheduledMonthly, scheduledDigest, scheduledTrialNurture, engineHealthPatrol, pagesFetch, interventionVerify, larkMessage];
+
+// Daily 02:30 UTC = 09:30 Vietnam — half an hour after the Friday scan's page
+// fetch. Keeps each opted-in project's ONE living suggestion card: merges new
+// pages into it, sends at most one notice line a week, ⏰ at 14 days, retires
+// at 30 (lib/lark-bot keepSuggestionCard). Manual scans never post by themselves.
+export const larkSuggestionKeeper = inngest.createFunction(
+  { id: 'lark-suggestion-keeper', name: 'Lark suggestion card keeper', triggers: [{ cron: '30 2 * * *' }, { event: 'lark/suggestions.keep' }] },
+  async ({ event, step }) => {
+    if ((event as any)?.name === 'inngest/scheduled.timer' && !cronsEnabled()) return CRON_SKIPPED();
+    const only = String((event as any)?.data?.projectId ?? '');
+    const projects = await step.run('list', async () => {
+      const sb = svc();
+      const { data } = await sb.from('projects').select('id, metadata, status').eq('status', 'active');
+      return (data ?? []).filter((p: any) => larkAutoPostOn(p) && (!only || p.id === only)).map((p: any) => p.id as string);
+    });
+    const results: Record<string, string> = {};
+    for (const id of projects) {
+      results[id] = await step.run(`keep-${id}`, () => keepSuggestionCard(svc(), { projectId: id, approvedBy: 'auto:keeper' }).catch((e) => `error:${e instanceof Error ? e.message : String(e)}`));
+    }
+    return { projects: projects.length, results };
+  },
+);
+
+export const functions = [runAgent, scheduledWeekly, scheduledMonthly, scheduledDigest, scheduledTrialNurture, engineHealthPatrol, pagesFetch, interventionVerify, larkMessage, larkSuggestionKeeper];

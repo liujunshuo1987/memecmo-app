@@ -9,7 +9,7 @@ import { domainOf } from '@/lib/interventions';
 import { unitHash } from '@/lib/edits';
 import { inngest } from '@/lib/inngest/client';
 import { confirmSuggestion, dismissSuggestion, loadPendingSuggestions } from '@/lib/suggestions';
-import { HELP_TEXT, XACNHAN_HELP, hanhdongCard, larkReply, larkSend, larkText, larkUserEmail, parseHanhdong, parseXacnhan, suggestionCard, suggestionListText, type HanhdongDraft } from '@/lib/lark';
+import { HELP_TEXT, XACNHAN_HELP, hanhdongCard, larkDeleteMessage, larkReply, larkSend, larkText, larkUpdateCard, larkUserEmail, parseHanhdong, parseXacnhan, suggestionCard, suggestionListText, type HanhdongDraft } from '@/lib/lark';
 
 type Sb = any;
 
@@ -34,7 +34,7 @@ async function boundProject(sb: Sb, chatId: string) {
   if (!b) return null;
   const { data: p } = await sb
     .from('projects')
-    .select('id, slug, brand_name, brand_url, metadata, organizations(id, parent_org_id)')
+    .select('id, slug, brand_name, brand_url, metadata, organizations(id, parent_org_id, slug)')
     .eq('id', b.project_id)
     .maybeSingle();
   return p ?? null;
@@ -364,32 +364,122 @@ async function handleSuggestionClick(sb: Sb, event: any, project: any, operator:
     }
   }
   const rows = await cardRows(sb, project.id, messageId, [String(v.id)]);
-  return { toast: toast(msg.startsWith('Lỗi') ? 'error' : 'success', msg), card: { type: 'raw', data: suggestionCard(rows, { brand: project.brand_name }) } };
+  const opts = await cardOptions(sb, project, messageId);
+  return { toast: toast(msg.startsWith('Lỗi') ? 'error' : 'success', msg), card: { type: 'raw', data: suggestionCard(rows, opts) } };
+}
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.memecmo.ai';
+const workspaceLink = (project: any) => `${APP_URL}/workspace/${project?.organizations?.slug ?? ''}/${project?.slug ?? ''}`;
+
+/** Rendering context of a project's living card: overflow count, workspace link, 14-day state. */
+async function cardOptions(sb: Sb, project: any, messageId: string) {
+  const pending = await loadPendingSuggestions(sb, project.id);
+  const moreCount = pending.filter((s) => s.lark_message_id !== messageId).length;
+  const { data: card } = messageId ? await sb.from('lark_suggestion_cards').select('reminded_at, retired_at').eq('message_id', messageId).maybeSingle() : { data: null };
+  return { brand: project.brand_name, moreCount, workspaceUrl: workspaceLink(project), reminder: !!card?.reminded_at, retired: !!card?.retired_at };
+}
+
+const DAY = 86400e3;
+const CARD_CAPACITY = 5;        // pages shown with buttons; the rest wait in the workspace
+const REUSE_DAYS = 7;           // a finished card older than this is not reused
+const NOTICE_GAP_DAYS = 6;      // at most one "N new pages ↑" line a week
+const REMIND_DAYS = 14;         // ⏰ in the header, once
+const RETIRE_DAYS = 30;         // delete / archive
+
+/** Vietnam working hours, Monday–Friday 08:30–17:30 (UTC+7). The notice line goes out only then. */
+export function vnWorkingHours(now = new Date()): boolean {
+  const vn = new Date(now.getTime() + 7 * 3600e3);
+  const dow = vn.getUTCDay(); const mins = vn.getUTCHours() * 60 + vn.getUTCMinutes();
+  return dow >= 1 && dow <= 5 && mins >= 8 * 60 + 30 && mins < 17 * 60 + 30;
 }
 
 /**
- * Post pending suggestions to the project's bound group as an interactive card.
- * `onlyNew` posts only rows never posted before (the per-scan automatic post);
- * without it every pending row is re-posted (an operator re-listing). Refuses
- * unless the project has suggested actions on for Lark.
+ * Keep the project's ONE living suggestion card in its Lark group (daily cron +
+ * the operator route). New pending pages merge into the current card (updated in
+ * place, silent) up to CARD_CAPACITY; a new card starts only when there is no
+ * usable card. One text notice at most every NOTICE_GAP_DAYS, inside Vietnam
+ * working hours (force skips the hours gate, never the gap). ⏰ once at 14 days,
+ * retired at 30. Refuses unless the project has suggested actions on for Lark.
  */
-export async function postSuggestionCard(sb: Sb, d: { projectId: string; approvedBy: string; onlyNew?: boolean }): Promise<string> {
+export async function keepSuggestionCard(sb: Sb, d: { projectId: string; approvedBy: string; force?: boolean; now?: Date }): Promise<string> {
   if (!d.approvedBy.trim()) return 'refused:no-approver';
-  const { data: project } = await sb.from('projects').select('id, brand_name, metadata').eq('id', d.projectId).maybeSingle();
+  const now = d.now ?? new Date();
+  const { data: project } = await sb.from('projects').select('id, slug, brand_name, metadata, organizations(id, parent_org_id, slug)').eq('id', d.projectId).maybeSingle();
   if (!project) return 'refused:no-project';
   if (!larkSuggestionsOn(project)) return 'refused:flag-off';
   const { data: binding } = await sb.from('lark_bindings').select('chat_id').eq('project_id', d.projectId).limit(1).maybeSingle();
   if (!binding?.chat_id) return 'refused:unbound';
-  let list = await loadPendingSuggestions(sb, d.projectId);
-  if (d.onlyNew) list = list.filter((s) => !s.lark_posted_at);
-  list = list.slice(0, 8);
-  if (!list.length) return 'nothing-pending';
-  const rows = list.map((s) => ({ id: s.id, seq: s.seq, url: s.url, title: s.title, published_guess: s.published_guess, guess_source: s.guess_source, target_candidates: s.target_candidates ?? [], evidence: s.evidence ?? {}, status: 'pending' as const }));
-  const messageId = await larkSend(binding.chat_id, { card: suggestionCard(rows, { brand: project.brand_name }) });
-  if (!messageId) return 'send-failed';
-  const { error } = await sb.from('intervention_suggestions').update({ lark_posted_at: new Date().toISOString(), lark_posted_by: d.approvedBy.trim(), lark_message_id: messageId }).in('id', list.map((s) => s.id));
-  if (error) throw new Error(`card posted (${messageId}) but not recorded: ${error.message}`);
-  return `posted:${messageId}:${list.length}`;
+  const stamp = now.toISOString();
+  const out: string[] = [];
+
+  // The current card, if any.
+  const { data: card } = await sb.from('lark_suggestion_cards').select('*').eq('project_id', d.projectId).is('retired_at', null).order('created_at', { ascending: false }).limit(1).maybeSingle();
+  const pendingAll = await loadPendingSuggestions(sb, d.projectId);
+  const onCard = card ? pendingAll.filter((s) => s.lark_message_id === card.message_id) : [];
+  const unposted = pendingAll.filter((s) => !s.lark_posted_at);
+  const ageDays = card ? (now.getTime() - Date.parse(card.created_at)) / DAY : 0;
+
+  // 30 days: retire (delete; if Lark refuses, archive the card text).
+  if (card && ageDays >= RETIRE_DAYS) {
+    const deleted = await larkDeleteMessage(card.message_id);
+    if (!deleted) { try { await larkUpdateCard(card.message_id, suggestionCard(await cardRows(sb, d.projectId, card.message_id, []), { retired: true, workspaceUrl: workspaceLink(project) })); } catch { /* best effort */ } }
+    await sb.from('lark_suggestion_cards').update({ retired_at: stamp, updated_at: stamp }).eq('id', card.id);
+    out.push(`retired:${card.message_id}:${deleted ? 'deleted' : 'archived'}`);
+  }
+  const reusable = card && ageDays < RETIRE_DAYS && (onCard.length > 0 || ageDays < REUSE_DAYS);
+  const live = reusable ? card : null;
+  if (card && !live && ageDays < RETIRE_DAYS) {
+    // Finished and older than a week: close it so new pages start a fresh card.
+    await sb.from('lark_suggestion_cards').update({ retired_at: stamp, updated_at: stamp }).eq('id', card.id);
+    out.push(`closed:${card.message_id}`);
+  }
+
+  const capacity = Math.max(0, CARD_CAPACITY - (live ? onCard.length : 0));
+  const toAdd = unposted.slice(0, capacity);
+  let messageId = live?.message_id ?? null;
+  let created = false;
+
+  if (live) {
+    if (toAdd.length) {
+      await sb.from('intervention_suggestions').update({ lark_posted_at: stamp, lark_posted_by: d.approvedBy.trim(), lark_message_id: live.message_id }).in('id', toAdd.map((s) => s.id));
+    }
+    // 14 days with pending pages: the one ⏰, silent.
+    const remind = !live.reminded_at && ageDays >= REMIND_DAYS && onCard.length > 0;
+    if (remind) await sb.from('lark_suggestion_cards').update({ reminded_at: stamp }).eq('id', live.id);
+    // Always re-render the living card: compact format, processed summary, overflow count.
+    const rows = await cardRows(sb, d.projectId, live.message_id, []);
+    const more = pendingAll.filter((s) => s.lark_message_id !== live.message_id).length;
+    try { await larkUpdateCard(live.message_id, suggestionCard(rows, { brand: project.brand_name, moreCount: more, workspaceUrl: workspaceLink(project), reminder: remind || !!live.reminded_at })); }
+    catch (e) { out.push(`update-failed:${e instanceof Error ? e.message.slice(0, 80) : 'error'}`); }
+    await sb.from('lark_suggestion_cards').update({ updated_at: stamp }).eq('id', live.id);
+    out.push(`updated:${live.message_id}:+${toAdd.length}${remind ? ':reminded' : ''}`);
+  } else if (toAdd.length) {
+    const rows = toAdd.map((s) => ({ id: s.id, seq: s.seq, url: s.url, title: s.title, published_guess: s.published_guess, guess_source: s.guess_source, target_candidates: s.target_candidates ?? [], evidence: s.evidence ?? {}, status: 'pending' as const }));
+    const more = unposted.length - toAdd.length;
+    messageId = await larkSend(binding.chat_id, { card: suggestionCard(rows, { brand: project.brand_name, moreCount: more, workspaceUrl: workspaceLink(project) }) });
+    if (!messageId) return [...out, 'send-failed'].join(' ');
+    await sb.from('lark_suggestion_cards').insert({ project_id: d.projectId, chat_id: binding.chat_id, message_id: messageId, created_by: d.approvedBy.trim(), notice_sent_at: stamp });
+    await sb.from('intervention_suggestions').update({ lark_posted_at: stamp, lark_posted_by: d.approvedBy.trim(), lark_message_id: messageId }).in('id', toAdd.map((s) => s.id));
+    created = true;
+    out.push(`created:${messageId}:${toAdd.length}`);
+  } else {
+    out.push('nothing-new');
+  }
+
+  // The weekly one-liner — only when pages were added to an EXISTING card, at most
+  // every NOTICE_GAP_DAYS, in Vietnam working hours (a new card is its own notice).
+  if (live && toAdd.length && messageId) {
+    const last = live.notice_sent_at ? Date.parse(live.notice_sent_at) : 0;
+    const gapOk = now.getTime() - last >= NOTICE_GAP_DAYS * DAY;
+    const hoursOk = d.force || vnWorkingHours(now);
+    if (gapOk && hoursOk) {
+      const n = toAdd.length;
+      const replyId = await larkReply(messageId, { text: `Tuần này có ${n} trang mới chờ xác nhận — xem thẻ phía trên ↑ · 本周新增 ${n} 页待确认，请在上方卡片确认。` }).catch(() => null);
+      if (replyId) { await sb.from('lark_suggestion_cards').update({ notice_sent_at: stamp }).eq('id', live.id); out.push(`notice:${replyId}`); }
+    } else out.push(`notice-held:${gapOk ? 'hours' : 'gap'}`);
+  }
+  if (created) out.push('notice:new-card');
+  return out.join(' ');
 }
 
 /** Automatic post after a scan's page fetch — only when the project opted in to it explicitly. */
