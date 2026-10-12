@@ -164,10 +164,11 @@ export async function runSiteAgent(
     '',
     'Produce an AEO upgrade as JSON of this shape:',
     '{',
-    '  "aeoChecklist": [{ "item": "what AI engines need (e.g. clear entity definition, NAP, FAQ, factual specifics)", "status": "missing|weak|ok", "fix": "the concrete change" }],',
+    '  "aeoChecklist": [{ "item": "what the PAGE has or lacks (e.g. clear entity definition, NAP, FAQ, factual specifics)", "status": "missing|weak|ok", "fix": "the concrete change" }],',
     '  "homepageEdits": [{ "section": "e.g. above-the-fold / about / services", "change": "exact copy or structural change to make" }],',
     '  "schema": [{ "type": "Organization|LocalBusiness|Service|FAQPage|BreadcrumbList", "jsonld": { ...valid schema.org JSON-LD object ready to paste into <head>... } }]',
     '}',
+    'A checklist item describes the page and nothing else. This audit reads one page; it cannot observe what any AI engine knows, has read or can verify — never write that AI "has no information", "does not know" or "cannot verify" something. Say what is on the page, what is not, and what to change.',
     'Rules: 5-7 checklist items (one sentence each), 3-4 homepage edits (concise), ' +
       'EXACTLY 2-3 schema blocks (always Organization; add LocalBusiness or FAQPage if ' +
       'clearly useful) — keep each JSON-LD compact, only essential fields. Be specific to ' +
@@ -227,6 +228,8 @@ export async function runSiteAgent(
     site.ok ? `Audited: ${input.brandUrl}  ·  existing schema: ${site.existingSchema.join(', ') || 'none'}` : `Brand: ${input.brandName} (homepage not fetched)`,
     '',
     '## AEO Checklist',
+    '_What the homepage has and lacks. Whether AI engines use it is a separate question, answered by the scans._',
+    '',
     ...checklist.map((c) => `- [${c.status === 'ok' ? 'x' : ' '}] **${c.item}** (${c.status}) — ${c.fix}`),
     '',
     '## Homepage Edits',

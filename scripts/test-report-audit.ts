@@ -7,6 +7,7 @@ import { selfNames, isBrandedPrompt, coreSplit, classifySource, sourceLane, stal
 import { extractDomains } from '../lib/reports/verify';
 import { stripSearchTrace, traceAffectedEngines, mostlyEmptyEngines, fetchRepairedEngines } from '../lib/engines/ingest';
 import { pageText } from '../lib/agents/site';
+import { siteUseByEngine } from '../lib/site-use';
 
 let bad = 0;
 const ok = (name: string, cond: boolean, got?: unknown) => { if (!cond) bad++; console.log(cond ? 'ok  ' : 'FAIL', name, cond ? '' : JSON.stringify(got)); };
@@ -125,6 +126,22 @@ const longPage = `<html><body><h1>Brand</h1><p>${filler(30000)}</p><footer>Hotli
 const lp = pageText(longPage);
 ok('a very long page keeps its top and its footer, and says how much of the middle is left out', lp.omitted > 0 && lp.text.startsWith('Brand') && /1900 5111/.test(lp.text) && lp.text.includes(`${lp.omitted} characters in the middle`));
 ok('scripts and styles are not page text', !/secret/.test(pageText('<script>var secret=1</script><style>.secret{}</style><p>Visible</p>').text));
+
+// --- "on the page" is not "used by AI": which engines cite the brand's own pages (lib/site-use) ---
+const useScan = { rawSamples: [
+  { engine: 'Perplexity', snippet: 'a', citations: ['https://www.acme.vn/', 'https://news.example/x'] },
+  { engine: 'Perplexity', snippet: 'b', citations: ['https://acme.vn/faq'] },
+  { engine: 'Perplexity', snippet: 'c', citations: ['https://other.vn/acme.vn'] },
+  { engine: 'Perplexity', snippet: '', citations: ['https://acme.vn/'] },
+  { engine: 'ChatGPT', snippet: 'd', citations: [] },
+  { engine: 'Google AI Overview', snippet: 'e', citations: ['https://blog.acme.vn/post', 'not a url'] },
+] };
+const use = siteUseByEngine(useScan, 'https://acme.vn');
+const row = (e: string) => use.find((r) => r.engine === e)!;
+ok('answers citing the site are counted per engine; the homepage separately; an empty answer is not an answer', row('Perplexity').answers === 3 && row('Perplexity').citingSite === 2 && row('Perplexity').homepage === 1);
+ok('a subdomain is the site; a look-alike path on another host is not', row('Google AI Overview').citingSite === 1 && row('Google AI Overview').homepage === 0);
+ok('an engine that returns no sources is listed as answering from training', row('ChatGPT').readsWeb === false && row('ChatGPT').citingSite === 0 && row('Perplexity').readsWeb === true);
+ok('no site address or no scan: nothing to show', siteUseByEngine(useScan, '').length === 0 && siteUseByEngine(null, 'https://acme.vn').length === 0);
 
 console.log(bad ? `\n${bad} failing` : '\nall passing');
 process.exit(bad ? 1 : 0);

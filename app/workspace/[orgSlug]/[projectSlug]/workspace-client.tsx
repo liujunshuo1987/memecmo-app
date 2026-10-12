@@ -19,6 +19,7 @@ import type { AgentRun, Organization, Project, ScanPoint } from '@/lib/workspace
 import { trendExtras } from '@/lib/trend';
 import { traceAffectedEngines, mostlyEmptyEngines } from '@/lib/engines/ingest';
 import { NOTES_PATH, NOTES_LINK_LABEL } from '@/lib/notes/paths';
+import { siteUseByEngine } from '@/lib/site-use';
 import { DeliverableBody, Typeset, dl, refineText } from './deliverables';
 
 interface Props {
@@ -1608,7 +1609,7 @@ function RunResult({ agentId, output, projectId, runId, versions, onVersions, on
           title="Homepage sandbox" artifactType="site_optimization"
           subtitle={output.siteAudited ? `audited ${output.siteAudited}` : 'homepage AEO upgrade'}
           quick={['更适配 AI 检索', '补充 FAQ schema', '强化实体定义', '加入 NAP 信息']}
-          structured={<SiteResult o={output} />} />
+          structured={<SiteResult o={output} scan={loop?.runsByAgent?.monitor?.output ?? loop?.runsByAgent?.full_scan?.output?.scorecard} scanAt={loop?.runsByAgent?.monitor?.createdAt ?? loop?.runsByAgent?.full_scan?.createdAt} />} />
       ) : agentId === 'distribute' ? (
         <ArtifactSandbox o={output} projectId={projectId} runId={runId} versions={versions} onVersions={onVersions}
           title="Distribution sandbox" artifactType="distribution_kit"
@@ -2001,7 +2002,40 @@ function EncyclopediaResult({ o }: { o: Record<string, any> }) {
   );
 }
 
-function SiteResult({ o }: { o: Record<string, any> }) {
+// Two questions, kept apart on purpose. The checklist says what the homepage
+// HAS; it used to read as "AI does not know this" (2026-10-12: a client asked
+// why AI "still has no information" about blocks that were on the page). What
+// the engines actually use is shown next to it, from the latest scan.
+const SITE_TEXT: Record<UiLang, { onPage: string; onPageNote: string; inAi: string; inAiNote: string; noScan: string; reads: string; memory: string; cites: (a: number, n: number) => string; home: (n: number) => string; none: string; status: Record<string, string> }> = {
+  en: {
+    onPage: '1 · On the page', onPageNote: 'What the homepage has and lacks. This does not say whether AI uses it.',
+    inAi: '2 · Does AI use the site?', inAiNote: 'From the latest scan. Being on the page is necessary, not sufficient. Whether an engine states a given fact correctly is not measured here.',
+    noScan: 'No scan yet — run Monitor to see which engines use the site.',
+    reads: 'reads web pages while answering', memory: 'answers from what it learned in training',
+    cites: (a, n) => `${a} of ${n} answers cite the site`, home: (n) => `homepage in ${n}`, none: 'no sources returned',
+    status: { ok: 'present', weak: 'weak', missing: 'missing' },
+  },
+  zh: {
+    onPage: '1 · 页面上有没有', onPageNote: '这里只说首页有什么、缺什么,不代表 AI 用没用上。',
+    inAi: '2 · AI 用上官网了吗', inAiNote: '来自最近一次扫描。页面上有是必要条件,不是充分条件。某个引擎是否把某条事实说对,这里没有测。',
+    noScan: '还没有扫描——运行一次监测,才能看到哪些引擎在用官网。',
+    reads: '回答时现场读网页', memory: '按训练时学到的内容回答',
+    cites: (a, n) => `${n} 条回答里有 ${a} 条引用了官网`, home: (n) => `其中首页 ${n} 条`, none: '不返回来源',
+    status: { ok: '有', weak: '偏弱', missing: '缺' },
+  },
+  vi: {
+    onPage: '1 · Trên trang có gì', onPageNote: 'Phần này chỉ cho biết trang chủ có gì và thiếu gì. Nó không cho biết AI đã dùng thông tin đó hay chưa.',
+    inAi: '2 · AI đã dùng website chưa', inAiNote: 'Theo lần quét gần nhất. Có trên trang là điều kiện cần, chưa phải điều kiện đủ. Việc một engine nêu đúng từng dữ kiện hay không chưa được đo ở đây.',
+    noScan: 'Chưa có lần quét — chạy Monitor để biết engine nào đang dùng website.',
+    reads: 'đọc trang web khi trả lời', memory: 'trả lời theo dữ liệu đã học',
+    cites: (a, n) => `${a}/${n} câu trả lời có trích website`, home: (n) => `trang chủ: ${n}`, none: 'không trả về nguồn',
+    status: { ok: 'có', weak: 'yếu', missing: 'thiếu' },
+  },
+};
+
+function SiteResult({ o, scan, scanAt }: { o: Record<string, any>; scan?: any; scanAt?: string | null }) {
+  const T = SITE_TEXT[UI_LANG];
+  const use = siteUseByEngine(scan, o.siteAudited);
   const checklist: any[] = o.aeoChecklist || [];
   const edits: any[] = o.homepageEdits || [];
   const schema: any[] = o.schema || [];
@@ -2022,11 +2056,13 @@ function SiteResult({ o }: { o: Record<string, any> }) {
 
       {checklist.length > 0 && (
         <div>
-          <SectionLabel>AEO checklist</SectionLabel>
+          <SectionLabel>{T.onPage}</SectionLabel>
+          <p className="text-[11px] text-faint -mt-1 mb-2">{T.onPageNote}</p>
           <ul className="space-y-1">
             {checklist.map((c, i) => (
               <li key={i} className="text-[12px] leading-snug">
                 <span className={`${dot(c.status)} mr-1`}>●</span>
+                <span className={`${dot(c.status)} text-[10px] uppercase tracking-wide mr-1.5`}>{T.status[c.status] ?? c.status}</span>
                 <span className="text-ink">{c.item}</span>
                 <span className="text-faint"> — {c.fix}</span>
               </li>
@@ -2034,6 +2070,26 @@ function SiteResult({ o }: { o: Record<string, any> }) {
           </ul>
         </div>
       )}
+
+      <div>
+        <SectionLabel>{T.inAi}</SectionLabel>
+        <p className="text-[11px] text-faint -mt-1 mb-2">{T.inAiNote}{scanAt ? ` · ${String(scanAt).slice(0, 10)}` : ''}</p>
+        {use.length === 0 ? (
+          <p className="text-[12px] text-dim">{T.noScan}</p>
+        ) : (
+          <ul className="space-y-1">
+            {use.map((r) => (
+              <li key={r.engine} className="text-[12px] leading-snug flex flex-wrap items-baseline gap-x-2">
+                <span className="text-ink font-medium">{r.engine}</span>
+                <span className="text-faint">{r.readsWeb ? T.reads : T.memory}</span>
+                <span className={r.citingSite > 0 ? 'text-sage tabular-nums' : 'text-dim tabular-nums'}>
+                  {r.readsWeb || r.citingSite > 0 ? `${T.cites(r.citingSite, r.answers)}${r.homepage ? ` · ${T.home(r.homepage)}` : ''}` : T.none}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
       {edits.length > 0 && (
         <div>
