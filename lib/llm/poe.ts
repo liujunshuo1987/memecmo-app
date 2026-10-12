@@ -84,7 +84,9 @@ export interface PoeMessage {
 export interface PoeResult {
   content: string;
   model: string;
-  usage?: { prompt: number; completion: number; total: number };
+  /** `reasoning`: tokens the model spent thinking, where the upstream reports
+   *  them. They are part of `completion` and count against max_tokens. */
+  usage?: { prompt: number; completion: number; total: number; reasoning?: number };
   latencyMs: number;
   /** OpenAI-style finish reason from the upstream ('stop' | 'length' | …). */
   finishReason?: string;
@@ -186,7 +188,10 @@ export async function poeChat(opts: PoeChatOptions): Promise<PoeResult> {
         finishReason: json?.choices?.[0]?.finish_reason ?? undefined,
         latencyMs: Date.now() - started,
         usage: u
-          ? { prompt: u.prompt_tokens, completion: u.completion_tokens, total: u.total_tokens }
+          ? {
+              prompt: u.prompt_tokens, completion: u.completion_tokens, total: u.total_tokens,
+              ...(typeof u.completion_tokens_details?.reasoning_tokens === 'number' ? { reasoning: u.completion_tokens_details.reasoning_tokens } : {}),
+            }
           : undefined,
       };
     } catch (err) {

@@ -8,6 +8,7 @@ import { extractDomains } from '../lib/reports/verify';
 import { stripSearchTrace, traceAffectedEngines, mostlyEmptyEngines, fetchRepairedEngines } from '../lib/engines/ingest';
 import { pageText } from '../lib/agents/site';
 import { siteUseByEngine } from '../lib/site-use';
+import { answerBudgetFor, maxTokensFor, answerLength, endsMidSentence, cutShortEngines, answerCapChanges, INSTRUMENT_FREEZES } from '../lib/engines/answer-budget';
 
 let bad = 0;
 const ok = (name: string, cond: boolean, got?: unknown) => { if (!cond) bad++; console.log(cond ? 'ok  ' : 'FAIL', name, cond ? '' : JSON.stringify(got)); };
@@ -149,6 +150,42 @@ ok('an engine that returns no sources is listed as answering from training', row
 ok('an engine outside the known list whose answers come back with sources reads the web, even when none of them is the site', row('Claude').readsWeb === true && row('Claude').sourced === 2 && row('Claude').citingSite === 0);
 ok('one stray link among answers written from training does not make an engine a reader', row('Gemini').readsWeb === false && row('Gemini').sourced === 1);
 ok('no site address or no scan: nothing to show', siteUseByEngine(useScan, '').length === 0 && siteUseByEngine(null, 'https://acme.vn').length === 0);
+
+// --- the token limit per answer is a project setting; a frozen instrument keeps the old one (lib/engines/answer-budget) ---
+const FROZEN = INSTRUMENT_FREEZES[0].projectId;
+const during = new Date('2026-10-16T02:00:00Z');
+const def = answerBudgetFor({ id: 'any-other-project' }, during);
+ok('a project with no setting: 900 for the answer, 2,100 on top for an engine that thinks', def.answerMaxTokens === 900 && def.thinkingAllowanceTokens === 2100 && def.source === 'default', def);
+ok('so Gemini is asked with 3,000 and the other engines with 900, as before', maxTokensFor(def, { thinking: true }) === 3000 && maxTokensFor(def, {}) === 900);
+const frz = answerBudgetFor({ id: FROZEN }, during);
+ok('the frozen project keeps 900 for every engine, thinking or not', frz.source === 'frozen' && frz.frozenUntil === '2027-01-01' && maxTokensFor(frz, { thinking: true }) === 900 && maxTokensFor(frz, {}) === 900, frz);
+ok('a setting on the project cannot lift a declared freeze', maxTokensFor(answerBudgetFor({ id: FROZEN, metadata: { answerBudget: { thinkingAllowanceTokens: 4000 } } }, during), { thinking: true }) === 900);
+ok('the freeze holds through the last second of 2026-12-31 and lapses on 2027-01-01', answerBudgetFor({ id: FROZEN }, new Date('2026-12-31T23:59:59Z')).source === 'frozen' && answerBudgetFor({ id: FROZEN }, new Date('2027-01-01T00:00:00Z')).source === 'default');
+const own = answerBudgetFor({ id: 'p', metadata: { answerBudget: { thinkingAllowanceTokens: 3100 } } }, during);
+ok('a project setting changes only what it names', own.source === 'project' && own.answerMaxTokens === 900 && maxTokensFor(own, { thinking: true }) === 4000, own);
+const pin = (until: string) => answerBudgetFor({ id: 'p', metadata: { answerBudget: { thinkingAllowanceTokens: 0, frozenUntil: until } } }, during);
+ok('a freeze written on the project holds until its date, then the default returns', pin('2026-12-01').source === 'frozen' && maxTokensFor(pin('2026-12-01'), { thinking: true }) === 900 && pin('2026-10-01').source === 'default');
+ok('a value of the wrong type or out of range is ignored, not clamped', [{ answerMaxTokens: '900' }, { answerMaxTokens: 50 }, { thinkingAllowanceTokens: -1 }, { thinkingAllowanceTokens: 1e6 }, { answerMaxTokens: 900.5 }, 'x', null]
+  .every((v) => answerBudgetFor({ id: 'p', metadata: { answerBudget: v } }, during).source === 'default'));
+
+// Gemini at 900, Highlands Coffee panel, 2026-10-12: 138 characters, 863 of 896 tokens spent thinking.
+const CUT = 'Việc so sánh **Highlands Coffee** và **Starbucks** thực chất là sự so sánh giữa hai văn hóa thưởng thức cà phê';
+const WHOLE = `${CUT} khác nhau.\n\n${'Highlands có giá thấp hơn và hợp khẩu vị đậm của người Việt. '.repeat(12)}`;
+ok('an answer cut by the limit stops inside a sentence; a whole one does not', endsMidSentence(CUT) && !endsMidSentence(WHOLE) && !endsMidSentence('') && !endsMidSentence('Xem thêm: [Highlands](https://highlandscoffee.com.vn)\n'));
+const len = answerLength([...Array.from({ length: 23 }, () => ({ text: CUT, reasoningTokens: 863 })), { text: WHOLE, reasoningTokens: 853 }, { text: '' }]);
+ok('lengths are taken on the full answers: 24 with text, 23 short, 23 mid-sentence, median and reasoning recorded', len.answers === 24 && len.short === 23 && len.midSentence === 23 && len.medianChars === CUT.length && len.reasoningTokens === 863, len);
+ok('an engine that reports no reasoning carries no reasoning figure', !('reasoningTokens' in answerLength([{ text: WHOLE }])));
+const stored = (engine: string, text: string, n: number) => Array.from({ length: n }, () => ({ engine, snippet: text.slice(0, 400) }));
+const cutScan = { rawSamples: [...stored('Gemini', CUT, 23), ...stored('Gemini', WHOLE, 1), ...stored('ChatGPT', WHOLE, 24), ...stored('Google AI Overview', 'Có. Giá từ 29.000đ.', 20), ...mk('Google AI Overview', 0, 4)] };
+ok('a stored scan flags the engine whose answers were cut, with its counts — not the one that answers briefly', JSON.stringify(cutShortEngines(cutScan)) === '[{"engine":"Gemini","cut":23,"total":24}]', cutShortEngines(cutScan));
+ok('fewer than half cut (11 of 24) is not flagged; nor is a missing scan', cutShortEngines({ rawSamples: [...stored('Gemini', CUT, 11), ...stored('Gemini', WHOLE, 13)] }).length === 0 && cutShortEngines(null).length === 0);
+
+const before = { engines: ['ChatGPT', 'Gemini', 'Google AI Overview'] };
+const after = { engines: before.engines, answerCap: { ...def, perEngine: { ChatGPT: 900, Gemini: 3000 } } };
+ok('first scan with the allowance after one without a record: Gemini 900 → 3,000, and only Gemini', JSON.stringify(answerCapChanges(after, before)) === '[{"engine":"Gemini","before":900,"now":3000}]', answerCapChanges(after, before));
+ok('a frozen project shows no change; nor do two scans with the same limits, or a first scan', answerCapChanges({ engines: before.engines, answerCap: { ...frz, perEngine: { ChatGPT: 900, Gemini: 900 } } }, before).length === 0 && answerCapChanges(after, after).length === 0 && answerCapChanges(after, null).length === 0);
+ok('an engine the previous scan did not measure has nothing to be compared with', answerCapChanges(after, { engines: ['ChatGPT'] }).length === 0);
+ok('the day a freeze lapses is a change of limit like any other', JSON.stringify(answerCapChanges(after, { engines: before.engines, answerCap: { ...frz, perEngine: { ChatGPT: 900, Gemini: 900 } } })) === '[{"engine":"Gemini","before":900,"now":3000}]');
 
 console.log(bad ? `\n${bad} failing` : '\nall passing');
 process.exit(bad ? 1 : 0);

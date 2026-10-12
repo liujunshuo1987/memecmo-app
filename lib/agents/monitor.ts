@@ -13,6 +13,7 @@
 import { poeChat, parseJsonFromLLM, EngineCapacityError, EngineOutageError, isCapacityError } from '@/lib/llm/poe';
 import { fetchAioPanel, localeFor, type AioResult } from './serp';
 import { stripSearchTrace } from '@/lib/engines/ingest';
+import { answerLength, maxTokensFor, SNIPPET_CHARS, type AnswerBudget } from '@/lib/engines/answer-budget';
 import { classifyIntent, type PromptIntent } from './intent';
 
 type EventEmitter = (event: {
@@ -41,6 +42,10 @@ interface MonitorInput {
   industry?: string | null;
   promptSet: PromptCategory[];
   keyPrompts?: string[];
+  // Token limit per engine answer, resolved per project by run.ts
+  // (answerBudgetFor). Required: a caller that left it out would silently
+  // measure a frozen project with the default instrument.
+  answerBudget: AnswerBudget;
   knownCompetitors?: string[];
   // Frozen competitor set (score stability): reused for 30 days, then
   // re-identified. Persisted on the project by run.ts.
@@ -80,13 +85,16 @@ type EngineKind = 'poe' | 'serp';
 // is retired or down. The engine LABEL (what the client sees, what the trend
 // line is keyed on) never changes; the model behind it is recorded on every
 // scorecard so a model change is visible as a methodology note, never hidden.
-export interface Engine { key: string; label: string; model: string; kind: EngineKind; fallbacks?: string[] }
+// `thinking`: the model reasons before it writes and the reasoning is charged
+// against max_tokens, so it gets the project's thinking allowance on top of
+// the answer limit (lib/engines/answer-budget). Applies to the fallbacks too.
+export interface Engine { key: string; label: string; model: string; kind: EngineKind; fallbacks?: string[]; thinking?: boolean }
 export const ENGINES: Engine[] = [
   { key: 'chatgpt', label: 'ChatGPT', model: 'GPT-4o', kind: 'poe' },
   // Gemini-2.5-Pro was retired by Poe between 2026-09-14 and 2026-09-16 (500
   // "Server got itself in trouble", absent from /v1/models). 3.1-Pro is the
   // only Pro-class Gemini left; 3.5-Flash is the verified cheaper stand-in.
-  { key: 'gemini', label: 'Gemini', model: 'Gemini-3.1-Pro', kind: 'poe', fallbacks: ['Gemini-3.5-Flash'] },
+  { key: 'gemini', label: 'Gemini', model: 'Gemini-3.1-Pro', kind: 'poe', fallbacks: ['Gemini-3.5-Flash'], thinking: true },
   { key: 'perplexity', label: 'Perplexity', model: 'Perplexity-Sonar', kind: 'poe' },
   { key: 'claude', label: 'Claude', model: 'Claude-Sonnet-4.5', kind: 'poe' },
 ];
@@ -404,6 +412,7 @@ interface RawAnswer {
   citations: string[];
   brandCited: boolean;
   fetch?: FetchRecord;
+  reasoningTokens?: number;
 }
 
 // How an answer was obtained, where the engine tells us (Google AI Overview).
@@ -566,6 +575,7 @@ export async function runMonitorAgent(
         let text = '';
         let citations: string[];
         let fetched: FetchRecord | undefined;
+        let reasoningTokens: number | undefined;
         if (engine.kind === 'serp') {
           const r = aio![i];
           text = r.text;
@@ -580,7 +590,7 @@ export async function runMonitorAgent(
             const resp = await poeChat({
               model: engine.model,
               messages: [{ role: 'user', content: s.prompt }],
-              maxTokens: 900,
+              maxTokens: maxTokensFor(input.answerBudget, engine),
               // temperature 0 → deterministic model sampling, so the measurement is
               // reproducible (residual variance is from web-retrieval engines only).
               temperature: 0,
@@ -595,6 +605,7 @@ export async function runMonitorAgent(
             if (body.stripped) traceStripped.set(engine.label, (traceStripped.get(engine.label) ?? 0) + 1);
             text = body.text;
             citations = extractUrls(text);
+            reasoningTokens = resp.usage?.reasoning;
           } catch (err) {
             if (isCapacityError(err)) throw err;
             failed++;
@@ -613,6 +624,7 @@ export async function runMonitorAgent(
           citations,
           brandCited: !!brandDomain && citations.some((u) => domainOf(u) === brandDomain),
           fetch: fetched,
+          reasoningTokens,
         };
         done++;
         if (done % 5 === 0 || done === totalQueries) {
@@ -837,7 +849,7 @@ export async function runMonitorAgent(
         competitorsPresent,
         citations: a.citations,
         brandCited: a.brandCited,
-        snippet: a.text.slice(0, 400),
+        snippet: a.text.slice(0, SNIPPET_CHARS),
         ...(a.fetch ?? {}),
       });
       goldenCandidates.push({
@@ -1009,14 +1021,24 @@ export async function runMonitorAgent(
     competitorSetRefreshed,
     engines: enginesUsed,
     engineModels: Object.fromEntries(engines.map((e) => [e.label, e.kind === 'serp' ? 'Google AI Overview' : e.model])),
+    // The token limit each engine was asked with. A change of limit is a change
+    // of instrument: readers compare this between two scans (answerCapChanges).
+    answerCap: { ...input.answerBudget, perEngine: Object.fromEntries(engines.filter((e) => e.kind === 'poe').map((e) => [e.label, maxTokensFor(input.answerBudget, e)])) },
     // Diagnostic provenance: readers MUST treat partial scorecards as
     // non-comparable (excluded from trend, digest, rollup, citation index).
     partial,
     plannedEngines: poolLabels,
     missingEngines: partial ? notMeasured : missing,
     engineIssues,
-    // Provenance: how many answers per engine had a search log removed before scoring.
-    ingest: { searchLogRemoved: Object.fromEntries(traceStripped), notReturned: Object.fromEntries(notReturned) },
+    // Provenance: how many answers per engine had a search log removed before scoring…
+    // …and, per engine, how long the answers were before the excerpt was cut:
+    // an engine whose answers stop short of SNIPPET_CHARS inside a sentence
+    // was cut by its limit.
+    ingest: {
+      searchLogRemoved: Object.fromEntries(traceStripped),
+      notReturned: Object.fromEntries(notReturned),
+      answerLength: Object.fromEntries(Array.from(rawByEngine, ([label, answers]) => [label, answerLength(answers)])),
+    },
     surfaces: { realSurfaces: serpKey ? ['Google AI Overview'] : [], proxySurfaces: ENGINES.map((e) => e.label) },
     sampled: { total: totalPrompts, used: sampled.length, queries: samples.length, keyUsed, keyTotal: keyPrompts.length },
     metrics: { overall, perEngine, perStage, perIntent, keySet },

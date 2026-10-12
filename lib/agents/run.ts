@@ -26,6 +26,7 @@ import { refundFailedRun } from '@/lib/credits';
 import { NonRetriableError } from 'inngest';
 import { poeChat, DEFAULT_MODEL, isCapacityError, isNonRetriable, runMeter, newMeter, type UsageMeter } from '@/lib/llm/poe';
 import { resolveEngineModels } from '@/lib/agents/monitor';
+import { answerBudgetFor, type AnswerBudget } from '@/lib/engines/answer-budget';
 import { notifyOperator } from '@/lib/alerts';
 import { loadEdits, applyProfileEdits, applyAnswerEdits, unitHash } from '@/lib/edits';
 
@@ -177,6 +178,14 @@ async function loadSourceTitles(sb: ReturnType<typeof svc>, domains: string[]): 
 async function loadCompetitorSet(sb: ReturnType<typeof svc>, projectId: string): Promise<any | null> {
   const { data } = await sb.from('projects').select('metadata').eq('id', projectId).maybeSingle();
   return (data?.metadata as any)?.competitorSet ?? null;
+}
+
+// Token limit per engine answer: a declared instrument freeze, then
+// projects.metadata.answerBudget, then the default (lib/engines/answer-budget).
+// A freeze is keyed on the project id, so it holds even if this read fails.
+async function loadAnswerBudget(sb: ReturnType<typeof svc>, projectId: string): Promise<AnswerBudget> {
+  const { data } = await sb.from('projects').select('metadata').eq('id', projectId).maybeSingle();
+  return answerBudgetFor({ id: projectId, metadata: data?.metadata });
 }
 
 // Core Benchmark lock (meeting resolution 2026-08-06, FMVN): the 20 co-selected
@@ -716,7 +725,7 @@ export async function executeAgentRun(
         const { promptSet, keyPrompts } = applyCoreLock(await loadCoreKeyPrompts(sb, project.id), edited.promptSet, edited.keyPrompts);
         // No nested stepper: this whole phase is already one step.
         const m = await runMonitorAgent(
-          { ...base, promptSet, keyPrompts, competitorSet: await loadCompetitorSet(sb, project.id), standardAnswers: await loadStandardAnswers(sb, project.id) },
+          { ...base, promptSet, keyPrompts, answerBudget: await loadAnswerBudget(sb, project.id), competitorSet: await loadCompetitorSet(sb, project.id), standardAnswers: await loadStandardAnswers(sb, project.id) },
           bandedEmit(33, isPreview ? 60 : 33),
         );
         await persistGoldenPool(sb, project, runId, m.output as Record<string, unknown>, isPreview || !!(m.output as any).partial);
@@ -876,6 +885,7 @@ export async function executeAgentRun(
           industry: project.industry,
           promptSet,
           keyPrompts,
+          answerBudget: await loadAnswerBudget(sb, project.id),
           competitorSet: await loadCompetitorSet(sb, project.id),
           sampleCap: (await planPolicyForProject(project.id).catch(() => null))?.sampledPerScan,
           standardAnswers: await loadStandardAnswers(sb, project.id),
