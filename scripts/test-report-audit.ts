@@ -135,12 +135,19 @@ const useScan = { rawSamples: [
   { engine: 'Perplexity', snippet: '', citations: ['https://acme.vn/'] },
   { engine: 'ChatGPT', snippet: 'd', citations: [] },
   { engine: 'Google AI Overview', snippet: 'e', citations: ['https://blog.acme.vn/post', 'not a url'] },
+  { engine: 'Claude', snippet: 'f', citations: ['https://news.example/a'] },
+  { engine: 'Claude', snippet: 'g', citations: ['https://wiki.example/b', 'https://news.example/c'] },
+  { engine: 'Gemini', snippet: 'h', citations: ['https://news.example/a'] },
+  { engine: 'Gemini', snippet: 'i', citations: [] },
+  { engine: 'Gemini', snippet: 'j', citations: [] },
 ] };
 const use = siteUseByEngine(useScan, 'https://acme.vn');
 const row = (e: string) => use.find((r) => r.engine === e)!;
 ok('answers citing the site are counted per engine; the homepage separately; an empty answer is not an answer', row('Perplexity').answers === 3 && row('Perplexity').citingSite === 2 && row('Perplexity').homepage === 1);
 ok('a subdomain is the site; a look-alike path on another host is not', row('Google AI Overview').citingSite === 1 && row('Google AI Overview').homepage === 0);
 ok('an engine that returns no sources is listed as answering from training', row('ChatGPT').readsWeb === false && row('ChatGPT').citingSite === 0 && row('Perplexity').readsWeb === true);
+ok('an engine outside the known list whose answers come back with sources reads the web, even when none of them is the site', row('Claude').readsWeb === true && row('Claude').sourced === 2 && row('Claude').citingSite === 0);
+ok('one stray link among answers written from training does not make an engine a reader', row('Gemini').readsWeb === false && row('Gemini').sourced === 1);
 ok('no site address or no scan: nothing to show', siteUseByEngine(useScan, '').length === 0 && siteUseByEngine(null, 'https://acme.vn').length === 0);
 
 console.log(bad ? `\n${bad} failing` : '\nall passing');
