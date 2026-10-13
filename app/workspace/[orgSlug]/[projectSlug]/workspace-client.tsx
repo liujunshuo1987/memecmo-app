@@ -21,6 +21,7 @@ import { traceAffectedEngines, mostlyEmptyEngines } from '@/lib/engines/ingest';
 import { NOTES_PATH, NOTES_LINK_LABEL } from '@/lib/notes/paths';
 import { siteUseByEngine } from '@/lib/site-use';
 import { DeliverableBody, Typeset, dl, refineText } from './deliverables';
+import { useLedger, type Ledger } from './actions';
 
 interface Props {
   project: Project;
@@ -230,6 +231,7 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Citations of the whole site {domain}, per scan, before → after: {pb} → {pa} (totals {cb} → {ca}).': '整站 {domain} 被引用的次数,按每次扫描计(之前 → 之后):{pb} → {pa}(合计 {cb} → {ca})。',
     'Measurement note: from the {date} scan, {engine} lists about {after} sources per answer (about {before} before). This is a change on the engine\'s side, so citation counts before and after are not directly comparable.': '测量说明：自 {date} 的扫描起，{engine} 每条回答列出约 {after} 个来源（此前约 {before} 个）。这是引擎一侧的变化，所以前后的引用次数不能直接比较。',
     '※ See the measurement note at the top of the list.': '※ 见列表顶部的测量说明。',
+    'Back to the run': '回到这次运行',
     'All engines': '全部引擎', 'Alignment with standard answers': '与标准答案一致度', 'not client-verified': '未经客户核实', 'judged': '条已评', 'brand-present': '条提到品牌', aligned: '一致', 'Since this report': '本报告之后', recommendations: '条建议', 'deliverables completed after it': '项执行交付已完成', 'No execution deliverables completed since this report yet — run them, and the next scan shows the movement here.': '本报告后尚无新的执行交付——完成执行后,下一次扫描的分数变化会显示在这里。', 'Answers diverging from the standard answers': '与标准答案不符的回答', wrong: '不符', partial: '部分一致', 'Benchmark and gaps remain whole-scan.': '竞对对标与缺口仍为全量扫描口径。',
     'Cited sources': '被引来源', Deliverables: '交付物', 'Structured view': '结构化视图', Refine: '改写', Ask: '问',
     'Ask about this result…': '问这份结果…', 'Which gap should we attack first?': '哪个缺口最该先打?',
@@ -341,6 +343,7 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Citations of the whole site {domain}, per scan, before → after: {pb} → {pa} (totals {cb} → {ca}).': 'Số lần trích dẫn toàn bộ website {domain}, tính trên mỗi lần quét (trước → sau): {pb} → {pa} (tổng {cb} → {ca}).',
     'Measurement note: from the {date} scan, {engine} lists about {after} sources per answer (about {before} before). This is a change on the engine\'s side, so citation counts before and after are not directly comparable.': 'Ghi chú đo lường: từ lần quét {date}, {engine} liệt kê khoảng {after} nguồn cho mỗi câu trả lời (trước đó khoảng {before}). Đây là thay đổi từ phía công cụ AI, nên số lần trích dẫn trước và sau không so sánh trực tiếp được.',
     '※ See the measurement note at the top of the list.': '※ Xem ghi chú đo lường ở đầu danh sách.',
+    'Back to the run': 'Quay lại lượt chạy',
     'Key findings': 'Phát hiện chính', Recommendations: 'Khuyến nghị', 'Quick wins': 'Việc cần làm', Deliverables: 'Sản phẩm',
     'Full Scan': 'Quét đầy đủ', Profile: 'Hồ sơ', Discovery: 'Khám phá', Monitor: 'Giám sát', Report: 'Báo cáo',
     Optimize: 'Nội dung', Site: 'Trang chủ', Distribute: 'Phân phối', Encyclopedia: 'Bách khoa',
@@ -616,6 +619,21 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
   // its events + output and stops (terminal).
   const [emptyAgent, setEmptyAgent] = useState<string | null>(null);
 
+  // The action ledger takes the stage without touching the run on it: opening
+  // it sets this flag and nothing else (no dispatch, no run fetch, no quota).
+  // What was on the stage stays mounted underneath, so a scan in progress keeps
+  // being followed and a result is not built (or translated) again on the way
+  // back. Any row of the list gives the stage back — viewRun, dispatchAgent and
+  // the empty state clear the flag.
+  const [ledgerOpen, setLedgerOpen] = useState(false);
+  const ledger = useLedger(demoMode ? undefined : project.id, ledgerOpen);
+  const openLedger = () => {
+    setLedgerOpen(true);
+    // From the rail's "Show all" on a narrow screen the stage is far up the page.
+    resultTopRef.current?.scrollTo({ top: 0 });
+    resultTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   // Open on data, never on emptiness: auto-view the newest completed scorecard
   // (scan preferred, else any completed deliverable). A blank panel whose only
   // affordance is a Run button nudges people into credit-priced manual scans.
@@ -643,6 +661,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
 
   const viewRun = (runId: string, agentId?: string) => {
     setEmptyAgent(null);
+    setLedgerOpen(false);
     // Synthesized (full-scan-credited) deliverables render from local output —
     // no run refetch, no risk of dispatching anything.
     const entry = agentId ? runsByAgent[agentId] : undefined;
@@ -667,6 +686,7 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
     if (sending) return;
     setSending(true);
     setEmptyAgent(null);
+    setLedgerOpen(false);
     freshRunRef.current = true;
     maxPctRef.current = 0;
     setActivity([]);
@@ -852,6 +872,9 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
               {t('Scheduled scans keep this project fresh automatically.')}
             </div>
           )}
+          {/* The action ledger. Above the groups so it is on screen at every size (on a
+              phone the groups are a strip that scrolls sideways). Not an agent: no run chip. */}
+          {!demoMode && <LedgerNavItem ledger={ledger} isViewing={ledgerOpen} onOpen={openLedger} />}
           {/* Phone/tablet: the deliverable groups become a horizontal tab strip; desktop: the column. */}
           <div className="flex lg:flex-col gap-4 overflow-x-auto lg:overflow-visible -mx-4 px-4 lg:mx-0 lg:px-0 pb-1 lg:pb-0">
           {DELIVERABLE_GROUPS.map((group) => (
@@ -867,10 +890,10 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
                     locked={trialMode && group.label.startsWith('Act')}
                     lockHref={`/dashboard?billing=${organization.slug}`}
                     running={sending && runStatus?.agentId === aid && !isTerminal}
-                    isViewing={runStatus?.agentId === aid || emptyAgent === aid}
+                    isViewing={!ledgerOpen && (runStatus?.agentId === aid || emptyAgent === aid)}
                     onView={viewRun}
                     onRun={dispatchAgent}
-                    onEmpty={(id) => { setEmptyAgent(id); setActiveRunId(null); setActivity([]); setRunStatus(null); }}
+                    onEmpty={(id) => { setEmptyAgent(id); setLedgerOpen(false); setActiveRunId(null); setActivity([]); setRunStatus(null); }}
                     disabled={sending}
                   />
                 ))}
@@ -882,6 +905,26 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
 
         {/* CENTER — stage */}
         <main ref={resultTopRef} className="mc-enter lg:overflow-y-auto px-4 sm:px-6 py-5 lg:min-h-0 min-w-0">
+          {ledgerOpen && (
+            <div className="space-y-4">
+              {/* A run that is not a finished result (in progress, or failed) stays one click away. */}
+              {runStatus && !['completed', 'loading'].includes(runStatus.status) && (
+                <button
+                  onClick={() => setLedgerOpen(false)}
+                  className="print-hide w-full flex items-center gap-2 px-3 py-2 rounded-lg mc-chip-inset text-[11px] text-dim text-left hover:text-brand transition"
+                >
+                  <span className="shrink-0 text-brand"><Icon name={runStatus.agentId ?? ''} size={14} /></span>
+                  <span className="truncate tabular-nums">
+                    {t(AGENTS[runStatus.agentId ?? '']?.shortName ?? 'Agent run')} · {runStatus.status}{isTerminal ? '' : ` · ${Math.max(maxPctRef.current, runStatus.progress_pct ?? 0)}%`}
+                  </span>
+                  <span className="ml-auto shrink-0 text-brand">{t('Back to the run')} →</span>
+                </button>
+              )}
+              <ActionsPanel projectId={project.id} lang={uiLang} t={t} ledger={ledger} whole />
+            </div>
+          )}
+          {/* Under the ledger, out of sight but still mounted (the lines inside keep their indent). */}
+          <div className={ledgerOpen ? 'hidden' : 'contents'}>
           {!runStatus && emptyAgent ? (
             <div className="h-full flex flex-col items-center justify-center text-center gap-3 py-16">
               <div className="text-brand"><Icon name={emptyAgent} size={32} /></div>
@@ -1005,12 +1048,13 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
             </div>
             );
           })()}
+          </div>
         </main>
 
         {/* RIGHT — at-a-glance context */}
         <aside className="mc-enter border-t lg:border-t-0 lg:border-l border-edge lg:overflow-y-auto px-4 py-4 space-y-4 lg:min-h-0" style={{ ['--i' as any]: 2 }}>
           <TrendPanel history={history} />
-          <ContextPanel headlineAigvr={headlineAigvr} scoreRun={scoreRun} runsByAgent={runsByAgent} totalAgents={DELIVERABLE_GROUPS.reduce((n, g) => n + g.items.length, 0)} projectId={demoMode ? undefined : project.id} />
+          <ContextPanel headlineAigvr={headlineAigvr} scoreRun={scoreRun} runsByAgent={runsByAgent} totalAgents={DELIVERABLE_GROUPS.reduce((n, g) => n + g.items.length, 0)} projectId={demoMode ? undefined : project.id} ledger={ledger} onShowAll={openLedger} />
         </aside>
       </div>
     </div>
@@ -1066,6 +1110,25 @@ function NavItem({
         </span>
       ) : null}
     </div>
+  );
+}
+
+// The action ledger's row in the list. Unlike the rows above it is not an
+// agent: there is nothing to run, so a click only changes what the stage shows.
+function LedgerNavItem({ ledger, isViewing, onOpen }: { ledger: Ledger; isViewing: boolean; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-pressed={isViewing}
+      className={`w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-lg transition cursor-pointer ${
+        isViewing ? 'bg-sage/12 border-sage/40' : 'mc-btn-soft hover:brightness-95'
+      }`}
+    >
+      <span className="shrink-0 text-brand"><Icon name="actions" size={17} /></span>
+      <span className="text-[13px] text-ink truncate flex-1">{t('Actions')}</span>
+      {ledger.loaded && !ledger.failed && <span className="text-[11px] text-faint tabular-nums shrink-0">{ledger.total}{ledger.atLeast ? '+' : ''}</span>}
+    </button>
   );
 }
 
@@ -1202,12 +1265,14 @@ function MonthlyTrend({ history, arrow, dColor }: {
   );
 }
 
-function ContextPanel({ headlineAigvr, scoreRun, runsByAgent, totalAgents, projectId }: {
+function ContextPanel({ headlineAigvr, scoreRun, runsByAgent, totalAgents, projectId, ledger, onShowAll }: {
   headlineAigvr: number | null;
   scoreRun?: LatestRun;
   runsByAgent: Record<string, LatestRun>;
   totalAgents: number;
   projectId?: string;
+  ledger: Ledger;
+  onShowAll: () => void;
 }) {
   const sc = scoreRun?.output?.scorecard ?? scoreRun?.output;
   // Count only the deliverables listed in the nav groups — full_scan is a
@@ -1246,7 +1311,7 @@ function ContextPanel({ headlineAigvr, scoreRun, runsByAgent, totalAgents, proje
       )}
       {/* What the brand DID, and what the engines did after — the loop. */}
       {projectId && (
-        <ActionsPanel projectId={projectId} lang={UI_LANG} t={t} />
+        <ActionsPanel projectId={projectId} lang={UI_LANG} t={t} ledger={ledger} onShowAll={onShowAll} />
       )}
       {SCORE_DISPLAY !== 'enterprise' && (
         <div className="mc-card mc-card-sm p-4 text-center">

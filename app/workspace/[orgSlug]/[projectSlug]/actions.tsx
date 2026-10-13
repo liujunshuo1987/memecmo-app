@@ -7,7 +7,9 @@
 // link (or several "link date" lines), the kind is worked out from the link,
 // Enter logs it. Outcomes are computed server-side from the scans; the panel
 // says them in whole sentences, each figure with its label. The rail shows the
-// latest few and opens in place to the whole ledger, month by month.
+// latest few; the whole ledger, month by month, is the same panel on the
+// workspace's stage (`whole`) — the "Actions" row of the left list, or "Show
+// all" in the rail. Both read one useLedger, held by the workspace.
 // A third, which asks for no typing: "Suggested actions" — pages the platform
 // itself found on the brand's site (lib/suggestions). The team confirms or
 // sets it aside ("not ours" — worded "Not an action", since the page is always
@@ -15,6 +17,7 @@
 // their name.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Icon } from '@/components/icons';
 import { parseActionLine, type ActionDraft } from '@/lib/action-input';
 import { NOTES_LINK_LABEL, NOTES_PATH } from '@/lib/notes/paths';
 
@@ -23,7 +26,8 @@ type T = (s: string) => string;
 // A sentence from the dictionary with its figures put in: "{n}" becomes the value.
 const fill = (s: string, v: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (m, k) => (k in v ? String(v[k]) : m));
 // Sentences one after another: a space between them, except after a Chinese full stop.
-const sentences = (parts: (string | false | 0 | null | undefined)[]) => (parts.filter(Boolean) as string[]).reduce((all, s) => all + (all && !/[。！？]$/.test(all) ? ' ' : '') + s, '');
+const JOINED = /[。！？]$/;
+const sentences = (parts: (string | false | 0 | null | undefined)[]) => (parts.filter(Boolean) as string[]).reduce((all, s) => all + (all && !JOINED.test(all) ? ' ' : '') + s, '');
 
 export interface InterventionRow {
   id: string; kind: string; url: string | null; domain: string | null; title: string | null; note: string | null;
@@ -122,8 +126,9 @@ export function InterventionForm({ projectId, lang, t, preset, onDone, onCancel 
   );
 }
 
-/** The page behind a logged action, in whole sentences: was it read, is it live, has AI cited it since. */
-export function VerifiedLine({ iv, cited, t }: { iv: InterventionRow; cited?: CitedAfterRow; t: T }) {
+/** The page behind a logged action, in whole sentences: was it read, is it live, has AI cited it since.
+ *  `flow`: the sentences run on as one paragraph (the stage's row) instead of one to a line. */
+export function VerifiedLine({ iv, cited, t, flow = false }: { iv: InterventionRow; cited?: CitedAfterRow; t: T; flow?: boolean }) {
   const day = String(iv.verified_at ?? '').slice(0, 10);
   const why = String(iv.verify_error ?? '');
   // Red is for a page that answers with an error. A page the platform will not or cannot read is not the reader's mistake.
@@ -137,10 +142,12 @@ export function VerifiedLine({ iv, cited, t }: { iv: InterventionRow; cited?: Ci
     : /skipped host/.test(why) ? t('Recorded. The platform does not read pages on this site (it needs a sign-in or is an app), so the page itself is not checked.')
     : /robots/.test(why) ? t('Recorded. This site asks robots not to read the page, so the platform does not check it.')
     : fill(t('The platform could not read the page on {date}; it checks again every week.'), { date: day });
+  const since = cited && (cited.cites > 0 ? fill(t('Since it was published, AI has cited this page {n}× on {e} of the AI engines.'), { n: cited.cites, e: cited.engines }) : t('AI has not cited this page since it was published.'));
+  if (flow) return <div className="text-[11px] leading-snug text-dim"><span className={broken ? 'text-garnet' : undefined}>{check}</span>{since && `${JOINED.test(check) ? '' : ' '}${since}`}</div>;
   return (
     <>
       <div className={`text-[11px] leading-snug ${broken ? 'text-garnet' : 'text-dim'}`}>{check}</div>
-      {cited && <div className="text-[11px] leading-snug text-dim">{cited.cites > 0 ? fill(t('Since it was published, AI has cited this page {n}× on {e} of the AI engines.'), { n: cited.cites, e: cited.engines }) : t('AI has not cited this page since it was published.')}</div>}
+      {since && <div className="text-[11px] leading-snug text-dim">{since}</div>}
     </>
   );
 }
@@ -160,24 +167,39 @@ function MeasurementNote({ breaks, lang, t }: { breaks: SourceBreakRow[]; lang: 
 
 /** What the scans on either side of the publish date show. The figures are the
  *  server's, unchanged; each now carries its label. `note`: where the
- *  measurement note for this row is said — under its site line, or once above the list. */
-export function OutcomeLine({ o, t, lang = 'en', note }: { o?: OutcomeRow; t: T; lang?: Lang; note?: 'inline' | 'above' }) {
+ *  measurement note for this row is said — under its site line, or once above the list.
+ *  `flow`: the sentences run on as one paragraph (the stage's row); a line per target question stays a line. */
+export function OutcomeLine({ o, t, lang = 'en', note, flow = false }: { o?: OutcomeRow; t: T; lang?: Lang; note?: 'inline' | 'above'; flow?: boolean }) {
   if (!o) return null;
   if (o.awaiting) return <div className="text-[11px] leading-snug text-dim">{fill(t('Scans before the publish date: {b}. Waiting for the next scan to compare.'), { b: o.scansBefore })}</div>;
   const perScan = (cites: number, scans: number) => (scans ? Math.round(cites / scans) : '—');
+  const compared = fill(t('Scans compared: {b} before the publish date, {a} after.'), { b: o.scansBefore, a: o.scansAfter });
+  const questions = o.prompts.map((p) => (
+    <div key={p.hash}>{fill(t('Answers naming the brand, before → after, to “{q}”:'), { q: p.prompt.length > 60 ? `${p.prompt.slice(0, 60)}…` : p.prompt })} {p.engines.map((e) => `${e.engine} ${fmt(e.before)} → ${fmt(e.after)}`).join(' · ')}</div>
+  ));
+  const site = o.domain && fill(t('Citations of the whole site {domain}, per scan, before → after: {pb} → {pa} (totals {cb} → {ca}).'), {
+    domain: o.domain.domain, pb: perScan(o.domain.before.cites, o.scansBefore), pa: perScan(o.domain.after.cites, o.scansAfter), cb: o.domain.before.cites, ca: o.domain.after.cites,
+  });
+  const pointer = o.domain && note === 'above' && !!o.sourceBreaks?.length && t('※ See the measurement note at the top of the list.');
+  // Run on: what is not a question's own line reads as one paragraph, in the same order.
+  const tail = flow ? sentences([!questions.length && compared, site]) : '';
   return (
     <div className="space-y-0.5 text-[11px] leading-snug text-dim">
-      <div>{fill(t('Scans compared: {b} before the publish date, {a} after.'), { b: o.scansBefore, a: o.scansAfter })}</div>
-      {o.prompts.map((p) => (
-        <div key={p.hash}>{fill(t('Answers naming the brand, before → after, to “{q}”:'), { q: p.prompt.length > 60 ? `${p.prompt.slice(0, 60)}…` : p.prompt })} {p.engines.map((e) => `${e.engine} ${fmt(e.before)} → ${fmt(e.after)}`).join(' · ')}</div>
-      ))}
-      {o.domain && (
-        <div>{fill(t('Citations of the whole site {domain}, per scan, before → after: {pb} → {pa} (totals {cb} → {ca}).'), {
-          domain: o.domain.domain, pb: perScan(o.domain.before.cites, o.scansBefore), pa: perScan(o.domain.after.cites, o.scansAfter), cb: o.domain.before.cites, ca: o.domain.after.cites,
-        })}</div>
+      {flow ? (
+        <>
+          {questions.length > 0 && <div>{compared}</div>}
+          {questions}
+          {(tail || pointer) && <div>{tail}{pointer && <>{tail && !JOINED.test(tail) ? ' ' : ''}<span className="inline-block text-faint">{pointer}</span></>}</div>}
+        </>
+      ) : (
+        <>
+          <div>{compared}</div>
+          {questions}
+          {site && <div>{site}</div>}
+        </>
       )}
       {o.domain && note === 'inline' && <MeasurementNote breaks={o.sourceBreaks ?? []} lang={lang} t={t} />}
-      {o.domain && note === 'above' && !!o.sourceBreaks?.length && <div className="text-faint">{t('※ See the measurement note at the top of the list.')}</div>}
+      {!flow && pointer && <div className="text-faint">{pointer}</div>}
     </div>
   );
 }
@@ -311,10 +333,9 @@ function SuggestedActions({ projectId, lang, t, list, can, onDone }: {
   );
 }
 
-// ── The ledger in the right rail ─────────────────────────────────────────────
-const COMPACT = 6;     // rows shown before "Show all"
+// ── The ledger: a summary in the right rail, the whole of it on the stage ────
+const COMPACT = 6;     // rows the rail shows; the rest are on the stage
 const PAGE = 50;       // the API's page size; the rest of the ledger is asked for page by page
-const NOTE_CLIP = 90;  // a note longer than this is cut to two lines until opened
 const NONE: string[] = [];
 
 // Where an action was logged from (interventions.channel).
@@ -339,10 +360,12 @@ const NO_REST: LedgerRest = { rows: [], outcomes: {}, citedAfter: {}, state: 'id
 
 /** The project's whole ledger. The first page is useInterventions' own, so it
  *  reloads whenever that does; the project's count says whether there is more,
- *  and the later pages are fetched only when someone asks to see everything.
- *  The same small request brings what the paste field needs: the brand's own
- *  hosts and its core questions. */
-function useLedger(projectId: string | undefined) {
+ *  and the later pages are fetched only when someone asks to see everything
+ *  (`all`). The same small request brings what the paste field needs: the
+ *  brand's own hosts and its core questions. The workspace holds one of these
+ *  and hands it to the rail and to the stage, so an action logged in either
+ *  shows in both. */
+export function useLedger(projectId: string | undefined, all = false) {
   const first = useInterventions(projectId, { withOutcomes: true, withPeople: true });
   const [meta, setMeta] = useState<{ total: number | null; failed: boolean; hosts: string[]; core: string[] } | null>(null);
   const [rest, setRest] = useState<LedgerRest>(NO_REST);
@@ -401,13 +424,16 @@ function useLedger(projectId: string | undefined) {
   const more = rest.state !== 'done' && (known != null ? known > rows.length : first.list.length >= PAGE);
   // The page came back with no rows although the count says there are some, or the count did not come either: that did not load; it is not "nothing logged".
   const failed = arrived && !first.loading && !!meta && !rows.length && (meta.failed || (known ?? 0) > 0);
+  // Kept below the effect that starts a round, so on a (re)load of the first page this one reads the new round.
+  useEffect(() => { if (all && more && rest.state === 'idle') loadRest(); }, [all, more, rest.state, loadRest]);
   return {
-    rows, outcomes, citedAfter, failed, more,
+    rows, outcomes, citedAfter, failed, more, loaded: arrived && !!meta,
     total: Math.max(known ?? 0, rows.length), atLeast: known == null && more,
     hosts: meta?.hosts ?? NONE, core: meta?.core ?? NONE,
     rest: rest.state, loadRest, reload: first.reload,
   };
 }
+export type Ledger = ReturnType<typeof useLedger>;
 
 interface Logged { rows: InterventionRow[]; already: InterventionRow[]; failed: { line: string; error: string }[] }
 
@@ -549,48 +575,89 @@ function QuickAdd({ projectId, lang, t, hosts, core, onLogged }: {
   );
 }
 
-/** One logged action: what it is, then kind and publish date as quiet labels, who logged it and from where, its note, the page check and the outcome. */
-function ActionRow({ iv, outcome, cited, lang, t, note }: {
-  iv: InterventionRow; outcome?: OutcomeRow; cited?: CitedAfterRow; lang: Lang; t: T; note?: 'inline' | 'above';
+/** One logged action: what it is, then kind and publish date as quiet labels, who logged it and from where, its note, the page check and the outcome.
+ *  `wide` is the stage's row, laid out across where the column has the room (576 px):
+ *    line 1  the title, with kind and publish date at the right edge
+ *    line 2  who logged it, the channel, the on-behalf mark and the link
+ *    then    the note, if there is one
+ *    below   the page check on the left, the outcome on the right, their sentences run on
+ *  Narrower than that it is the rail's order, one under the other. */
+function ActionRow({ iv, outcome, cited, lang, t, note, wide = false }: {
+  iv: InterventionRow; outcome?: OutcomeRow; cited?: CitedAfterRow; lang: Lang; t: T; note?: 'inline' | 'above'; wide?: boolean;
 }) {
   const [full, setFull] = useState(false);
+  const [cut, setCut] = useState(false); // two lines do not hold the note, at the width it has now
+  const noteBox = useRef<HTMLDivElement>(null);
   const said = (iv.note ?? '').trim();
+  useEffect(() => {
+    const el = noteBox.current;
+    if (!el || full) return;
+    const measure = () => setCut(el.scrollHeight > el.clientHeight + 1);
+    measure();
+    const watch = new ResizeObserver(measure);
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [said, full]);
   const kind = KIND_LABELS[iv.kind]?.[lang] ?? iv.kind;
   // The title as logged, else the page's own title, else the address; an action with neither is named by its kind.
   const title = iv.title || iv.page_title || '';
   const by = iv.logger !== undefined ? `${t('Logged by')}: ${iv.logger?.operator ? 'MemeCMO' : iv.logger?.name || t('not recorded')}` : '';
   const channel = iv.channel ? `${t('Channel')}: ${CHANNEL_LABELS[iv.channel]?.[lang] ?? iv.channel}` : '';
-  return (
+  const head = `${wide ? 'text-[13px]' : 'text-[12px]'} font-medium leading-snug`;
+  const small = wide ? 'text-[11px]' : 'text-[10px]';
+  const name = title ? <div className={`${head} text-ink`}>{title}</div>
+    : iv.url ? <a href={iv.url} target="_blank" rel="noreferrer" title={iv.url} className={`block ${head} text-brand break-all ${wide ? '@xl:truncate' : ''}`}>{shortLink(iv.url)}</a>
+    : <div className={`${head} text-ink`}>{kind}</div>;
+  const labels = <>{title || iv.url ? `${kind} · ` : ''}<span className="whitespace-nowrap">{fill(t('published {date}'), { date: iv.published_at })}</span></>;
+  const who = (by || channel) && <>{by && <span className="min-w-0 break-words">{by}</span>}<span className="whitespace-nowrap">{channel}</span></>;
+  const behalf = said && ON_BEHALF.test(said.normalize('NFC')) && (
+    <span className={`inline-block ${small} px-1.5 py-0.5 rounded bg-gold/15 text-gold border border-gold/30`}>{t('Entered on the client\'s behalf')}</span>
+  );
+  const remark = said && (
+    <div className={`${small} text-dim pl-2 border-l-2 border-gold/50 break-words ${wide ? 'flex items-end gap-x-3' : ''}`}>
+      <div ref={noteBox} className={`min-w-0 ${full ? '' : wide ? 'line-clamp-2 @xl:line-clamp-1' : 'line-clamp-2'}`}>{t('Note')}: {said}</div>
+      {(cut || full) && <button onClick={() => setFull(!full)} aria-expanded={full} className="shrink-0 text-brand hover:underline">{full ? t('Collapse') : t('Full text')}</button>}
+    </div>
+  );
+  const link = (cls: string) => title && iv.url && <a href={iv.url} target="_blank" rel="noreferrer" title={iv.url} className={`truncate ${small} text-brand ${cls}`}>{shortLink(iv.url)}</a>;
+  if (!wide) return (
     <div className="border-t border-edge pt-1.5 space-y-0.5">
-      {title ? <div className="text-[12px] font-medium leading-snug text-ink">{title}</div>
-        : iv.url ? <a href={iv.url} target="_blank" rel="noreferrer" title={iv.url} className="block text-[12px] font-medium leading-snug text-brand break-all">{shortLink(iv.url)}</a>
-        : <div className="text-[12px] font-medium leading-snug text-ink">{kind}</div>}
-      <div className="text-[10px] text-faint">{title || iv.url ? `${kind} · ` : ''}<span className="whitespace-nowrap">{fill(t('published {date}'), { date: iv.published_at })}</span></div>
-      {(by || channel) && <div className="flex flex-wrap gap-x-2 text-[10px] text-faint">{by && <span className="min-w-0 break-words">{by}</span>}<span className="whitespace-nowrap">{channel}</span></div>}
-      {said && ON_BEHALF.test(said.normalize('NFC')) && (
-        <div><span className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-gold/15 text-gold border border-gold/30">{t('Entered on the client\'s behalf')}</span></div>
-      )}
-      {said && (
-        <div className="text-[10px] text-dim pl-2 border-l-2 border-gold/50 break-words">
-          <div className={full ? '' : 'line-clamp-2'}>{t('Note')}: {said}</div>
-          {said.length > NOTE_CLIP && <button onClick={() => setFull(!full)} aria-expanded={full} className="text-brand hover:underline">{full ? t('Collapse') : t('Full text')}</button>}
-        </div>
-      )}
-      {title && iv.url && <a href={iv.url} target="_blank" rel="noreferrer" title={iv.url} className="block truncate text-[10px] text-brand">{shortLink(iv.url)}</a>}
+      {name}
+      <div className={`${small} text-faint`}>{labels}</div>
+      {who && <div className={`flex flex-wrap gap-x-2 ${small} text-faint`}>{who}</div>}
+      {behalf && <div>{behalf}</div>}
+      {remark}
+      {link('block')}
       {iv.url && <VerifiedLine iv={iv} cited={cited} t={t} />}
       <OutcomeLine o={outcome} t={t} lang={lang} note={note} />
     </div>
   );
+  return (
+    <div className="border-t border-edge pt-2 space-y-0.5">
+      <div className="@xl:flex @xl:items-baseline @xl:justify-between @xl:gap-x-4">
+        <div className="min-w-0">{name}</div>
+        <div className={`${small} text-faint @xl:shrink-0 @xl:whitespace-nowrap`}>{labels}</div>
+      </div>
+      {(who || behalf || (title && iv.url)) && (
+        <div className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 ${small} text-faint`}>{who}{behalf}{link('min-w-0 flex-[1_1_12rem]')}</div>
+      )}
+      {remark}
+      {iv.url && <VerifiedLine iv={iv} cited={cited} t={t} flow />}
+      <OutcomeLine o={outcome} t={t} lang={lang} note={note} flow />
+    </div>
+  );
 }
 
-/** Right-rail panel: the place to type, what was just logged, suggested actions, the latest few and, opened, the whole ledger by month. */
-export function ActionsPanel({ projectId, lang, t }: { projectId?: string; lang: Lang; t: T }) {
-  const ledger = useLedger(projectId);
-  const suggested = useSuggestions(projectId);
-  const [all, setAll] = useState(false);
+/** The ledger's two places, one panel. In the right rail: the place to type,
+ *  what was just logged, suggested actions and the latest few; "Show all" hands
+ *  over to the stage. On the stage (`whole`): the place to type on top, then
+ *  every action under its publish month, at the column's full width. */
+export function ActionsPanel({ projectId, lang, t, ledger, whole = false, onShowAll }: {
+  projectId?: string; lang: Lang; t: T; ledger: Ledger; whole?: boolean; onShowAll?: () => void;
+}) {
+  const suggested = useSuggestions(whole ? undefined : projectId);
   const [logged, setLogged] = useState<Logged | null>(null);
-  const { rows, total, more, rest, loadRest } = ledger;
-  useEffect(() => { if (all && more && rest === 'idle') loadRest(); }, [all, more, rest, loadRest]);
+  const { rows, total, rest, loadRest } = ledger;
   if (!projectId) return null;
 
   // What was just logged stays on top until dismissed (the list itself is by publish date); the list below leaves those rows out.
@@ -598,24 +665,15 @@ export function ActionsPanel({ projectId, lang, t }: { projectId?: string; lang:
   const onTop = logged ? (logged.rows.length ? logged.rows : logged.already.slice(0, 1)).map(fresh) : [];
   const pinned = new Set(onTop.map((r) => r.id));
   const below = rows.filter((r) => !pinned.has(r.id));
-  const shown = all ? below : below.slice(0, COMPACT);
+  const shown = whole ? below : below.slice(0, COMPACT);
 
   // An engine-side change is said once. One row touched: under that row's site line. Several: once above the list, and each row points to it.
   const touched = [...onTop, ...shown].filter((r) => ledger.outcomes[r.id]?.sourceBreaks?.length);
   const where: 'inline' | 'above' = touched.length > 1 ? 'above' : 'inline';
   const breaks = Array.from(new Map(touched.flatMap((r) => ledger.outcomes[r.id]?.sourceBreaks ?? []).map((b) => [`${b.engine} ${b.from}`, b])).values());
 
-  const toggle = below.length > 0 && total > COMPACT && (
-    <button onClick={() => setAll(!all)} aria-expanded={all} className="w-full mc-btn-soft text-[11px] text-dim hover:text-brand py-1.5 tabular-nums">{all ? t('Collapse') : `${t('Show all')} (${total}${ledger.atLeast ? '+' : ''})`}</button>
-  );
-  const row = (iv: InterventionRow) => <ActionRow key={iv.id} iv={iv} outcome={ledger.outcomes[iv.id]} cited={ledger.citedAfter[iv.id]} lang={lang} t={t} note={where} />;
-  // Opened: every row, under its publish month (the rows arrive newest first).
-  const months: { month: string; rows: InterventionRow[] }[] = [];
-  if (all) for (const iv of shown) {
-    const month = iv.published_at.slice(0, 7);
-    const last = months[months.length - 1];
-    if (last?.month === month) last.rows.push(iv); else months.push({ month, rows: [iv] });
-  }
+  const row = (iv: InterventionRow) => <ActionRow key={iv.id} iv={iv} outcome={ledger.outcomes[iv.id]} cited={ledger.citedAfter[iv.id]} lang={lang} t={t} note={where} wide={whole} />;
+  const count = total > 0 ? ` · ${total}${ledger.atLeast ? '+' : ''}` : '';
   const alone = logged && logged.rows.length + logged.already.length + logged.failed.length === 1;
   const said = logged && sentences([
     alone && logged.rows.length === 1 && t('Logged.'),
@@ -625,37 +683,64 @@ export function ActionsPanel({ projectId, lang, t }: { projectId?: string; lang:
     logged.failed.length > 0 && fill(t('Not saved: {n}.'), { n: logged.failed.length }),
     logged.rows.length > 0 && t('From the next scan on, this panel compares the AI answers before and after the publish date.'),
   ]);
-  return (
+  const typing = <QuickAdd projectId={projectId} lang={lang} t={t} hosts={ledger.hosts} core={ledger.core} onLogged={(r) => { setLogged(r); ledger.reload(); }} />;
+  const justLogged = logged && (
+    <div className="rounded-md mc-chip-inset p-2 space-y-1.5" role="status">
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-[11px] leading-snug text-ink">{said}</div>
+        <button onClick={() => setLogged(null)} aria-label={t('Close')} className="shrink-0 px-1 text-[12px] leading-none text-faint hover:text-brand">×</button>
+      </div>
+      {logged.failed.map((f, i) => <div key={i} className="text-[10px] text-garnet break-all">{f.line}: {f.error}</div>)}
+      {onTop.length > 0 && <div className="text-[10px] uppercase tracking-widest text-sage">{t(logged.rows.length ? 'Just logged' : 'Already logged')}</div>}
+      {onTop.map(row)}
+    </div>
+  );
+  const failure = ledger.failed && <div className={`${whole ? 'text-xs' : 'text-[10px]'} text-garnet`}>{t('Load failed')} · <button onClick={ledger.reload} className="underline hover:text-brand">{t('Retry')}</button></div>;
+  const noteAbove = where === 'above' && <div className="rounded-md mc-chip-inset p-2"><MeasurementNote breaks={breaks} lang={lang} t={t} /></div>;
+
+  if (!whole) return (
     <div className="mc-card mc-card-sm p-3 space-y-2">
-      <div className="text-[10px] uppercase tracking-widest text-faint tabular-nums">{t('Actions')}{total > 0 ? ` · ${total}${ledger.atLeast ? '+' : ''}` : ''}</div>
+      <div className="text-[10px] uppercase tracking-widest text-faint tabular-nums">{t('Actions')}{count}</div>
       <div className="text-[11px] leading-snug text-dim">{t(WHY_LOG)}</div>
-      <QuickAdd projectId={projectId} lang={lang} t={t} hosts={ledger.hosts} core={ledger.core} onLogged={(r) => { setLogged(r); ledger.reload(); }} />
-      {logged && (
-        <div className="rounded-md mc-chip-inset p-2 space-y-1.5" role="status">
-          <div className="flex items-start justify-between gap-2">
-            <div className="text-[11px] leading-snug text-ink">{said}</div>
-            <button onClick={() => setLogged(null)} aria-label={t('Close')} className="shrink-0 px-1 text-[12px] leading-none text-faint hover:text-brand">×</button>
-          </div>
-          {logged.failed.map((f, i) => <div key={i} className="text-[10px] text-garnet break-all">{f.line}: {f.error}</div>)}
-          {onTop.length > 0 && <div className="text-[10px] uppercase tracking-widest text-sage">{t(logged.rows.length ? 'Just logged' : 'Already logged')}</div>}
-          {onTop.map(row)}
-        </div>
-      )}
+      {typing}
+      {justLogged}
       <SuggestedActions projectId={projectId} lang={lang} t={t} list={suggested.list} can={suggested.can} onDone={() => { suggested.reload(); ledger.reload(); }} />
-      {ledger.failed && <div className="text-[10px] text-garnet">{t('Load failed')} · <button onClick={ledger.reload} className="underline hover:text-brand">{t('Retry')}</button></div>}
-      {where === 'above' && <div className="rounded-md mc-chip-inset p-2"><MeasurementNote breaks={breaks} lang={lang} t={t} /></div>}
-      {all && toggle}
-      {all
-        ? months.map((m) => (
-          <div key={m.month} className="space-y-1.5">
-            <div className="flex items-baseline justify-between pt-1 text-[10px] tracking-widest text-gold tabular-nums"><span>{m.month}</span><span className="text-faint">{m.rows.length}</span></div>
-            {m.rows.map(row)}
-          </div>
-        ))
-        : shown.map(row)}
-      {all && rest === 'loading' && <div className="text-[10px] text-faint tabular-nums">{t('Loading…')} {rows.length}{ledger.atLeast ? '' : `/${total}`}</div>}
-      {all && rest === 'failed' && <div className="text-[10px] text-garnet tabular-nums">{t('Load failed')} ({rows.length}{ledger.atLeast ? '+' : `/${total}`}) · <button onClick={loadRest} className="underline hover:text-brand">{t('Retry')}</button></div>}
-      {toggle}
+      {failure}
+      {noteAbove}
+      {shown.map(row)}
+      {below.length > 0 && total > COMPACT && (
+        <button onClick={onShowAll} className="w-full mc-btn-soft text-[11px] text-dim hover:text-brand py-1.5 tabular-nums">{t('Show all')} ({total}{ledger.atLeast ? '+' : ''})</button>
+      )}
+    </div>
+  );
+
+  // Every row under its publish month (the rows arrive newest first).
+  const months: { month: string; rows: InterventionRow[] }[] = [];
+  for (const iv of shown) {
+    const month = iv.published_at.slice(0, 7);
+    const last = months[months.length - 1];
+    if (last?.month === month) last.rows.push(iv); else months.push({ month, rows: [iv] });
+  }
+  return (
+    <div className="@container space-y-4">
+      <div>
+        <div className="flex items-center gap-2 text-sm font-medium text-ink tabular-nums"><span className="text-brand"><Icon name="actions" size={16} /></span>{t('Actions')}{count}</div>
+        <div className="text-[11px] leading-snug text-dim">{t(WHY_LOG)}</div>
+      </div>
+      <div className="mc-card p-4 space-y-2 max-w-2xl">
+        {typing}
+        {justLogged}
+      </div>
+      {failure}
+      {noteAbove}
+      {months.map((m) => (
+        <section key={m.month} className="mc-card p-4 space-y-2.5">
+          <div className="flex items-baseline justify-between text-[11px] tracking-widest text-gold tabular-nums"><span>{m.month}</span><span className="text-faint">{m.rows.length}</span></div>
+          {m.rows.map(row)}
+        </section>
+      ))}
+      {rest === 'loading' && <div className="text-[11px] text-faint tabular-nums">{t('Loading…')} {rows.length}{ledger.atLeast ? '' : `/${total}`}</div>}
+      {rest === 'failed' && <div className="text-xs text-garnet tabular-nums">{t('Load failed')} ({rows.length}{ledger.atLeast ? '+' : `/${total}`}) · <button onClick={loadRest} className="underline hover:text-brand">{t('Retry')}</button></div>}
     </div>
   );
 }

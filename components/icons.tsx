@@ -15,6 +15,8 @@ const PATHS: Record<string, ReactNode> = {
   optimize: (<><path d="M15 5l4 4L9 19l-4 1 1-4z" /><path d="M13.5 6.5l4 4" /></>),
   distribute: (<><circle cx="6" cy="12" r="2.1" /><circle cx="17" cy="6" r="2.1" /><circle cx="17" cy="18" r="2.1" /><path d="M7.9 11l7.2-3.8M7.9 13l7.2 3.8" /></>),
   encyclopedia: (<><path d="M12 6c-2-1.4-5-1.4-7 0v12c2-1.4 5-1.4 7 0 2-1.4 5-1.4 7 0V6c-2-1.4-5-1.4-7 0z" /><path d="M12 6v12" /></>),
+  // The action ledger — what the brand published (not an agent)
+  actions: (<><path d="M4.5 7.2l1.6 1.6 3-3.3" /><path d="M12 7h7.5" /><path d="M4.5 13.2l1.6 1.6 3-3.3" /><path d="M12 13h7.5" /><circle cx="6.5" cy="18.9" r="1.4" /><path d="M12 19h7.5" /></>),
   // UI
   copy: (<><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></>),
   refresh: (<><path d="M4 12a8 8 0 0 1 13.5-5.8L20 8" /><path d="M20 4v4h-4" /><path d="M20 12a8 8 0 0 1-13.5 5.8L4 16" /><path d="M4 20v-4h4" /></>),
