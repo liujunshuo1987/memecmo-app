@@ -2,11 +2,12 @@
 
 // Intervention log UI — the action side of the intervention→outcome loop.
 // Two entry points: "Mark published" on a deliverable (pre-fills kind, source
-// run and the targeted question), and a general "Log an action" in the right
-// rail for anything the client did on their own (a site update, a directory
-// claim). Outcomes are computed server-side from the scans; the panel shows
-// them as fractions. The rail shows the latest few and opens in place to the
-// whole ledger, month by month, each row with who logged it and from where.
+// run and the targeted question), and the right rail's panel for anything the
+// client did on their own. The panel opens with the place to type: paste a
+// link (or several "link date" lines), the kind is worked out from the link,
+// Enter logs it. Outcomes are computed server-side from the scans; the panel
+// says them in whole sentences, each figure with its label. The rail shows the
+// latest few and opens in place to the whole ledger, month by month.
 // A third, which asks for no typing: "Suggested actions" — pages the platform
 // itself found on the brand's site (lib/suggestions). The team confirms or
 // sets it aside ("not ours" — worded "Not an action", since the page is always
@@ -14,6 +15,15 @@
 // their name.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { parseActionLine, type ActionDraft } from '@/lib/action-input';
+import { NOTES_LINK_LABEL, NOTES_PATH } from '@/lib/notes/paths';
+
+type Lang = 'en' | 'zh' | 'vi';
+type T = (s: string) => string;
+// A sentence from the dictionary with its figures put in: "{n}" becomes the value.
+const fill = (s: string, v: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (m, k) => (k in v ? String(v[k]) : m));
+// Sentences one after another: a space between them, except after a Chinese full stop.
+const sentences = (parts: (string | false | 0 | null | undefined)[]) => (parts.filter(Boolean) as string[]).reduce((all, s) => all + (all && !/[。！？]$/.test(all) ? ' ' : '') + s, '');
 
 export interface InterventionRow {
   id: string; kind: string; url: string | null; domain: string | null; title: string | null; note: string | null;
@@ -25,10 +35,13 @@ export interface InterventionRow {
 }
 interface Win { present: number; total: number }
 export interface CitedAfterRow { cites: number; engines: number; firstTs: string | null }
+/** An engine began listing a different number of sources per answer from the scan dated `from` (lib/interventions sourceCountBreaks). */
+export interface SourceBreakRow { engine: string; from: string; before: number; after: number }
 export interface OutcomeRow {
   scansBefore: number; scansAfter: number; awaiting: boolean;
   prompts: { hash: string; prompt: string; engines: { engine: string; before: Win; after: Win }[] }[];
   domain: { domain: string; before: { cites: number; engines: string[] }; after: { cites: number; engines: string[] } } | null;
+  sourceBreaks?: SourceBreakRow[];
 }
 
 export const KIND_LABELS: Record<string, { en: string; zh: string; vi: string }> = {
@@ -109,29 +122,62 @@ export function InterventionForm({ projectId, lang, t, preset, onDone, onCancel 
   );
 }
 
-/** Compact outcome line for one intervention. */
-/** Phase 2: the page behind a logged action — live? how long? changed? cited since? */
-export function VerifiedLine({ iv, cited, t }: { iv: InterventionRow; cited?: CitedAfterRow; t: (s: string) => string }) {
-  const parts: string[] = [];
-  if (!iv.verified_at) parts.push(t('verifying…'));
-  else if (iv.page_ok) parts.push(`✓ ${t('live')}${iv.page_words ? ` · ${iv.page_words} ${t('words')}` : ''}${iv.changed_at ? ` · ${t('changed')} ${String(iv.changed_at).slice(0, 10)}` : ''} · ${t('checked')} ${String(iv.verified_at).slice(0, 10)}`);
-  else parts.push(`✗ ${t('not reachable')}${iv.page_status ? ` (${iv.page_status})` : iv.verify_error ? ` (${iv.verify_error})` : ''} · ${t('checked')} ${String(iv.verified_at).slice(0, 10)}`);
-  if (cited) parts.push(cited.cites > 0 ? `${t('cited since publish')}: ${cited.cites}× · ${cited.engines} ${t('engines')}` : t('not cited yet since publish'));
-  return <div className={`text-[10px] ${iv.verified_at && !iv.page_ok ? 'text-garnet' : 'text-faint'}`}>{parts.join(' · ')}</div>;
+/** The page behind a logged action, in whole sentences: was it read, is it live, has AI cited it since. */
+export function VerifiedLine({ iv, cited, t }: { iv: InterventionRow; cited?: CitedAfterRow; t: T }) {
+  const day = String(iv.verified_at ?? '').slice(0, 10);
+  const why = String(iv.verify_error ?? '');
+  // Red is for a page that answers with an error. A page the platform will not or cannot read is not the reader's mistake.
+  const broken = !!iv.verified_at && !iv.page_ok && (iv.page_status === 404 || iv.page_status === 410 || (iv.page_status ?? 0) >= 500);
+  const check = !iv.verified_at ? t('The page has not been checked yet.')
+    : iv.page_ok ? sentences([
+      fill(t(iv.page_words ? 'The page is live ({words} words), checked on {date}.' : 'The page is live, checked on {date}.'), { words: iv.page_words ?? 0, date: day }),
+      iv.changed_at && fill(t('Its content changed on {date}.'), { date: String(iv.changed_at).slice(0, 10) }),
+    ])
+    : broken ? fill(t('The page did not open (HTTP {status}) when checked on {date}.'), { status: iv.page_status ?? '', date: day })
+    : /skipped host/.test(why) ? t('Recorded. The platform does not read pages on this site (it needs a sign-in or is an app), so the page itself is not checked.')
+    : /robots/.test(why) ? t('Recorded. This site asks robots not to read the page, so the platform does not check it.')
+    : fill(t('The platform could not read the page on {date}; it checks again every week.'), { date: day });
+  return (
+    <>
+      <div className={`text-[11px] leading-snug ${broken ? 'text-garnet' : 'text-dim'}`}>{check}</div>
+      {cited && <div className="text-[11px] leading-snug text-dim">{cited.cites > 0 ? fill(t('Since it was published, AI has cited this page {n}× on {e} of the AI engines.'), { n: cited.cites, e: cited.engines }) : t('AI has not cited this page since it was published.')}</div>}
+    </>
+  );
 }
 
-export function OutcomeLine({ o, t }: { o?: OutcomeRow; t: (s: string) => string }) {
-  if (!o) return null;
-  if (o.awaiting) return <div className="text-[10px] text-faint">{o.scansBefore} {t('scans before')} · {t('awaiting the next scan')}</div>;
+const MEASUREMENT_NOTE = 'Measurement note: from the {date} scan, {engine} lists about {after} sources per answer (about {before} before). This is a change on the engine\'s side, so citation counts before and after are not directly comparable.';
+
+/** An engine changed how many sources it lists, so the citation counts on either side are not comparable. One sentence per change, quiet, with the public notes page. */
+function MeasurementNote({ breaks, lang, t }: { breaks: SourceBreakRow[]; lang: Lang; t: T }) {
+  if (!breaks.length) return null;
   return (
-    <div className="space-y-0.5">
-      <div className="text-[10px] text-faint">{o.scansBefore} {t('scans before')} · {o.scansAfter} {t('after')}</div>
+    <div className="text-[11px] leading-snug text-dim">
+      {breaks.map((b) => <span key={`${b.engine} ${b.from}`}>{fill(t(MEASUREMENT_NOTE), { date: b.from, engine: b.engine, before: Math.round(b.before), after: Math.round(b.after) })} </span>)}
+      <a href={NOTES_PATH[lang]} target="_blank" rel="noreferrer" className="text-brand hover:underline whitespace-nowrap">{NOTES_LINK_LABEL[lang]} →</a>
+    </div>
+  );
+}
+
+/** What the scans on either side of the publish date show. The figures are the
+ *  server's, unchanged; each now carries its label. `note`: where the
+ *  measurement note for this row is said — under its site line, or once above the list. */
+export function OutcomeLine({ o, t, lang = 'en', note }: { o?: OutcomeRow; t: T; lang?: Lang; note?: 'inline' | 'above' }) {
+  if (!o) return null;
+  if (o.awaiting) return <div className="text-[11px] leading-snug text-dim">{fill(t('Scans before the publish date: {b}. Waiting for the next scan to compare.'), { b: o.scansBefore })}</div>;
+  const perScan = (cites: number, scans: number) => (scans ? Math.round(cites / scans) : '—');
+  return (
+    <div className="space-y-0.5 text-[11px] leading-snug text-dim">
+      <div>{fill(t('Scans compared: {b} before the publish date, {a} after.'), { b: o.scansBefore, a: o.scansAfter })}</div>
       {o.prompts.map((p) => (
-        <div key={p.hash} className="text-[10px] text-dim">
-          “{p.prompt.slice(0, 50)}…” — {p.engines.map((e) => `${e.engine} ${fmt(e.before)} → ${fmt(e.after)}`).join(' · ')}
-        </div>
+        <div key={p.hash}>{fill(t('Answers naming the brand, before → after, to “{q}”:'), { q: p.prompt.length > 60 ? `${p.prompt.slice(0, 60)}…` : p.prompt })} {p.engines.map((e) => `${e.engine} ${fmt(e.before)} → ${fmt(e.after)}`).join(' · ')}</div>
       ))}
-      {o.domain && <div className="text-[10px] text-dim">{o.domain.domain} — {t('cited')} {o.domain.before.cites}{o.scansBefore ? ` (${Math.round(o.domain.before.cites / o.scansBefore)}/scan)` : ''} → {o.domain.after.cites}{o.scansAfter ? ` (${Math.round(o.domain.after.cites / o.scansAfter)}/scan)` : ''}</div>}
+      {o.domain && (
+        <div>{fill(t('Citations of the whole site {domain}, per scan, before → after: {pb} → {pa} (totals {cb} → {ca}).'), {
+          domain: o.domain.domain, pb: perScan(o.domain.before.cites, o.scansBefore), pa: perScan(o.domain.after.cites, o.scansAfter), cb: o.domain.before.cites, ca: o.domain.after.cites,
+        })}</div>
+      )}
+      {o.domain && note === 'inline' && <MeasurementNote breaks={o.sourceBreaks ?? []} lang={lang} t={t} />}
+      {o.domain && note === 'above' && !!o.sourceBreaks?.length && <div className="text-faint">{t('※ See the measurement note at the top of the list.')}</div>}
     </div>
   );
 }
@@ -269,6 +315,7 @@ function SuggestedActions({ projectId, lang, t, list, can, onDone }: {
 const COMPACT = 6;     // rows shown before "Show all"
 const PAGE = 50;       // the API's page size; the rest of the ledger is asked for page by page
 const NOTE_CLIP = 90;  // a note longer than this is cut to two lines until opened
+const NONE: string[] = [];
 
 // Where an action was logged from (interventions.channel).
 const CHANNEL_LABELS: Record<string, { en: string; zh: string; vi: string }> = {
@@ -283,29 +330,39 @@ const CHANNEL_LABELS: Record<string, { en: string; zh: string; vi: string }> = {
 // The note itself is always shown, so a phrasing missed here can still be read.
 const ON_BEHALF = /on behalf|re-?entered|nhập lại|nhập thay|nhập hộ|ghi thay|ghi hộ|thay mặt|补录|代录|代为登记|代为录入|代客户/i;
 
-const WHAT_AN_ACTION_IS = 'An action is something the brand has published where AI can read it (a web page, a press article, a directory profile), logged here so the next scans can show what changed.';
+const WHY_LOG = 'Log what the brand has published (an article, a web page, a profile) so the next scans can show whether the AI answers changed.';
+// A link as a person reads it: no scheme, no www, no query string.
+const shortLink = (url: string) => url.replace(/^https?:\/\/(www\.)?/, '').replace(/[?#].*$/, '').replace(/\/$/, '');
 
 interface LedgerRest { rows: InterventionRow[]; outcomes: Record<string, OutcomeRow>; citedAfter: Record<string, CitedAfterRow>; state: 'idle' | 'loading' | 'done' | 'failed' }
 const NO_REST: LedgerRest = { rows: [], outcomes: {}, citedAfter: {}, state: 'idle' };
 
 /** The project's whole ledger. The first page is useInterventions' own, so it
  *  reloads whenever that does; the project's count says whether there is more,
- *  and the later pages are fetched only when someone asks to see everything. */
+ *  and the later pages are fetched only when someone asks to see everything.
+ *  The same small request brings what the paste field needs: the brand's own
+ *  hosts and its core questions. */
 function useLedger(projectId: string | undefined) {
   const first = useInterventions(projectId, { withOutcomes: true, withPeople: true });
-  const [count, setCount] = useState<{ total: number | null; failed: boolean } | null>(null); // null until the first page has come back
+  const [meta, setMeta] = useState<{ total: number | null; failed: boolean; hosts: string[]; core: string[] } | null>(null);
   const [rest, setRest] = useState<LedgerRest>(NO_REST);
   const unloaded = useRef(first.list); // the hook's starting list: while it is still this one, nothing has come back
-  const round = useRef(0); // one per (re)load of the first page; later pages of an older round are dropped
+  const round = useRef(0); // one per (re)load of the first page; answers of an older round are dropped
+  const arrived = first.list !== unloaded.current;
 
+  // On opening, and again after each (re)load of the first page: the later pages are stale, the count may have moved.
   useEffect(() => {
-    if (!projectId || first.loading || first.list === unloaded.current) return;
+    if (!projectId || first.loading) return;
     const mine = ++round.current;
     setRest(NO_REST);
     (async () => {
-      const res = await fetch(`/api/workspace/interventions?${new URLSearchParams({ projectId, count: '1' })}`).catch(() => null);
+      const res = await fetch(`/api/workspace/interventions?${new URLSearchParams({ projectId, meta: '1' })}`).catch(() => null);
       const d = res && res.ok ? await res.json().catch(() => null) : null;
-      if (round.current === mine) setCount({ total: typeof d?.total === 'number' ? d.total : null, failed: !d });
+      if (round.current !== mine) return;
+      setMeta((was) => ({
+        total: typeof d?.total === 'number' ? d.total : null, failed: !d,
+        hosts: Array.isArray(d?.brandHosts) ? d.brandHosts : was?.hosts ?? NONE, core: Array.isArray(d?.core) ? d.core : was?.core ?? NONE,
+      }));
     })();
   }, [projectId, first.loading, first.list]);
 
@@ -339,87 +396,254 @@ function useLedger(projectId: string | undefined) {
   const rows = useMemo(() => [...first.list, ...rest.rows], [first.list, rest.rows]);
   const outcomes = useMemo(() => ({ ...first.outcomes, ...rest.outcomes }), [first.outcomes, rest.outcomes]);
   const citedAfter = useMemo(() => ({ ...first.citedAfter, ...rest.citedAfter }), [first.citedAfter, rest.citedAfter]);
-  const known = count?.total ?? null; // the server's count; null = not known
+  const known = meta?.total ?? null; // the server's count; null = not known
   // Without a count, a full first page may not be the end of it.
   const more = rest.state !== 'done' && (known != null ? known > rows.length : first.list.length >= PAGE);
-  // No rows although the count says there are some, or no count either: that did not load; it is not "nothing logged".
-  const failed = !!count && !rows.length && (count.failed || (known ?? 0) > 0);
+  // The page came back with no rows although the count says there are some, or the count did not come either: that did not load; it is not "nothing logged".
+  const failed = arrived && !first.loading && !!meta && !rows.length && (meta.failed || (known ?? 0) > 0);
   return {
-    rows, outcomes, citedAfter, loaded: !!count, failed, more,
+    rows, outcomes, citedAfter, failed, more,
     total: Math.max(known ?? 0, rows.length), atLeast: known == null && more,
+    hosts: meta?.hosts ?? NONE, core: meta?.core ?? NONE,
     rest: rest.state, loadRest, reload: first.reload,
   };
 }
 
-/** One logged action: what, when, who logged it and from where, its note, then the page check and the outcome. */
-function ActionRow({ iv, outcome, cited, lang, t }: {
-  iv: InterventionRow; outcome?: OutcomeRow; cited?: CitedAfterRow; lang: 'en' | 'zh' | 'vi'; t: (s: string) => string;
+interface Logged { rows: InterventionRow[]; already: InterventionRow[]; failed: { line: string; error: string }[] }
+
+async function postAction(body: Record<string, unknown>): Promise<{ row: InterventionRow | null; duplicate: boolean; error: string | null }> {
+  const res = await fetch('/api/workspace/interventions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => null);
+  const d = res ? await res.json().catch(() => ({})) : {};
+  return res?.ok && d.intervention ? { row: d.intervention, duplicate: !!d.duplicate, error: null } : { row: null, duplicate: false, error: d.error || 'Failed' };
+}
+
+/** The place to type. One line: a link, Enter logs it. Several lines of "link
+ *  date": a list to check, and one button to record them all. The kind is read
+ *  from the link (lib/action-input, the Lark command's rule) and can be changed;
+ *  note and target questions are there, folded. */
+function QuickAdd({ projectId, lang, t, hosts, core, onLogged }: {
+  projectId: string; lang: Lang; t: T; hosts: string[]; core: string[]; onLogged: (r: Logged) => void;
 }) {
-  const [full, setFull] = useState(false);
-  const note = (iv.note ?? '').trim();
-  const label = iv.title || iv.domain;
-  const by = iv.logger !== undefined ? `${t('Logged by')}: ${iv.logger?.operator ? 'MemeCMO' : iv.logger?.name || t('not recorded')}` : '';
-  const channel = iv.channel ? `${t('Channel')}: ${CHANNEL_LABELS[iv.channel]?.[lang] ?? iv.channel}` : '';
+  const [text, setText] = useState('');
+  const [date, setDate] = useState(today());
+  const [kinds, setKinds] = useState<Record<string, string>>({}); // a kind the person chose themself, by link
+  const [more, setMore] = useState(false);
+  const [note, setNote] = useState('');
+  const [picked, setPicked] = useState<string[]>([]);
+  const [busy, setBusy] = useState<{ i: number; n: number } | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const box = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => { const el = box.current; if (!el) return; el.style.height = 'auto'; el.style.height = `${Math.min(el.scrollHeight, 168)}px`; }, [text]);
+
+  const lines = useMemo(() => text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean), [text]);
+  const drafts = useMemo(() => lines.map((raw) => ({ raw, ...parseActionLine(raw, today(), hosts) })), [lines, hosts]);
+  const one = drafts.length === 1 ? drafts[0] : null;
+  // A date typed with the link is the publish date: it goes into the date box, so there is one date to read.
+  const typedDate = one?.date;
+  useEffect(() => { if (typedDate) setDate(typedDate); }, [typedDate]);
+
+  const kindOf = (d: ActionDraft) => kinds[d.url ?? ''] ?? d.kind;
+  const list = drafts.length > 1
+    ? drafts.map((d, i) => ({ d, left: !d.url ? 'no link, left out' : drafts.findIndex((x) => x.url === d.url) < i ? 'same link as a line above, left out' : null }))
+    : [];
+  const toSave = one ? [one] : list.filter((x) => !x.left).map((x) => x.d);
+
+  const save = async () => {
+    if (busy) return;
+    if (!toSave.length) { box.current?.focus(); return; }
+    setErr(null);
+    const out: Logged = { rows: [], already: [], failed: [] };
+    const again: string[] = [];
+    for (let i = 0; i < toSave.length; i++) {
+      const d = toSave[i];
+      setBusy({ i: i + 1, n: toSave.length });
+      const targets = Array.from(new Set([...(one ? picked : []), ...d.targets.map((n) => core[n - 1]).filter(Boolean)]));
+      const r = await postAction({
+        projectId, kind: kindOf(d), url: d.url ?? undefined, ifNew: true,
+        // One line: the date box is the date (a date typed with the link is already in it). A list: each line's own date, the box for lines without one.
+        publishedAt: one ? date : d.date ?? date,
+        title: d.url ? undefined : d.note || undefined,
+        note: (one ? note.trim() : '') || (d.url ? d.note : '') || undefined,
+        targetPrompts: targets.length ? targets : undefined,
+      });
+      if (!r.row) { out.failed.push({ line: d.url ?? d.note, error: r.error ?? 'Failed' }); again.push(d.raw); }
+      else (r.duplicate ? out.already : out.rows).push(r.row);
+    }
+    setBusy(null);
+    // Nothing went through: what was typed stays, with the server's words.
+    if (out.failed.length === toSave.length) { setErr(out.failed[0].error); return; }
+    setText(again.join('\n')); setNote(''); setPicked([]); setKinds({}); setMore(false); setDate(today());
+    onLogged(out);
+  };
+
+  const kindSelect = (d: ActionDraft) => (
+    <select value={kindOf(d)} onChange={(e) => setKinds({ ...kinds, [d.url ?? '']: e.target.value })} aria-label={t('Kind')}
+      className="max-w-full bg-transparent text-[10px] text-ink underline decoration-dotted underline-offset-2 cursor-pointer">
+      {Object.entries(KIND_LABELS).map(([k, l]) => <option key={k} value={k}>{l[lang]}</option>)}
+    </select>
+  );
+  const primary = 'mc-btn-brand text-[12px] font-semibold px-3 py-1 hover:brightness-110 disabled:opacity-60 whitespace-nowrap';
+  const saving = busy && fill(t('Saving {i} of {n}…'), busy);
   return (
-    <div className="border-t border-edge pt-1.5 space-y-0.5">
-      <div className="text-[11px] text-ink">{KIND_LABELS[iv.kind]?.[lang] ?? iv.kind}{label ? ` · ${label}` : ''} <span className="text-faint whitespace-nowrap">· {iv.published_at}</span></div>
-      {(by || channel) && <div className="flex flex-wrap gap-x-2 text-[10px] text-faint"><span className="min-w-0 break-words">{by}</span><span className="whitespace-nowrap">{channel}</span></div>}
-      {note && ON_BEHALF.test(note.normalize('NFC')) && (
-        <div><span className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-gold/15 text-gold border border-gold/30">{t('Entered on the client\'s behalf')}</span></div>
-      )}
-      {note && (
-        <div className="text-[10px] text-dim pl-2 border-l-2 border-gold/50 break-words">
-          <div className={full ? '' : 'line-clamp-2'}>{t('Note')}: {note}</div>
-          {note.length > NOTE_CLIP && <button onClick={() => setFull(!full)} aria-expanded={full} className="text-brand hover:underline">{full ? t('Collapse') : t('Full text')}</button>}
+    <div className="space-y-1.5">
+      <textarea ref={box} rows={1} value={text} onChange={(e) => setText(e.target.value)} disabled={!!busy}
+        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && drafts.length <= 1) { e.preventDefault(); save(); } }}
+        placeholder={t('Paste the link of what was published')} aria-label={t('Paste the link of what was published')}
+        className="block w-full resize-none mc-input rounded-md px-2 py-1.5 text-[12px] leading-snug text-ink placeholder:text-faint" />
+      {!drafts.length && <div className="text-[10px] text-faint">{t('One link, or several lines of “link date”.')}</div>}
+      {one && (
+        <div className="flex flex-wrap items-center gap-x-1.5 text-[10px] text-dim">
+          <span>{t('Kind')}:</span>{kindSelect(one)}
+          {one.url && one.kindFrom === 'link' && !((one.url ?? '') in kinds) && <span className="text-faint">{t('worked out from the link; change it if it is wrong')}</span>}
         </div>
       )}
-      {iv.url && <a href={iv.url} target="_blank" rel="noreferrer" title={iv.url} className="block truncate text-[10px] text-brand">{iv.url.replace(/^https?:\/\/(www\.)?/, '')}</a>}
-      {iv.url && <VerifiedLine iv={iv} cited={cited} t={t} />}
-      <OutcomeLine o={outcome} t={t} />
+      {one && !one.url && <div className="text-[10px] text-dim">{t('No link found: it will be recorded as a description, and no page can be checked.')}</div>}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <label className="flex items-center gap-1.5 text-[10px] text-dim">{t('Published on')}
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={!!busy} className="mc-input rounded px-1.5 py-1 text-[11px] text-ink" />
+        </label>
+        {!list.length && <button onClick={save} disabled={!!busy} className={primary}>{saving || t('Log')}</button>}
+      </div>
+      {list.length > 0 && (
+        <div className="rounded-md mc-chip-inset p-2 space-y-1.5">
+          <div className="text-[11px] text-ink">{fill(t('Check the list before anything is saved: {n} to record.'), { n: toSave.length })}</div>
+          {list.map(({ d, left }, i) => (
+            <div key={i} className={`border-t border-edge pt-1 text-[10px] ${left ? 'text-faint' : 'text-dim'}`}>
+              <div className={`truncate ${left ? 'line-through' : 'text-ink'}`} title={d.url ?? d.note}>{i + 1}. {d.url ? shortLink(d.url) : d.note}</div>
+              {left ? <div>{t(left)}</div> : (
+                <div className="flex flex-wrap items-center gap-x-1.5">
+                  <span className="tabular-nums">{d.date ?? date}</span>{kindSelect(d)}
+                  {!d.date && <span className="text-faint">{t('no date on this line: the date above is used')}</span>}
+                </div>
+              )}
+            </div>
+          ))}
+          <div className="flex flex-wrap items-center gap-2 pt-0.5">
+            <button onClick={save} disabled={!!busy || !toSave.length} className={primary}>{saving || fill(t('Record {n} actions'), { n: toSave.length })}</button>
+            <button onClick={() => setText('')} disabled={!!busy} className="px-2 py-1 rounded mc-chip-inset text-[11px] text-dim">{t('Cancel')}</button>
+          </div>
+        </div>
+      )}
+      {one && (
+        more ? (
+          <div className="rounded-md mc-chip-inset p-2 space-y-1.5">
+            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('Note (optional)')} className="w-full mc-input rounded px-1.5 py-1 text-[11px] text-ink" />
+            {core.length > 0 && (
+              <div className="space-y-0.5">
+                <div className="text-[10px] text-faint">{SUGGEST_LABELS.targets[lang]}</div>
+                <div className="max-h-40 overflow-y-auto space-y-0.5">
+                  {core.map((p, i) => (
+                    <label key={p} className="flex items-start gap-1.5 text-[10px] text-dim">
+                      <input type="checkbox" checked={picked.includes(p)} onChange={() => setPicked((cur) => (cur.includes(p) ? cur.filter((x) => x !== p) : [...cur, p]))} className="mt-0.5" />
+                      <span>Q{i + 1} · {p}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : <button onClick={() => setMore(true)} className="text-[10px] text-dim underline decoration-dotted underline-offset-2 hover:text-brand">+ {t('Add a note or target questions')}</button>
+      )}
+      {err && <div className="text-[11px] text-garnet">{err}</div>}
     </div>
   );
 }
 
-/** Right-rail panel: "Log an action", suggested actions, the latest few and, opened, the whole ledger by month. */
-export function ActionsPanel({ projectId, lang, t }: { projectId?: string; lang: 'en' | 'zh' | 'vi'; t: (s: string) => string }) {
+/** One logged action: what it is, then kind and publish date as quiet labels, who logged it and from where, its note, the page check and the outcome. */
+function ActionRow({ iv, outcome, cited, lang, t, note }: {
+  iv: InterventionRow; outcome?: OutcomeRow; cited?: CitedAfterRow; lang: Lang; t: T; note?: 'inline' | 'above';
+}) {
+  const [full, setFull] = useState(false);
+  const said = (iv.note ?? '').trim();
+  const kind = KIND_LABELS[iv.kind]?.[lang] ?? iv.kind;
+  // The title as logged, else the page's own title, else the address; an action with neither is named by its kind.
+  const title = iv.title || iv.page_title || '';
+  const by = iv.logger !== undefined ? `${t('Logged by')}: ${iv.logger?.operator ? 'MemeCMO' : iv.logger?.name || t('not recorded')}` : '';
+  const channel = iv.channel ? `${t('Channel')}: ${CHANNEL_LABELS[iv.channel]?.[lang] ?? iv.channel}` : '';
+  return (
+    <div className="border-t border-edge pt-1.5 space-y-0.5">
+      {title ? <div className="text-[12px] font-medium leading-snug text-ink">{title}</div>
+        : iv.url ? <a href={iv.url} target="_blank" rel="noreferrer" title={iv.url} className="block text-[12px] font-medium leading-snug text-brand break-all">{shortLink(iv.url)}</a>
+        : <div className="text-[12px] font-medium leading-snug text-ink">{kind}</div>}
+      <div className="text-[10px] text-faint">{title || iv.url ? `${kind} · ` : ''}<span className="whitespace-nowrap">{fill(t('published {date}'), { date: iv.published_at })}</span></div>
+      {(by || channel) && <div className="flex flex-wrap gap-x-2 text-[10px] text-faint">{by && <span className="min-w-0 break-words">{by}</span>}<span className="whitespace-nowrap">{channel}</span></div>}
+      {said && ON_BEHALF.test(said.normalize('NFC')) && (
+        <div><span className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-gold/15 text-gold border border-gold/30">{t('Entered on the client\'s behalf')}</span></div>
+      )}
+      {said && (
+        <div className="text-[10px] text-dim pl-2 border-l-2 border-gold/50 break-words">
+          <div className={full ? '' : 'line-clamp-2'}>{t('Note')}: {said}</div>
+          {said.length > NOTE_CLIP && <button onClick={() => setFull(!full)} aria-expanded={full} className="text-brand hover:underline">{full ? t('Collapse') : t('Full text')}</button>}
+        </div>
+      )}
+      {title && iv.url && <a href={iv.url} target="_blank" rel="noreferrer" title={iv.url} className="block truncate text-[10px] text-brand">{shortLink(iv.url)}</a>}
+      {iv.url && <VerifiedLine iv={iv} cited={cited} t={t} />}
+      <OutcomeLine o={outcome} t={t} lang={lang} note={note} />
+    </div>
+  );
+}
+
+/** Right-rail panel: the place to type, what was just logged, suggested actions, the latest few and, opened, the whole ledger by month. */
+export function ActionsPanel({ projectId, lang, t }: { projectId?: string; lang: Lang; t: T }) {
   const ledger = useLedger(projectId);
   const suggested = useSuggestions(projectId);
-  const [open, setOpen] = useState(false);
   const [all, setAll] = useState(false);
+  const [logged, setLogged] = useState<Logged | null>(null);
   const { rows, total, more, rest, loadRest } = ledger;
   useEffect(() => { if (all && more && rest === 'idle') loadRest(); }, [all, more, rest, loadRest]);
   if (!projectId) return null;
-  const empty = ledger.loaded && !ledger.failed && total === 0;
-  const logButton = (wide: boolean) => (
-    <button onClick={() => setOpen(true)} className={`mc-btn-brand text-[11px] font-semibold px-2.5 hover:brightness-110 whitespace-nowrap ${wide ? 'w-full py-1.5' : 'py-1'}`}>+ {t('Log an action')}</button>
-  );
-  const toggle = rows.length > 0 && total > COMPACT && (
+
+  // What was just logged stays on top until dismissed (the list itself is by publish date); the list below leaves those rows out.
+  const fresh = (r: InterventionRow) => rows.find((x) => x.id === r.id) ?? r;
+  const onTop = logged ? (logged.rows.length ? logged.rows : logged.already.slice(0, 1)).map(fresh) : [];
+  const pinned = new Set(onTop.map((r) => r.id));
+  const below = rows.filter((r) => !pinned.has(r.id));
+  const shown = all ? below : below.slice(0, COMPACT);
+
+  // An engine-side change is said once. One row touched: under that row's site line. Several: once above the list, and each row points to it.
+  const touched = [...onTop, ...shown].filter((r) => ledger.outcomes[r.id]?.sourceBreaks?.length);
+  const where: 'inline' | 'above' = touched.length > 1 ? 'above' : 'inline';
+  const breaks = Array.from(new Map(touched.flatMap((r) => ledger.outcomes[r.id]?.sourceBreaks ?? []).map((b) => [`${b.engine} ${b.from}`, b])).values());
+
+  const toggle = below.length > 0 && total > COMPACT && (
     <button onClick={() => setAll(!all)} aria-expanded={all} className="w-full mc-btn-soft text-[11px] text-dim hover:text-brand py-1.5 tabular-nums">{all ? t('Collapse') : `${t('Show all')} (${total}${ledger.atLeast ? '+' : ''})`}</button>
   );
-  const row = (iv: InterventionRow) => <ActionRow key={iv.id} iv={iv} outcome={ledger.outcomes[iv.id]} cited={ledger.citedAfter[iv.id]} lang={lang} t={t} />;
+  const row = (iv: InterventionRow) => <ActionRow key={iv.id} iv={iv} outcome={ledger.outcomes[iv.id]} cited={ledger.citedAfter[iv.id]} lang={lang} t={t} note={where} />;
   // Opened: every row, under its publish month (the rows arrive newest first).
   const months: { month: string; rows: InterventionRow[] }[] = [];
-  if (all) for (const iv of rows) {
+  if (all) for (const iv of shown) {
     const month = iv.published_at.slice(0, 7);
     const last = months[months.length - 1];
     if (last?.month === month) last.rows.push(iv); else months.push({ month, rows: [iv] });
   }
+  const alone = logged && logged.rows.length + logged.already.length + logged.failed.length === 1;
+  const said = logged && sentences([
+    alone && logged.rows.length === 1 && t('Logged.'),
+    !alone && logged.rows.length > 0 && fill(t('Logged: {n}.'), { n: logged.rows.length }),
+    alone && logged.already.length === 1 && fill(t('This link was already logged (published {date}); nothing was added.'), { date: logged.already[0].published_at }),
+    !alone && logged.already.length > 0 && fill(t('Already logged before, not added again: {n}.'), { n: logged.already.length }),
+    logged.failed.length > 0 && fill(t('Not saved: {n}.'), { n: logged.failed.length }),
+    logged.rows.length > 0 && t('From the next scan on, this panel compares the AI answers before and after the publish date.'),
+  ]);
   return (
     <div className="mc-card mc-card-sm p-3 space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
-        <div className="text-[10px] uppercase tracking-widest text-faint tabular-nums">{t('Actions')}{total > 0 ? ` · ${total}${ledger.atLeast ? '+' : ''}` : ''}</div>
-        {!open && !empty && logButton(false)}
-      </div>
-      {open && <InterventionForm projectId={projectId} lang={lang} t={t} onDone={() => { setOpen(false); ledger.reload(); }} onCancel={() => setOpen(false)} />}
-      {empty && !open && (
-        <>
-          <div className="text-[11px] leading-relaxed text-dim">{t(WHAT_AN_ACTION_IS)}</div>
-          {logButton(true)}
-        </>
+      <div className="text-[10px] uppercase tracking-widest text-faint tabular-nums">{t('Actions')}{total > 0 ? ` · ${total}${ledger.atLeast ? '+' : ''}` : ''}</div>
+      <div className="text-[11px] leading-snug text-dim">{t(WHY_LOG)}</div>
+      <QuickAdd projectId={projectId} lang={lang} t={t} hosts={ledger.hosts} core={ledger.core} onLogged={(r) => { setLogged(r); ledger.reload(); }} />
+      {logged && (
+        <div className="rounded-md mc-chip-inset p-2 space-y-1.5" role="status">
+          <div className="flex items-start justify-between gap-2">
+            <div className="text-[11px] leading-snug text-ink">{said}</div>
+            <button onClick={() => setLogged(null)} aria-label={t('Close')} className="shrink-0 px-1 text-[12px] leading-none text-faint hover:text-brand">×</button>
+          </div>
+          {logged.failed.map((f, i) => <div key={i} className="text-[10px] text-garnet break-all">{f.line}: {f.error}</div>)}
+          {onTop.length > 0 && <div className="text-[10px] uppercase tracking-widest text-sage">{t(logged.rows.length ? 'Just logged' : 'Already logged')}</div>}
+          {onTop.map(row)}
+        </div>
       )}
-      {!empty && total > 0 && <div className="text-[10px] text-faint">{t('What the brand published, and what AI did afterwards.')}</div>}
       <SuggestedActions projectId={projectId} lang={lang} t={t} list={suggested.list} can={suggested.can} onDone={() => { suggested.reload(); ledger.reload(); }} />
       {ledger.failed && <div className="text-[10px] text-garnet">{t('Load failed')} · <button onClick={ledger.reload} className="underline hover:text-brand">{t('Retry')}</button></div>}
+      {where === 'above' && <div className="rounded-md mc-chip-inset p-2"><MeasurementNote breaks={breaks} lang={lang} t={t} /></div>}
       {all && toggle}
       {all
         ? months.map((m) => (
@@ -428,7 +652,7 @@ export function ActionsPanel({ projectId, lang, t }: { projectId?: string; lang:
             {m.rows.map(row)}
           </div>
         ))
-        : rows.slice(0, COMPACT).map(row)}
+        : shown.map(row)}
       {all && rest === 'loading' && <div className="text-[10px] text-faint tabular-nums">{t('Loading…')} {rows.length}{ledger.atLeast ? '' : `/${total}`}</div>}
       {all && rest === 'failed' && <div className="text-[10px] text-garnet tabular-nums">{t('Load failed')} ({rows.length}{ledger.atLeast ? '+' : `/${total}`}) · <button onClick={loadRest} className="underline hover:text-brand">{t('Retry')}</button></div>}
       {toggle}

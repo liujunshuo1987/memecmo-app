@@ -6,8 +6,12 @@
 //        first. `total` is the project's whole count of live actions, so a
 //        reader can tell a page from the ledger and ask for the rest.
 //        withPeople adds `logger` to each row: who logged it, for display.
-// GET    ?projectId=&count=1      → { total } only
-// POST   { projectId, kind, url?, publishedAt, title?, note?, targetPrompts?: string[], sourceRunId?, sourceAssetType? }
+//        With outcomes, an outcome whose site-citation counts straddle an
+//        engine's change in how many sources it lists carries `sourceBreaks`.
+// GET    ?projectId=&meta=1       → { total, brandHosts, core } — what the panel's quick-add needs before any row has loaded
+// POST   { projectId, kind, url?, publishedAt, title?, note?, targetPrompts?: string[], sourceRunId?, sourceAssetType?, ifNew? }
+//        ifNew: a link the project has already logged is not logged again; the
+//        answer is { ok, duplicate: true, intervention: <the earlier row> }.
 // DELETE ?projectId=&id=          (marks removed; history is never deleted)
 //
 // Authorisation: any member of the project's org may read (GET); writes need
@@ -19,7 +23,9 @@ import { createClient } from '@/lib/supabase/server';
 import { serviceClient } from '@/lib/commerce';
 import { canAccessOrg, canEditOrg } from '@/lib/org-auth';
 import { unitHash } from '@/lib/edits';
-import { INTERVENTION_KINDS, computeOutcomes, countInterventions, domainOf, loadInterventions, loggersOf, citedAfterMap } from '@/lib/interventions';
+import { INTERVENTION_KINDS, breaksAffecting, computeOutcomesAndBreaks, countInterventions, domainOf, loadInterventions, loggersOf, citedAfterMap } from '@/lib/interventions';
+import { brandHostsOf } from '@/lib/action-input';
+import { normUrl } from '@/lib/suggestions';
 import { inngest } from '@/lib/inngest/client';
 
 export const runtime = 'nodejs';
@@ -30,7 +36,7 @@ async function authorize(projectId: string, mode: 'read' | 'write') {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
   const svc = serviceClient();
-  const { data: project } = await svc.from('projects').select('id, organizations(id, parent_org_id)').eq('id', projectId).maybeSingle();
+  const { data: project } = await svc.from('projects').select('id, brand_url, metadata, organizations(id, parent_org_id)').eq('id', projectId).maybeSingle();
   if (!project) return { error: NextResponse.json({ error: 'Project not found' }, { status: 404 }) };
   const org: any = (project as any).organizations;
   const scope = { id: org.id, parent_org_id: org.parent_org_id };
@@ -38,7 +44,7 @@ async function authorize(projectId: string, mode: 'read' | 'write') {
   if (!allowed) {
     return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   }
-  return { svc, user, orgId: org.id as string };
+  return { svc, user, orgId: org.id as string, project: project as { brand_url?: string | null; metadata?: any } };
 }
 
 export async function GET(req: NextRequest) {
@@ -47,21 +53,30 @@ export async function GET(req: NextRequest) {
   if (!projectId) return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
   const a = await authorize(projectId, 'read');
   if ('error' in a) return a.error;
-  if (q.get('count') === '1') return NextResponse.json({ total: await countInterventions(a.svc, projectId) });
+  if (q.get('meta') === '1') {
+    const core = Array.isArray(a.project.metadata?.coreKeyPrompts) ? a.project.metadata.coreKeyPrompts.filter((p: unknown) => typeof p === 'string') : [];
+    return NextResponse.json({ total: await countInterventions(a.svc, projectId), brandHosts: brandHostsOf(a.project), core });
+  }
   const sourceRunId = q.get('sourceRunId') ?? undefined;
   const limit = Math.min(100, Math.max(1, Math.floor(Number(q.get('limit'))) || 50));
   const offset = Math.max(0, Math.floor(Number(q.get('offset'))) || 0);
   const list = await loadInterventions(a.svc, projectId, { sourceRunId, limit, offset });
   const withOutcomes = q.get('withOutcomes') === '1';
-  const [outcomes, citedAfter, people, total] = await Promise.all([
-    withOutcomes ? computeOutcomes(a.svc, projectId, list) : {},
+  const [measured, citedAfter, people, total] = await Promise.all([
+    withOutcomes ? computeOutcomesAndBreaks(a.svc, projectId, list) : { outcomes: {}, breaks: [] },
     withOutcomes ? citedAfterMap(a.svc, projectId, list) : {},
     q.get('withPeople') === '1' ? loggersOf(a.svc, a.orgId, list) : null,
     // The count is of the whole project; a per-run lookup has no use for it.
     sourceRunId ? null : countInterventions(a.svc, projectId),
   ]);
   const interventions = people ? list.map((iv) => ({ ...iv, logger: iv.logged_by ? people[iv.logged_by] ?? null : null })) : list;
-  return NextResponse.json({ interventions, outcomes, citedAfter, total });
+  // The figures are untouched; an outcome only learns which engine-side changes its site line straddles.
+  const outcomes = measured.outcomes;
+  for (const o of Object.values(outcomes)) {
+    const breaks = breaksAffecting(o, measured.breaks);
+    if (breaks.length) o.sourceBreaks = breaks;
+  }
+  return NextResponse.json({ interventions, outcomes, citedAfter, total, breaks: measured.breaks });
 }
 
 export async function POST(req: NextRequest) {
@@ -77,6 +92,13 @@ export async function POST(req: NextRequest) {
     : [];
   const a = await authorize(projectId, 'write');
   if ('error' in a) return a.error;
+  if (body.ifNew && url) {
+    // Same page under another spelling (scheme, www, trailing slash, tracking parameters) is the same link.
+    const key = normUrl(String(url));
+    const { data: sameSite } = await a.svc.from('interventions').select('*').eq('project_id', projectId).eq('status', 'live').eq('domain', domainOf(url)).order('created_at', { ascending: true });
+    const earlier = (sameSite ?? []).find((iv: any) => key && normUrl(iv.url) === key);
+    if (earlier) return NextResponse.json({ ok: true, duplicate: true, intervention: earlier });
+  }
   const { data, error } = await a.svc
     .from('interventions')
     .insert({

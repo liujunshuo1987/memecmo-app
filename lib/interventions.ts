@@ -9,9 +9,10 @@
 // digest's verification gate is fed the same figures.
 
 import { unitHash } from '@/lib/edits';
+import { INTERVENTION_KINDS, type InterventionKind } from '@/lib/action-input';
 
-export const INTERVENTION_KINDS = ['content_page', 'schema', 'third_party_placement', 'encyclopedia', 'directory_profile', 'site_update', 'other'] as const;
-export type InterventionKind = (typeof INTERVENTION_KINDS)[number];
+// The kinds live in lib/action-input (client-safe) so the browser can name them too.
+export { INTERVENTION_KINDS, type InterventionKind };
 
 export interface Intervention {
   id: string;
@@ -62,7 +63,13 @@ export interface Outcome {
   awaiting: boolean;          // no comparable scan after the publish date yet
   prompts: PromptOutcome[];
   domain: { domain: string; before: { cites: number; engines: string[] }; after: { cites: number; engines: string[] } } | null;
+  /** Set by a reader that shows the domain line: engine-side changes that make its before and after not comparable (breaksAffecting). */
+  sourceBreaks?: SourceBreak[];
 }
+
+/** An engine started listing a different number of sources per answer: from the
+ *  scan dated `from`, about `after` per answer where it was about `before`. */
+export interface SourceBreak { engine: string; from: string; before: number; after: number }
 
 export const domainOf = (url: string | null | undefined): string | null => {
   if (!url) return null;
@@ -135,8 +142,15 @@ async function loadComparableScans(sb: any, projectId: string, maxScans: number)
  *  scans. Bounded to the most recent `maxScans` scans (each carries ~120
  *  answers), which covers ~3 months of weekly cadence. */
 export async function computeOutcomes(sb: any, projectId: string, interventions: Intervention[], maxScans = 16): Promise<Record<string, Outcome>> {
+  return (await computeOutcomesAndBreaks(sb, projectId, interventions, maxScans)).outcomes;
+}
+
+/** The same outcomes, with what the same scans say about each engine's source
+ *  lists (sourceCountBreaks). The figures are computeOutcomes' own: one load,
+ *  one loop, nothing recounted. */
+export async function computeOutcomesAndBreaks(sb: any, projectId: string, interventions: Intervention[], maxScans = 16): Promise<{ outcomes: Record<string, Outcome>; breaks: SourceBreak[] }> {
   const out: Record<string, Outcome> = {};
-  if (!interventions.length) return out;
+  if (!interventions.length) return { outcomes: out, breaks: [] };
   const scans = await loadComparableScans(sb, projectId, maxScans);
   for (const iv of interventions) {
     const cut = new Date(iv.published_at + 'T00:00:00Z').getTime();
@@ -171,7 +185,65 @@ export async function computeOutcomes(sb: any, projectId: string, interventions:
     }
     out[iv.id] = { scansBefore: before.length, scansAfter: after.length, awaiting: after.length === 0, prompts, domain };
   }
+  return { outcomes: out, breaks: sourceCountBreaks(scans) };
+}
+
+// ── Measurement note: an engine that changes how many sources it lists ────────
+// The domain line counts citations of a whole site before and after a publish
+// date. When an engine starts listing a fifth of the sources it used to, that
+// count falls for every site at once, whatever the brand did. Nothing here
+// changes a figure: it only says when the two sides are not comparable.
+
+const median = (xs: number[]): number => {
+  const s = [...xs].sort((a, b) => a - b), m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+};
+// A factor of two or more, and the higher side lists at least one source per answer.
+const apart = (a: number, b: number): boolean => Math.max(a, b) >= 1 && Math.max(a, b) >= 2 * Math.min(a, b);
+
+/** In one engine's series of sources per answer (one value per scan, oldest
+ *  first): the point from which it lists a different number. At least two
+ *  scans on each side, medians a factor of two apart, and still so with any
+ *  one scan left out, so a single odd scan is never a break. Where several
+ *  points qualify, the one that leaves each side closest to its own median. */
+export function seriesBreak(values: number[]): { at: number; before: number; after: number } | null {
+  let best: { at: number; before: number; after: number; spread: number } | null = null;
+  const without = (xs: number[], i: number) => xs.filter((_, j) => j !== i);
+  for (let at = 2; at <= values.length - 2; at++) {
+    const b = values.slice(0, at), a = values.slice(at);
+    const mb = median(b), ma = median(a);
+    if (!apart(mb, ma)) continue;
+    if (!b.every((_, i) => apart(median(without(b, i)), ma)) || !a.every((_, i) => apart(mb, median(without(a, i))))) continue;
+    const off = (xs: number[], m: number) => xs.reduce((n, x) => n + Math.abs(Math.log1p(x) - Math.log1p(m)), 0);
+    const spread = off(b, mb) + off(a, ma);
+    if (!best || spread < best.spread) best = { at, before: mb, after: ma, spread };
+  }
+  return best && { at: best.at, before: best.before, after: best.after };
+}
+
+/** Per engine, from the comparable scans (oldest first): sources listed ÷
+ *  answers in each scan the engine answered in, and the break in that series if there is one. */
+export function sourceCountBreaks(scans: { at: string; samples: any[] }[]): SourceBreak[] {
+  const engines = Array.from(new Set(scans.flatMap((s) => s.samples.map((a: any) => String(a.engine)))));
+  const out: SourceBreak[] = [];
+  for (const engine of engines) {
+    const points: { at: string; perAnswer: number }[] = [];
+    for (const s of scans) {
+      const answers = s.samples.filter((a: any) => String(a.engine) === engine);
+      if (answers.length) points.push({ at: s.at, perAnswer: answers.reduce((n: number, a: any) => n + (a.citations ?? []).length, 0) / answers.length });
+    }
+    const found = seriesBreak(points.map((p) => p.perAnswer));
+    if (found) out.push({ engine, from: String(points[found.at].at).slice(0, 10), before: found.before, after: found.after });
+  }
   return out;
+}
+
+/** The breaks that bear on one outcome's domain line: it compares scans on
+ *  both sides of the publish date, and the engine is one that cites that site. */
+export function breaksAffecting(o: Outcome, breaks: SourceBreak[]): SourceBreak[] {
+  if (!o.domain || !o.scansBefore || !o.scansAfter) return [];
+  const citing = new Set([...o.domain.before.engines, ...o.domain.after.engines]);
+  return breaks.filter((b) => citing.has(b.engine));
 }
 
 /** Every number an outcome presents — fed to the digest's verification gate
