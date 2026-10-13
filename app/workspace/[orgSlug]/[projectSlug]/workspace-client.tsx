@@ -21,7 +21,7 @@ import { traceAffectedEngines, mostlyEmptyEngines } from '@/lib/engines/ingest';
 import { NOTES_PATH, NOTES_LINK_LABEL } from '@/lib/notes/paths';
 import { siteUseByEngine } from '@/lib/site-use';
 import { DeliverableBody, Typeset, dl, refineText } from './deliverables';
-import { useLedger, type Ledger } from './actions';
+import { LOG_HERE, useLedger, type Ledger } from './actions';
 
 interface Props {
   project: Project;
@@ -232,6 +232,7 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Measurement note: from the {date} scan, {engine} lists about {after} sources per answer (about {before} before). This is a change on the engine\'s side, so citation counts before and after are not directly comparable.': '测量说明：自 {date} 的扫描起，{engine} 每条回答列出约 {after} 个来源（此前约 {before} 个）。这是引擎一侧的变化，所以前后的引用次数不能直接比较。',
     '※ See the measurement note at the top of the list.': '※ 见列表顶部的测量说明。',
     'Back to the run': '回到这次运行',
+    'Log what you published': '登记已发布内容', 'See all {n} logged': '查看已登记的全部 {n} 条',
     'All engines': '全部引擎', 'Alignment with standard answers': '与标准答案一致度', 'not client-verified': '未经客户核实', 'judged': '条已评', 'brand-present': '条提到品牌', aligned: '一致', 'Since this report': '本报告之后', recommendations: '条建议', 'deliverables completed after it': '项执行交付已完成', 'No execution deliverables completed since this report yet — run them, and the next scan shows the movement here.': '本报告后尚无新的执行交付——完成执行后,下一次扫描的分数变化会显示在这里。', 'Answers diverging from the standard answers': '与标准答案不符的回答', wrong: '不符', partial: '部分一致', 'Benchmark and gaps remain whole-scan.': '竞对对标与缺口仍为全量扫描口径。',
     'Cited sources': '被引来源', Deliverables: '交付物', 'Structured view': '结构化视图', Refine: '改写', Ask: '问',
     'Ask about this result…': '问这份结果…', 'Which gap should we attack first?': '哪个缺口最该先打?',
@@ -344,6 +345,7 @@ const UI_DICT: Record<'zh' | 'vi', Record<string, string>> = {
     'Measurement note: from the {date} scan, {engine} lists about {after} sources per answer (about {before} before). This is a change on the engine\'s side, so citation counts before and after are not directly comparable.': 'Ghi chú đo lường: từ lần quét {date}, {engine} liệt kê khoảng {after} nguồn cho mỗi câu trả lời (trước đó khoảng {before}). Đây là thay đổi từ phía công cụ AI, nên số lần trích dẫn trước và sau không so sánh trực tiếp được.',
     '※ See the measurement note at the top of the list.': '※ Xem ghi chú đo lường ở đầu danh sách.',
     'Back to the run': 'Quay lại lượt chạy',
+    'Log what you published': 'Ghi nội dung đã đăng', 'See all {n} logged': 'Xem tất cả {n} mục đã ghi',
     'Key findings': 'Phát hiện chính', Recommendations: 'Khuyến nghị', 'Quick wins': 'Việc cần làm', Deliverables: 'Sản phẩm',
     'Full Scan': 'Quét đầy đủ', Profile: 'Hồ sơ', Discovery: 'Khám phá', Monitor: 'Giám sát', Report: 'Báo cáo',
     Optimize: 'Nội dung', Site: 'Trang chủ', Distribute: 'Phân phối', Encyclopedia: 'Bách khoa',
@@ -1053,8 +1055,11 @@ export default function WorkspaceClient({ project, organization, initialRuns, sc
 
         {/* RIGHT — at-a-glance context */}
         <aside className="mc-enter border-t lg:border-t-0 lg:border-l border-edge lg:overflow-y-auto px-4 py-4 space-y-4 lg:min-h-0" style={{ ['--i' as any]: 2 }}>
+          {/* What the brand DID, and what the engines did after — the loop. First in the rail: the one card here that asks for something,
+              so its field is on the first screen whatever the window's height. While the stage shows the ledger, the field is there. */}
+          {!demoMode && <ActionsPanel projectId={project.id} lang={uiLang} t={t} ledger={ledger} typing={!ledgerOpen} onShowAll={openLedger} />}
           <TrendPanel history={history} />
-          <ContextPanel headlineAigvr={headlineAigvr} scoreRun={scoreRun} runsByAgent={runsByAgent} totalAgents={DELIVERABLE_GROUPS.reduce((n, g) => n + g.items.length, 0)} projectId={demoMode ? undefined : project.id} ledger={ledger} onShowAll={openLedger} />
+          <ContextPanel headlineAigvr={headlineAigvr} scoreRun={scoreRun} runsByAgent={runsByAgent} totalAgents={DELIVERABLE_GROUPS.reduce((n, g) => n + g.items.length, 0)} />
         </aside>
       </div>
     </div>
@@ -1121,13 +1126,13 @@ function LedgerNavItem({ ledger, isViewing, onOpen }: { ledger: Ledger; isViewin
       type="button"
       onClick={onOpen}
       aria-pressed={isViewing}
-      className={`w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-lg transition cursor-pointer ${
-        isViewing ? 'bg-sage/12 border-sage/40' : 'mc-btn-soft hover:brightness-95'
+      className={`w-full text-left flex items-center gap-2 px-2.5 py-2 rounded-lg transition cursor-pointer shadow-[var(--shadow-raise-btn)] ${
+        isViewing ? 'bg-sage/12' : 'bg-brand-soft hover:brightness-95'
       }`}
     >
       <span className="shrink-0 text-brand"><Icon name="actions" size={17} /></span>
-      <span className="text-[13px] text-ink truncate flex-1">{t('Actions')}</span>
-      {ledger.loaded && !ledger.failed && <span className="text-[11px] text-faint tabular-nums shrink-0">{ledger.total}{ledger.atLeast ? '+' : ''}</span>}
+      <span className="text-[13px] font-medium text-brand-deep truncate flex-1">{t(LOG_HERE)}</span>
+      {ledger.loaded && !ledger.failed && <span className="text-[11px] text-dim tabular-nums shrink-0">{ledger.total}{ledger.atLeast ? '+' : ''}</span>}
     </button>
   );
 }
@@ -1265,14 +1270,11 @@ function MonthlyTrend({ history, arrow, dColor }: {
   );
 }
 
-function ContextPanel({ headlineAigvr, scoreRun, runsByAgent, totalAgents, projectId, ledger, onShowAll }: {
+function ContextPanel({ headlineAigvr, scoreRun, runsByAgent, totalAgents }: {
   headlineAigvr: number | null;
   scoreRun?: LatestRun;
   runsByAgent: Record<string, LatestRun>;
   totalAgents: number;
-  projectId?: string;
-  ledger: Ledger;
-  onShowAll: () => void;
 }) {
   const sc = scoreRun?.output?.scorecard ?? scoreRun?.output;
   // Count only the deliverables listed in the nav groups — full_scan is a
@@ -1308,10 +1310,6 @@ function ContextPanel({ headlineAigvr, scoreRun, runsByAgent, totalAgents, proje
           <ContextMetric tip="gaps" label="High-intent gaps" value={String(gaps)} />
           <ContextMetric label="Cited sources" value={String(sources)} />
         </div>
-      )}
-      {/* What the brand DID, and what the engines did after — the loop. */}
-      {projectId && (
-        <ActionsPanel projectId={projectId} lang={UI_LANG} t={t} ledger={ledger} onShowAll={onShowAll} />
       )}
       {SCORE_DISPLAY !== 'enterprise' && (
         <div className="mc-card mc-card-sm p-4 text-center">

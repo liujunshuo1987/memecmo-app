@@ -334,7 +334,6 @@ function SuggestedActions({ projectId, lang, t, list, can, onDone }: {
 }
 
 // ── The ledger: a summary in the right rail, the whole of it on the stage ────
-const COMPACT = 6;     // rows the rail shows; the rest are on the stage
 const PAGE = 50;       // the API's page size; the rest of the ledger is asked for page by page
 const NONE: string[] = [];
 
@@ -351,6 +350,9 @@ const CHANNEL_LABELS: Record<string, { en: string; zh: string; vi: string }> = {
 // The note itself is always shown, so a phrasing missed here can still be read.
 const ON_BEHALF = /on behalf|re-?entered|nhập lại|nhập thay|nhập hộ|ghi thay|ghi hộ|thay mặt|补录|代录|代为登记|代为录入|代客户/i;
 
+// What the place is called, wherever it is named (the list's row, the rail's card, the stage): by what a person does there.
+// "Actions" alone told nobody that this is where to say what was published, and in Vietnamese it is also a group's heading in the same list.
+export const LOG_HERE = 'Log what you published';
 const WHY_LOG = 'Log what the brand has published (an article, a web page, a profile) so the next scans can show whether the AI answers changed.';
 // A link as a person reads it: no scheme, no www, no query string.
 const shortLink = (url: string) => url.replace(/^https?:\/\/(www\.)?/, '').replace(/[?#].*$/, '').replace(/\/$/, '');
@@ -648,12 +650,15 @@ function ActionRow({ iv, outcome, cited, lang, t, note, wide = false }: {
   );
 }
 
-/** The ledger's two places, one panel. In the right rail: the place to type,
- *  what was just logged, suggested actions and the latest few; "Show all" hands
- *  over to the stage. On the stage (`whole`): the place to type on top, then
- *  every action under its publish month, at the column's full width. */
-export function ActionsPanel({ projectId, lang, t, ledger, whole = false, onShowAll }: {
-  projectId?: string; lang: Lang; t: T; ledger: Ledger; whole?: boolean; onShowAll?: () => void;
+/** The ledger's two places, one panel. In the right rail, first card: the place
+ *  to type, what was just logged, suggested actions, and the way to the list —
+ *  short enough to sit on the first screen; the rows themselves are on the
+ *  stage. On the stage (`whole`): the place to type on top, then every action
+ *  under its publish month, at the column's full width. `typing={false}`: the
+ *  stage is already showing the place to type, so the rail keeps only what
+ *  waits for an answer (suggested actions). */
+export function ActionsPanel({ projectId, lang, t, ledger, whole = false, typing: canType = true, onShowAll }: {
+  projectId?: string; lang: Lang; t: T; ledger: Ledger; whole?: boolean; typing?: boolean; onShowAll?: () => void;
 }) {
   const suggested = useSuggestions(whole ? undefined : projectId);
   const [logged, setLogged] = useState<Logged | null>(null);
@@ -665,7 +670,7 @@ export function ActionsPanel({ projectId, lang, t, ledger, whole = false, onShow
   const onTop = logged ? (logged.rows.length ? logged.rows : logged.already.slice(0, 1)).map(fresh) : [];
   const pinned = new Set(onTop.map((r) => r.id));
   const below = rows.filter((r) => !pinned.has(r.id));
-  const shown = whole ? below : below.slice(0, COMPACT);
+  const shown = whole ? below : [];
 
   // An engine-side change is said once. One row touched: under that row's site line. Several: once above the list, and each row points to it.
   const touched = [...onTop, ...shown].filter((r) => ledger.outcomes[r.id]?.sourceBreaks?.length);
@@ -684,6 +689,7 @@ export function ActionsPanel({ projectId, lang, t, ledger, whole = false, onShow
     logged.rows.length > 0 && t('From the next scan on, this panel compares the AI answers before and after the publish date.'),
   ]);
   const typing = <QuickAdd projectId={projectId} lang={lang} t={t} hosts={ledger.hosts} core={ledger.core} onLogged={(r) => { setLogged(r); ledger.reload(); }} />;
+  const noteAbove = where === 'above' && <div className="rounded-md mc-chip-inset p-2"><MeasurementNote breaks={breaks} lang={lang} t={t} /></div>;
   const justLogged = logged && (
     <div className="rounded-md mc-chip-inset p-2 space-y-1.5" role="status">
       <div className="flex items-start justify-between gap-2">
@@ -692,27 +698,30 @@ export function ActionsPanel({ projectId, lang, t, ledger, whole = false, onShow
       </div>
       {logged.failed.map((f, i) => <div key={i} className="text-[10px] text-garnet break-all">{f.line}: {f.error}</div>)}
       {onTop.length > 0 && <div className="text-[10px] uppercase tracking-widest text-sage">{t(logged.rows.length ? 'Just logged' : 'Already logged')}</div>}
+      {/* In the rail there is no list below to carry the note: it goes with the rows it is about. */}
+      {!whole && noteAbove}
       {onTop.map(row)}
     </div>
   );
   const failure = ledger.failed && <div className={`${whole ? 'text-xs' : 'text-[10px]'} text-garnet`}>{t('Load failed')} · <button onClick={ledger.reload} className="underline hover:text-brand">{t('Retry')}</button></div>;
-  const noteAbove = where === 'above' && <div className="rounded-md mc-chip-inset p-2"><MeasurementNote breaks={breaks} lang={lang} t={t} /></div>;
 
-  if (!whole) return (
-    <div className="mc-card mc-card-sm p-3 space-y-2">
-      <div className="text-[10px] uppercase tracking-widest text-faint tabular-nums">{t('Actions')}{count}</div>
-      <div className="text-[11px] leading-snug text-dim">{t(WHY_LOG)}</div>
-      {typing}
-      {justLogged}
-      <SuggestedActions projectId={projectId} lang={lang} t={t} list={suggested.list} can={suggested.can} onDone={() => { suggested.reload(); ledger.reload(); }} />
-      {failure}
-      {noteAbove}
-      {shown.map(row)}
-      {below.length > 0 && total > COMPACT && (
-        <button onClick={onShowAll} className="w-full mc-btn-soft text-[11px] text-dim hover:text-brand py-1.5 tabular-nums">{t('Show all')} ({total}{ledger.atLeast ? '+' : ''})</button>
-      )}
-    </div>
-  );
+  if (!whole) {
+    const waiting = <SuggestedActions projectId={projectId} lang={lang} t={t} list={suggested.list} can={suggested.can} onDone={() => { suggested.reload(); ledger.reload(); }} />;
+    if (!canType) return suggested.list.length ? <div className="mc-card mc-card-sm p-3 space-y-2">{waiting}</div> : null;
+    return (
+      <div className="mc-card mc-card-sm p-3 space-y-2">
+        <div className="flex items-center gap-1.5 text-[12px] font-medium text-ink"><span className="shrink-0 text-brand"><Icon name="actions" size={15} /></span>{t(LOG_HERE)}</div>
+        <div className="text-[11px] leading-snug text-dim">{t(WHY_LOG)}</div>
+        {typing}
+        {justLogged}
+        {waiting}
+        {failure}
+        {total > 0 && (
+          <button onClick={onShowAll} className="w-full mc-btn-soft text-[11px] text-dim hover:text-brand py-1.5 tabular-nums">{fill(t('See all {n} logged'), { n: `${total}${ledger.atLeast ? '+' : ''}` })} →</button>
+        )}
+      </div>
+    );
+  }
 
   // Every row under its publish month (the rows arrive newest first).
   const months: { month: string; rows: InterventionRow[] }[] = [];
@@ -724,7 +733,7 @@ export function ActionsPanel({ projectId, lang, t, ledger, whole = false, onShow
   return (
     <div className="@container space-y-4">
       <div>
-        <div className="flex items-center gap-2 text-sm font-medium text-ink tabular-nums"><span className="text-brand"><Icon name="actions" size={16} /></span>{t('Actions')}{count}</div>
+        <div className="flex items-center gap-2 text-sm font-medium text-ink tabular-nums"><span className="text-brand"><Icon name="actions" size={16} /></span>{t(LOG_HERE)}{count}</div>
         <div className="text-[11px] leading-snug text-dim">{t(WHY_LOG)}</div>
       </div>
       <div className="mc-card p-4 space-y-2 max-w-2xl">
