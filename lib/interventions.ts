@@ -27,6 +27,8 @@ export interface Intervention {
   published_at: string; // YYYY-MM-DD
   status: 'live' | 'removed';
   created_at: string;
+  logged_by?: string | null;
+  channel?: 'web' | 'lark' | 'connector';
   // Phase 2 verification (lib/pages/verify): is the page live, how long, when it last changed.
   verified_at?: string | null;
   page_ok?: boolean | null;
@@ -67,11 +69,48 @@ export const domainOf = (url: string | null | undefined): string | null => {
   try { return new URL(url.startsWith('http') ? url : `https://${url}`).hostname.replace(/^www\./, '').toLowerCase(); } catch { return null; }
 };
 
-export async function loadInterventions(sb: any, projectId: string, opts: { sourceRunId?: string; limit?: number } = {}): Promise<Intervention[]> {
-  let q = sb.from('interventions').select('*').eq('project_id', projectId).eq('status', 'live').order('published_at', { ascending: false }).limit(opts.limit ?? 50);
+/** Live actions, newest publish date first. One page: `limit` rows (50 unless
+ *  asked) from `offset`. Same-day rows keep one order across pages (logged
+ *  last first, then id), so paging neither repeats nor skips a row. */
+export async function loadInterventions(sb: any, projectId: string, opts: { sourceRunId?: string; limit?: number; offset?: number } = {}): Promise<Intervention[]> {
+  const from = Math.max(0, opts.offset ?? 0);
+  let q = sb.from('interventions').select('*').eq('project_id', projectId).eq('status', 'live')
+    .order('published_at', { ascending: false }).order('created_at', { ascending: false }).order('id', { ascending: true })
+    .range(from, from + (opts.limit ?? 50) - 1);
   if (opts.sourceRunId) q = q.eq('source_run_id', opts.sourceRunId);
   const { data } = await q;
   return Array.isArray(data) ? data : [];
+}
+
+/** How many live actions the project has — a page of them is not the ledger. Null when the count could not be read. */
+export async function countInterventions(sb: any, projectId: string): Promise<number | null> {
+  const { count, error } = await sb.from('interventions').select('id', { count: 'exact', head: true }).eq('project_id', projectId).eq('status', 'live');
+  return error || typeof count !== 'number' ? null : count;
+}
+
+export interface Logger { name: string | null; operator: boolean }
+
+/** Who logged each action, for display, keyed by user id. A MemeCMO operator
+ *  (root-org member) on a client's project is named as such and their address
+ *  is not sent; anyone else is named by sign-in email, as on the Lark card.
+ *  Same split as collab-alignment: client team = org members minus root-org members. */
+export async function loggersOf(sb: any, orgId: string, list: Intervention[]): Promise<Record<string, Logger>> {
+  const ids = Array.from(new Set(list.map((iv) => iv.logged_by).filter(Boolean))) as string[];
+  const out: Record<string, Logger> = {};
+  if (!ids.length) return out;
+  const operators = new Set<string>();
+  const { data: root } = await sb.from('organizations').select('id').eq('type', 'root').maybeSingle();
+  if (root && root.id !== orgId) {
+    const { data: mems } = await sb.from('organization_members').select('user_id').eq('organization_id', root.id).in('user_id', ids);
+    for (const m of mems ?? []) operators.add(String(m.user_id));
+  }
+  await Promise.all(ids.map(async (id) => {
+    if (operators.has(id)) { out[id] = { name: null, operator: true }; return; }
+    let name: string | null = null;
+    try { const { data } = await sb.auth.admin.getUserById(id); name = data?.user?.email ?? null; } catch { /* display only */ }
+    out[id] = { name, operator: false };
+  }));
+  return out;
 }
 
 interface ScanLite { id: string; at: string; samples: any[] }

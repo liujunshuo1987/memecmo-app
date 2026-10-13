@@ -1,7 +1,12 @@
 // Intervention log — what the client put into the world, and (computed) what
 // the engines did afterwards. lib/interventions.ts, table interventions.
 //
-// GET    ?projectId=[&sourceRunId=][&withOutcomes=1]
+// GET    ?projectId=[&sourceRunId=][&withOutcomes=1][&withPeople=1][&limit=&offset=]
+//        One page (50 rows unless asked, 100 at most), newest publish date
+//        first. `total` is the project's whole count of live actions, so a
+//        reader can tell a page from the ledger and ask for the rest.
+//        withPeople adds `logger` to each row: who logged it, for display.
+// GET    ?projectId=&count=1      → { total } only
 // POST   { projectId, kind, url?, publishedAt, title?, note?, targetPrompts?: string[], sourceRunId?, sourceAssetType? }
 // DELETE ?projectId=&id=          (marks removed; history is never deleted)
 //
@@ -14,7 +19,7 @@ import { createClient } from '@/lib/supabase/server';
 import { serviceClient } from '@/lib/commerce';
 import { canAccessOrg, canEditOrg } from '@/lib/org-auth';
 import { unitHash } from '@/lib/edits';
-import { INTERVENTION_KINDS, computeOutcomes, domainOf, loadInterventions, citedAfterMap } from '@/lib/interventions';
+import { INTERVENTION_KINDS, computeOutcomes, countInterventions, domainOf, loadInterventions, loggersOf, citedAfterMap } from '@/lib/interventions';
 import { inngest } from '@/lib/inngest/client';
 
 export const runtime = 'nodejs';
@@ -33,7 +38,7 @@ async function authorize(projectId: string, mode: 'read' | 'write') {
   if (!allowed) {
     return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   }
-  return { svc, user };
+  return { svc, user, orgId: org.id as string };
 }
 
 export async function GET(req: NextRequest) {
@@ -42,12 +47,21 @@ export async function GET(req: NextRequest) {
   if (!projectId) return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
   const a = await authorize(projectId, 'read');
   if ('error' in a) return a.error;
-  const list = await loadInterventions(a.svc, projectId, { sourceRunId: q.get('sourceRunId') ?? undefined });
+  if (q.get('count') === '1') return NextResponse.json({ total: await countInterventions(a.svc, projectId) });
+  const sourceRunId = q.get('sourceRunId') ?? undefined;
+  const limit = Math.min(100, Math.max(1, Math.floor(Number(q.get('limit'))) || 50));
+  const offset = Math.max(0, Math.floor(Number(q.get('offset'))) || 0);
+  const list = await loadInterventions(a.svc, projectId, { sourceRunId, limit, offset });
   const withOutcomes = q.get('withOutcomes') === '1';
-  const [outcomes, citedAfter] = withOutcomes
-    ? await Promise.all([computeOutcomes(a.svc, projectId, list), citedAfterMap(a.svc, projectId, list)])
-    : [{}, {}];
-  return NextResponse.json({ interventions: list, outcomes, citedAfter });
+  const [outcomes, citedAfter, people, total] = await Promise.all([
+    withOutcomes ? computeOutcomes(a.svc, projectId, list) : {},
+    withOutcomes ? citedAfterMap(a.svc, projectId, list) : {},
+    q.get('withPeople') === '1' ? loggersOf(a.svc, a.orgId, list) : null,
+    // The count is of the whole project; a per-run lookup has no use for it.
+    sourceRunId ? null : countInterventions(a.svc, projectId),
+  ]);
+  const interventions = people ? list.map((iv) => ({ ...iv, logger: iv.logged_by ? people[iv.logged_by] ?? null : null })) : list;
+  return NextResponse.json({ interventions, outcomes, citedAfter, total });
 }
 
 export async function POST(req: NextRequest) {
