@@ -107,17 +107,22 @@ const ENGINE_MIN_ANSWER_RATE = 0.8;
 /** One-token liveness probe of every Poe engine we are about to spend on.
  *  Returns the model to use per engine key (primary or a live fallback) and
  *  throws EngineOutageError — non-retriable — if any engine has no live
- *  model. Costs ~4 tokens; saves a 5-engine, 3-attempt, $15 dead run. */
+ *  model. Costs ~4 tokens; saves a 5-engine, 3-attempt, $15 dead run.
+ *  `noFallback` (a frozen instrument, lib/engines/answer-budget): only the
+ *  primary is tried, so a primary that is down stops the scan at 0%. */
 export async function resolveEngineModels(
   engineKeys?: string[],
-  opts: { tolerateDead?: boolean } = {},
+  opts: { tolerateDead?: boolean; noFallback?: boolean } = {},
 ): Promise<{ models: Record<string, string>; substituted: string[]; dead: string[] }> {
   const wanted = ENGINES.filter((e) => !engineKeys?.length || engineKeys.includes(e.key));
   const models: Record<string, string> = {};
   const substituted: string[] = [];
   const dead: string[] = [];
+  let fallbacksSkipped = false;
   await Promise.all(wanted.map(async (e) => {
-    for (const candidate of [e.model, ...(e.fallbacks ?? [])]) {
+    const candidates = opts.noFallback ? [e.model] : [e.model, ...(e.fallbacks ?? [])];
+    if (opts.noFallback && e.fallbacks?.length) fallbacksSkipped = true;
+    for (const candidate of candidates) {
       try {
         await poeChat({ model: candidate, messages: [{ role: 'user', content: 'ping' }], maxTokens: 1, retries: 0 });
         models[e.key] = candidate;
@@ -128,12 +133,13 @@ export async function resolveEngineModels(
         // 5xx / 404 / network: try the next candidate
       }
     }
-    dead.push(`${e.label} (${[e.model, ...(e.fallbacks ?? [])].join(', ')})`);
+    dead.push(`${e.label} (${candidates.join(', ')})`);
   }));
   if (dead.length && !opts.tolerateDead) {
     throw new EngineOutageError(
       `Engine unavailable upstream: ${dead.join('; ')}. No live model for this engine — the scan was not started so nothing was spent. ` +
-      'This usually means the provider retired the model; update the engine table.',
+      (fallbacksSkipped ? 'Fallback models were not tried: this project\'s instrument is frozen. ' : '') +
+      'Usually a temporary upstream outage; the engine table changes only if the model has been withdrawn upstream.',
       dead,
     );
   }

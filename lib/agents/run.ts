@@ -26,7 +26,7 @@ import { refundFailedRun } from '@/lib/credits';
 import { NonRetriableError } from 'inngest';
 import { poeChat, DEFAULT_MODEL, isCapacityError, isNonRetriable, runMeter, newMeter, type UsageMeter } from '@/lib/llm/poe';
 import { resolveEngineModels } from '@/lib/agents/monitor';
-import { answerBudgetFor, type AnswerBudget } from '@/lib/engines/answer-budget';
+import { answerBudgetFor, declaredFreeze, type AnswerBudget } from '@/lib/engines/answer-budget';
 import { notifyOperator } from '@/lib/alerts';
 import { loadEdits, applyProfileEdits, applyAnswerEdits, unitHash } from '@/lib/edits';
 
@@ -491,6 +491,26 @@ function isTransient(err: unknown): boolean {
 
 const RETRY_DELAY_MS = 10 * 60_000;
 
+// An engine down upstream (EngineOutageError) is usually back within hours —
+// 2026-10-15: GPT-4o 400 and Gemini-3.1-Pro 503 at 01:30 UTC, both answering
+// again by 14:40. A scheduled scan that stopped on it is queued again once,
+// this long after, by scheduled-outage-retry (lib/inngest/functions.ts), and
+// goes through the same preflight and freeze rules. Manual and API scans are
+// not re-run: someone is there to press the button.
+export const OUTAGE_RETRY_DELAY_MS = 3 * 3600_000;
+
+/** Ask for the one re-run of a scheduled scan stopped by an engine outage.
+ *  Returns the sentence for the operator alert ('' when nothing applies). The
+ *  event id and the function's idempotency key both hold it to once per run. */
+async function requestOutageRetry(sb: ReturnType<typeof svc>, f: { runId: string; agentId: string; projectId: string }): Promise<string> {
+  const { data: row } = await sb.from('agent_runs').select('trigger_method, options').eq('id', f.runId).maybeSingle();
+  if (row?.trigger_method !== 'schedule') return '';
+  if ((row.options as any)?.retryOf) return 'This was already the automatic re-run; nothing further is queued. Re-run it by hand once the engine answers.';
+  await inngest.send({ id: `outage-retry-${f.runId}`, name: 'agent/run.outage-retry', data: { runId: f.runId, agentId: f.agentId, projectId: f.projectId } });
+  const at = new Date(Date.now() + OUTAGE_RETRY_DELAY_MS).toISOString().slice(11, 16);
+  return `Scheduled scan: queued again once, at about ${at} UTC, through the same preflight and freeze rules.`;
+}
+
 async function afterScheduledFailure(
   sb: ReturnType<typeof svc>,
   f: { runId: string; agentId: string; project: ProjectLite; message: string; transient: boolean },
@@ -626,8 +646,13 @@ export async function executeAgentRun(
         : diagnostic && Array.isArray(rr?.options?.engineKeys) && rr.options.engineKeys.length
           ? (rr.options.engineKeys as string[])
           : undefined;
+      // A frozen instrument keeps its models: primaries only, no fallback.
+      const freeze = declaredFreeze(project.id);
+      if (freeze?.noFallback) {
+        await persistAndEmit({ event_type: 'log', payload: { text: `Instrument frozen until ${freeze.until}: every engine runs on its primary model; if one is down the scan stops here and no fallback model stands in.` } });
+      }
       // Diagnostic: a dead engine is dropped and named, not fatal.
-      const { models, substituted, dead } = await resolveEngineModels(keys, { tolerateDead: diagnostic });
+      const { models, substituted, dead } = await resolveEngineModels(keys, { tolerateDead: diagnostic, noFallback: !!freeze?.noFallback });
       if (substituted.length) {
         await persistAndEmit({ event_type: 'log', payload: { text: `Engine model substitution (primary unavailable upstream): ${substituted.join('; ')}` } });
       }
@@ -1250,13 +1275,18 @@ export async function executeAgentRun(
     const root = isNonRetriable(err) ? err : (err as any)?.cause;
     const capacity = isCapacityError(root);
     const outage = !capacity && isNonRetriable(root);
+    // By name: an error that crossed a step boundary is no longer an instance.
+    const retryNote = outage && (root as any)?.name === 'EngineOutageError'
+      ? await requestOutageRetry(sb, { runId, agentId, projectId: project.id })
+          .catch((e) => { console.error('[run] outage re-run not queued:', e instanceof Error ? e.message : e); return ''; })
+      : '';
     if (capacity || outage) {
       await notifyOperator({
         kind: capacity ? 'engine_capacity' : 'scan_incomplete',
         title: capacity
           ? 'AI engine capacity exhausted — all scans failing'
           : `Engine outage — scans failing (${((root as any)?.engines ?? []).join(', ') || 'see detail'})`,
-        detail: msg,
+        detail: retryNote ? `${msg} ${retryNote}` : msg,
         runId,
         projectId: project.id,
         projectSlug: (project as any).slug,

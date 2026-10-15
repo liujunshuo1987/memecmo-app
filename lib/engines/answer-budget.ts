@@ -25,6 +25,14 @@
 // baseline taken with the old behaviour, so the old behaviour is kept — defect
 // included — until the date given. Freezes are declared here, in the open, and
 // ship with the code that honours them.
+//
+// A freeze can also forbid fallback models (noFallback). A fallback is another
+// model behind the same engine label, i.e. another ruler: on 2026-10-15 a 503
+// from Gemini-3.1-Pro at the 01:30 patrol meant the next scan of a frozen
+// project would have been measured with Gemini-3.5-Flash. With noFallback the
+// preflight tries the primary only; if it is down the scan stops at 0%
+// (EngineOutageError: nothing charged, no reading written) and a scheduled scan
+// is queued again once, about three hours later (lib/inngest/functions.ts).
 
 export const SNIPPET_CHARS = 400;
 export const ANSWER_MAX_TOKENS = 900;
@@ -32,20 +40,27 @@ export const THINKING_ALLOWANCE_TOKENS = 2100;
 
 export interface InstrumentFreeze {
   projectId: string;
+  /** For people reading alerts; the id is what binds. */
+  label: string;
   /** First day (UTC) the freeze no longer applies. */
   until: string;
   answerMaxTokens: number;
   thinkingAllowanceTokens: number;
+  /** Engines run on their primary model only; a primary that is down stops
+   *  the scan instead of handing it to a fallback. */
+  noFallback?: boolean;
   reason: string;
 }
 
 export const INSTRUMENT_FREEZES: InstrumentFreeze[] = [
   {
-    projectId: 'f8f77dd4-a9ee-4828-8de1-2f317ad88392', // Focus Media Vietnam (vi)
+    projectId: 'f8f77dd4-a9ee-4828-8de1-2f317ad88392',
+    label: 'Focus Media Vietnam (vi)',
     until: '2027-01-01',
     answerMaxTokens: 900,
     thinkingAllowanceTokens: 0,
-    reason: 'Contract runs to 2026-12-31 and is judged against Day-0 (2026-07-25), which was measured with Gemini cut by the 900-token limit. Founder decision 2026-10-12: the instrument does not change during the contract.',
+    noFallback: true,
+    reason: 'Contract runs to 2026-12-31 and is judged against Day-0 (2026-07-25), which was measured with Gemini cut by the 900-token limit. Founder decision 2026-10-12: the instrument does not change during the contract — neither the answer limit nor the model behind an engine.',
   },
 ];
 
@@ -61,6 +76,22 @@ const tokens = (v: unknown, min: number, max: number): number | null =>
 const inForce = (until: unknown, now: Date): until is string =>
   typeof until === 'string' && !Number.isNaN(Date.parse(until)) && now.getTime() < Date.parse(until);
 
+/** The freeze declared for this project and in force on `now`, if any. */
+export const declaredFreeze = (
+  projectId: string,
+  now: Date = new Date(),
+  freezes: InstrumentFreeze[] = INSTRUMENT_FREEZES,
+): InstrumentFreeze | undefined => freezes.find((f) => f.projectId === projectId && inForce(f.until, now));
+
+/** Whether a scan of this project may run an engine on a fallback model when
+ *  its primary is down. Only a declared freeze can say no; project metadata
+ *  cannot, so the rule holds even if the project row cannot be read. */
+export const fallbackAllowed = (
+  projectId: string,
+  now: Date = new Date(),
+  freezes: InstrumentFreeze[] = INSTRUMENT_FREEZES,
+): boolean => !declaredFreeze(projectId, now, freezes)?.noFallback;
+
 /** The budget a scan of this project runs with. Order: a freeze declared in
  *  INSTRUMENT_FREEZES, then projects.metadata.answerBudget
  *  ({ answerMaxTokens?, thinkingAllowanceTokens?, frozenUntil? }), then the
@@ -72,7 +103,7 @@ export function answerBudgetFor(
   now: Date = new Date(),
   freezes: InstrumentFreeze[] = INSTRUMENT_FREEZES,
 ): AnswerBudget {
-  const declared = freezes.find((f) => f.projectId === project.id && inForce(f.until, now));
+  const declared = declaredFreeze(project.id, now, freezes);
   if (declared) {
     return { answerMaxTokens: declared.answerMaxTokens, thinkingAllowanceTokens: declared.thinkingAllowanceTokens, source: 'frozen', frozenUntil: declared.until };
   }

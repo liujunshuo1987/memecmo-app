@@ -8,7 +8,7 @@ import { extractDomains } from '../lib/reports/verify';
 import { stripSearchTrace, traceAffectedEngines, mostlyEmptyEngines, fetchRepairedEngines } from '../lib/engines/ingest';
 import { pageText } from '../lib/agents/site';
 import { siteUseByEngine } from '../lib/site-use';
-import { answerBudgetFor, maxTokensFor, answerLength, endsMidSentence, cutShortEngines, answerCapChanges, INSTRUMENT_FREEZES } from '../lib/engines/answer-budget';
+import { answerBudgetFor, maxTokensFor, answerLength, endsMidSentence, cutShortEngines, answerCapChanges, fallbackAllowed, INSTRUMENT_FREEZES } from '../lib/engines/answer-budget';
 
 let bad = 0;
 const ok = (name: string, cond: boolean, got?: unknown) => { if (!cond) bad++; console.log(cond ? 'ok  ' : 'FAIL', name, cond ? '' : JSON.stringify(got)); };
@@ -167,6 +167,10 @@ const pin = (until: string) => answerBudgetFor({ id: 'p', metadata: { answerBudg
 ok('a freeze written on the project holds until its date, then the default returns', pin('2026-12-01').source === 'frozen' && maxTokensFor(pin('2026-12-01'), { thinking: true }) === 900 && pin('2026-10-01').source === 'default');
 ok('a value of the wrong type or out of range is ignored, not clamped', [{ answerMaxTokens: '900' }, { answerMaxTokens: 50 }, { thinkingAllowanceTokens: -1 }, { thinkingAllowanceTokens: 1e6 }, { answerMaxTokens: 900.5 }, 'x', null]
   .every((v) => answerBudgetFor({ id: 'p', metadata: { answerBudget: v } }, during).source === 'default'));
+// The freeze also keeps the model behind each engine: no fallback while it holds.
+ok('the frozen project gets no fallback model; any other project does', !fallbackAllowed(FROZEN, during) && fallbackAllowed('any-other-project', during));
+ok('no fallback through 2026-12-31; fallbacks return on 2027-01-01', !fallbackAllowed(FROZEN, new Date('2026-12-31T23:59:59Z')) && fallbackAllowed(FROZEN, new Date('2027-01-01T00:00:00Z')));
+ok('a freeze that does not say noFallback keeps the fallbacks', fallbackAllowed('p', during, [{ ...INSTRUMENT_FREEZES[0], projectId: 'p', noFallback: undefined }]));
 
 // Gemini at 900, Highlands Coffee panel, 2026-10-12: 138 characters, 863 of 896 tokens spent thinking.
 const CUT = 'Việc so sánh **Highlands Coffee** và **Starbucks** thực chất là sự so sánh giữa hai văn hóa thưởng thức cà phê';
