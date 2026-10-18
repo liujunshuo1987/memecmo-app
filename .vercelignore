@@ -1,3 +1,15 @@
 
 # Zapier integration lives in its own package; never ship it with the app
 integrations/
+
+# Credentials and local tooling never belong in a deployment's source tree.
+# When this file exists the Vercel CLI does NOT read .gitignore, and its own
+# default list skips only .env.local / .env.*.local — on 2026-10-18 production
+# deployment dpl_4CANaGLs8PX6guevL1fPF18FfhyH was found to carry
+# .env.vercel.prod and .env.local.backup-20260825-1050 with live keys.
+# The build takes its variables from the Vercel project settings, not from
+# files; no .env file is needed at build time.
+.env
+.env.*
+.claude/
+.bolt/
