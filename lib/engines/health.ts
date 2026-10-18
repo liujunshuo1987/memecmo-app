@@ -91,7 +91,15 @@ async function probe(engine: string, model: string, role: ModelProbe['role'], li
   const t0 = Date.now();
   const base: ModelProbe = { engine, model, role, listed: listed ? listed.has(model.toLowerCase()) : null, alive: false, latencyMs: 0 };
   try {
-    await poeChat({ model, messages: [{ role: 'user', content: 'ping' }], maxTokens: 1, retries: 0 });
+    // A liveness ping asks for 16 output tokens, never fewer. Since 2026-10-15
+    // Poe's OpenAI bots reject any request with max_tokens below 16 with 400
+    // "upstream gateway failure" (measured 2026-10-18 against GPT-4o: 1–12 →
+    // 400, 16+ → 200, real questions answered normally), consistent with the
+    // OpenAI Responses API minimum of 16 output tokens. The 1-token ping used
+    // here filed "Engine dead — ChatGPT (GPT-4o: 400)" for three nights and the
+    // same ping in resolveEngineModels stopped FMVN's 2026-10-16 scheduled scan
+    // at 0% while the engine was alive. Gemini and Perplexity accept 1.
+    await poeChat({ model, messages: [{ role: 'user', content: 'ping' }], maxTokens: 16, retries: 0 });
     return { p: { ...base, alive: true, latencyMs: Date.now() - t0 }, capacity: false };
   } catch (err) {
     const e = err as any;

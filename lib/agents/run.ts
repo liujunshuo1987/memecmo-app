@@ -627,16 +627,18 @@ export async function executeAgentRun(
     let result: { summary: string; output: Record<string, unknown> };
 
     // Preflight. Every agent needs the engine account; probe it with a
-    // one-token call before spending minutes of scan time and third-party
-    // SERP budget. Out of capacity → fails here at 0%, non-retriable, operator
-    // alerted, credits refunded — instead of at 75% after eight minutes.
+    // 16-token call (Poe's OpenAI bots reject max_tokens < 16 since
+    // 2026-10-15 — see lib/engines/health.ts) before spending minutes of scan
+    // time and third-party SERP budget. Out of capacity → fails here at 0%,
+    // non-retriable, operator alerted, credits refunded — instead of at 75%
+    // after eight minutes.
     // For measuring agents the probe covers EVERY engine and resolves a live
     // model per engine (primary or verified fallback) — a retired upstream bot
     // fails here at 0% with its name, instead of after three 5-engine attempts.
     const measuring = agentId === 'monitor' || agentId === 'full_scan';
     const engineModels: Record<string, string> = await runStep('preflight-engine', async () => {
       if (!measuring) {
-        await poeChat({ model: DEFAULT_MODEL, messages: [{ role: 'user', content: 'ping' }], maxTokens: 1, retries: 1 });
+        await poeChat({ model: DEFAULT_MODEL, messages: [{ role: 'user', content: 'ping' }], maxTokens: 16, retries: 1 });
         return {};
       }
       const { data: rr } = await sb.from('agent_runs').select('trigger_method, options').eq('id', runId).maybeSingle();
