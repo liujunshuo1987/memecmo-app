@@ -23,6 +23,7 @@ const TOOLS: [string, string, string][] = [
   ['get_deliverables', '最新交付物:内容稿、分发包、官网改造、百科草稿、报告、标准答案、品牌档案;含人工修改', 'Latest deliverables with the client\'s edits applied'],
   ['get_actions', '行动台账:已登记的发布、核验状态与前后对比', 'The action ledger with verification and before/after outcomes'],
   ['log_action', '登记一条已发布的行动(URL、日期、针对的问题)——发布后调用', 'Log a published action (URL, date, targeted questions) — call it after publishing'],
+  ['get_map', 'MemeCMO 业务本体地图(公开视图):卖什么、靠什么测量、哪些闭环、哪些规则;可按对象 id 看它牵动什么', 'The MemeCMO business ontology map (public view): offerings, instruments, loops, rules; ask by object id what it touches'],
 ];
 
 export default function ConnectorPage() {
@@ -99,6 +100,7 @@ export default function ConnectorPage() {
                     ['GET /api/connector/v1/projects/{slug}/deliverables[?type=]', '交付物列表或某一类的全文 · deliverables'],
                     ['GET|POST /api/connector/v1/projects/{slug}/actions', '行动台账;POST 登记行动 · the action ledger; POST logs one'],
                     ['GET /api/connector/v1/events/scans · /events/deliverables', '跨项目的最新扫描与交付物,供轮询 · polling feeds'],
+                    ['GET /api/connector/v1/map[?id=&depth=&world=&type=]', '业务本体地图(公开视图),与 /api/map 相同 · the business map (public view), same as /api/map'],
                   ].map(([path, desc]) => (
                     <tr key={path} className="border-t border-edge first:border-0 align-top"><td className="px-3 py-2 font-mono text-ink text-[11px]">{path}</td><td className="px-3 py-2 text-dim">{desc}</td></tr>
                   ))}

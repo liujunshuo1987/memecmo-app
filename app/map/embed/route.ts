@@ -1,18 +1,14 @@
-// The map viewer itself, framed by /map. Members only; same-origin framing only.
+// The map viewer itself, framed by /map. Public; same-origin framing only.
 // Serves the generated public view (lib/map/public-view.ts) as a complete HTML document:
 // the viewer's own <title>/<meta>/<link>/<style> go into <head>, the app markup and scripts into <body>.
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { MAP_VIEW } from '@/lib/map/public-view';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return new NextResponse('Sign in to view the map.', { status: 401, headers: { 'content-type': 'text/plain; charset=utf-8' } });
   const html = MAP_VIEW.html as string;
   const cut = html.indexOf('<div class="app">');
   const head = cut > 0 ? html.slice(0, cut) : '';
@@ -22,7 +18,7 @@ export async function GET() {
     status: 200,
     headers: {
       'content-type': 'text/html; charset=utf-8',
-      'cache-control': 'private, max-age=300',
+      'cache-control': 'public, max-age=300, s-maxage=3600',
       'content-security-policy': "frame-ancestors 'self'",
       'x-map-version': MAP_VIEW.version,
     },
