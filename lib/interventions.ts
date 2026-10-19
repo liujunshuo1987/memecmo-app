@@ -131,8 +131,8 @@ export async function peopleOf(sb: any, orgId: string, userIds: (string | null |
 // target question, so a change must say who made it and what it replaced. The
 // row keeps the current values; each change is a row of intervention_edits:
 // { field: { from, to } }, its author and time ('remove' = status live → removed).
-// That table is not in the schema yet (decision open, 2026-10-19). Until it
-// exists nothing is edited: PATCH answers 503 and the panel offers no edit or
+// The table comes with migration 20261019_intervention_edits. Wherever it is
+// missing nothing is edited: PATCH answers 503 and the panel offers no edit or
 // remove (editTrailReady). Readers of the outcome never read it.
 
 export const EDIT_TRAIL = 'intervention_edits';
