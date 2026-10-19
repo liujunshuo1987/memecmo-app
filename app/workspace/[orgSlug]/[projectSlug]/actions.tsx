@@ -14,9 +14,12 @@
 // itself found on the brand's site (lib/suggestions). The team confirms or
 // sets it aside ("not ours" — worded "Not an action", since the page is always
 // on the brand's own host); only a confirmed one becomes an action, under
-// their name.
+// their name. Whoever may not confirm (MemeCMO, a viewer) sees that it waits
+// for the client team, not a lone "Not an action".
+// A logged action can be edited or removed by whoever may log one, once each
+// change can be recorded with its author (meta `editable`, lib/interventions).
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Icon } from '@/components/icons';
 import { parseActionLine, type ActionDraft } from '@/lib/action-input';
 import { NOTES_LINK_LABEL, NOTES_PATH } from '@/lib/notes/paths';
@@ -36,6 +39,8 @@ export interface InterventionRow {
   channel?: string | null;
   /** Who logged it — sent only when asked for (withPeople). null = nobody on record. */
   logger?: { name: string | null; operator: boolean } | null;
+  /** The latest change to it, and by whom (withPeople, once changes are recorded). */
+  edited?: { at: string; by: { name: string | null; operator: boolean } | null };
 }
 interface Win { present: number; total: number }
 export interface CitedAfterRow { cites: number; engines: number; firstTs: string | null }
@@ -61,6 +66,15 @@ const ASSET_KIND: Record<string, string> = { content_draft: 'content_page', dist
 
 const today = () => new Date().toISOString().slice(0, 10);
 const fmt = (w: Win) => (w.total ? `${w.present}/${w.total}` : '—');
+
+// Buttons a decision is made with: a word and its icon, high enough for a finger (taller still on a touch screen).
+// Side by side they take their words' width and wrap when the column is narrower; the icon never gives way (ICON).
+const BTN = 'inline-flex items-center justify-center gap-1.5 rounded-md px-3 min-h-9 pointer-coarse:min-h-11 text-[12px] font-medium whitespace-nowrap transition disabled:opacity-60';
+const BTN_PRIMARY = `${BTN} mc-btn-brand hover:brightness-110`;
+const BTN_SECONDARY = `${BTN} mc-btn-soft text-dim hover:text-ink`;
+// A row's own tools: always visible, quieter than a decision.
+const TOOL = 'inline-flex items-center gap-1 rounded-md px-2.5 min-h-8 pointer-coarse:min-h-11 text-[11px] mc-btn-soft text-dim transition disabled:opacity-60';
+const ICON = 'shrink-0';
 
 export function useInterventions(projectId: string | undefined, opts: { sourceRunId?: string; withOutcomes?: boolean; withPeople?: boolean } = {}) {
   const [list, setList] = useState<InterventionRow[]>([]);
@@ -220,22 +234,28 @@ const SUGGEST_LABELS = {
     zh: '平台在品牌官网上发现的新页面。团队成员确认后才登记,未确认的不算行动。',
     vi: 'Trang mới nền tảng phát hiện trên website của thương hiệu. Chỉ ghi khi thành viên đội ngũ xác nhận.',
   },
-  confirm: { en: 'Confirm', zh: '确认', vi: 'Xác nhận' },
+  confirm: { en: 'Confirm and log', zh: '确认并登记', vi: 'Xác nhận và ghi' },
   notOurs: { en: 'Not an action', zh: '不算行动', vi: 'Không phải hành động' },
   published: { en: 'Published', zh: '发布日期', vi: 'Ngày đăng' },
   page_meta: { en: 'date stated on the page', zh: '页面标注的日期', vi: 'ngày ghi trên trang' },
   sitemap_lastmod: { en: 'date in the sitemap', zh: 'sitemap 中的日期', vi: 'ngày trong sitemap' },
   first_seen: { en: 'first seen by the platform', zh: '平台首次发现的日期', vi: 'ngày nền tảng thấy lần đầu' },
-  fixDate: { en: 'correct it if it is off', zh: '如有出入请修改', vi: 'sửa nếu chưa đúng' },
+  changeDate: { en: 'Change the date', zh: '改日期', vi: 'Sửa ngày' },
   cited: { en: 'cited in the scans', zh: '在扫描中被引用', vi: 'được trích dẫn trong các lần quét' },
   targets: { en: 'Target questions (optional)', zh: '目标问题(可选)', vi: 'Câu hỏi mục tiêu (tùy chọn)' },
+  pickTargets: { en: 'Choose target questions (optional)', zh: '选择目标问题(可选)', vi: 'Chọn câu hỏi mục tiêu (tùy chọn)' },
+  // The same for a MemeCMO operator and for a viewer of the client team: neither may confirm.
   waiting: {
-    en: 'Waiting for the client team to confirm — MemeCMO does not confirm on their behalf.',
-    zh: '等待客户团队确认 —— MemeCMO 不代为确认。',
-    vi: 'Đang chờ đội ngũ khách hàng xác nhận — MemeCMO không xác nhận thay.',
+    en: 'Waiting for an admin or editor of the client team to confirm — MemeCMO does not confirm on their behalf.',
+    zh: '等待客户团队的管理员或编辑确认 —— MemeCMO 不代为确认。',
+    vi: 'Đang chờ quản trị viên hoặc biên tập viên của đội ngũ khách hàng xác nhận — MemeCMO không xác nhận thay.',
   },
+  awaiting: { en: 'Awaiting the client team', zh: '待客户团队确认', vi: 'Chờ khách hàng xác nhận' },
+  confirmed: { en: 'Logged under your name: {title}.', zh: '已以你的名义登记：{title}。', vi: 'Đã ghi dưới tên bạn: {title}.' },
+  dismissed: { en: 'Set aside, not counted as an action: {title}.', zh: '已标为不算行动：{title}。', vi: 'Đã để riêng, không tính là hành động: {title}.' },
   more: { en: 'more', zh: '条更多', vi: 'mục nữa' },
 } as const;
+type SuggestKey = keyof typeof SUGGEST_LABELS;
 
 export function useSuggestions(projectId: string | undefined) {
   const [list, setList] = useState<SuggestionItem[]>([]);
@@ -251,84 +271,114 @@ export function useSuggestions(projectId: string | undefined) {
 }
 
 async function decideSuggestion(body: Record<string, unknown>): Promise<string | null> {
-  const res = await fetch('/api/workspace/suggestions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const d = await res.json().catch(() => ({}));
-  return res.ok ? null : d.error || 'Failed';
+  const res = await fetch('/api/workspace/suggestions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => null);
+  const d = res ? await res.json().catch(() => ({})) : {};
+  return res?.ok ? null : d.error || 'Failed';
 }
 
-/** One found page: link, where the date guess comes from, Confirm / Not ours. */
+/** What was just decided on a found page, said once above the list. */
+export interface Decided { action: 'confirm' | 'dismiss'; title: string }
+
+/** One found page: link, the publish date and where it comes from, then the two
+ *  decisions — ✓ Confirm and log (one press: the date shown and any question
+ *  ticked go with it) and ✕ Not an action. Whoever may not confirm sees that
+ *  it waits for the client team; setting it aside, if they may, stays quiet. */
 function SuggestionCard({ s, projectId, lang, t, can, onDone }: {
-  s: SuggestionItem; projectId: string; lang: 'en' | 'zh' | 'vi'; t: (s: string) => string; can: { confirm: boolean; dismiss: boolean }; onDone: () => void;
+  s: SuggestionItem; projectId: string; lang: Lang; t: T; can: { confirm: boolean; dismiss: boolean }; onDone: (d: Decided) => void;
 }) {
-  const L = (k: keyof typeof SUGGEST_LABELS) => SUGGEST_LABELS[k][lang];
-  const [open, setOpen] = useState(false);
+  const L = (k: SuggestKey) => SUGGEST_LABELS[k][lang];
   const [date, setDate] = useState(s.published_guess);
+  const [dating, setDating] = useState(false);
+  const [aiming, setAiming] = useState(false);
   // Candidates start unticked: the target question is the confirming person's choice, not the matcher's.
   const [picked, setPicked] = useState<string[]>([]);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<Decided['action'] | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const send = async (body: Record<string, unknown>) => {
-    setBusy(true); setErr(null);
-    const e = await decideSuggestion({ projectId, id: s.id, ...body });
-    setBusy(false);
-    if (e) setErr(e); else onDone();
+  const title = s.title || s.domain || s.url;
+  const send = async (action: Decided['action'], body: Record<string, unknown> = {}) => {
+    setBusy(action); setErr(null);
+    const e = await decideSuggestion({ projectId, id: s.id, action, ...body });
+    setBusy(null);
+    if (e) setErr(e); else onDone({ action, title });
   };
   const toggle = (p: string) => setPicked((cur) => (cur.includes(p) ? cur.filter((x) => x !== p) : [...cur, p]));
+  const dismiss = (quiet: boolean) => (
+    <button onClick={() => send('dismiss')} disabled={!!busy} data-act="dismiss"
+      className={quiet ? 'ml-auto inline-flex items-center gap-1 rounded-md px-2 min-h-8 pointer-coarse:min-h-11 text-[11px] text-faint hover:text-ink hover:bg-brand-soft disabled:opacity-60' : `${BTN_SECONDARY} flex-auto min-w-[6.5rem]`}>
+      <Icon name="close" size={quiet ? 13 : 14}  className={ICON} />{L('notOurs')}
+    </button>
+  );
   return (
-    <div className="border-t border-edge pt-1.5 space-y-1">
-      <div className="text-[11px] text-ink">{s.title || s.domain || s.url}</div>
-      <a href={s.url} target="_blank" rel="noreferrer" className="block text-[10px] text-brand break-all">{s.url.replace(/^https?:\/\/(www\.)?/, '')}</a>
-      <div className="text-[10px] text-faint">
-        {L('published')} {s.published_guess} · {L(s.guess_source)}
-        {s.evidence?.cites ? ` · ${L('cited')} ${s.evidence.cites}×` : ''}
+    <div className="border-t border-edge pt-2 space-y-1.5" data-suggestion={s.id}>
+      <div className="text-[12px] leading-snug text-ink">{title}</div>
+      <a href={s.url} target="_blank" rel="noreferrer" className="block text-[11px] text-brand break-all hover:underline">{s.url.replace(/^https?:\/\/(www\.)?/, '')}</a>
+      {/* Runs as text, so a wrapped line never starts with a separator. */}
+      <div className="text-[11px] leading-relaxed text-faint">
+        {L('published')}{' '}
+        {dating
+          ? <input type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label={L('published')} autoFocus className="mc-input rounded px-1.5 py-1 text-[11px] text-ink" />
+          : <span className="tabular-nums text-dim whitespace-nowrap">{date}</span>}
+        {` (${L(s.guess_source)})`}{s.evidence?.cites ? ` · ${L('cited')} ${s.evidence.cites}×` : ''}
+        {can.confirm && !dating && <>{' · '}<button onClick={() => setDating(true)} className="py-1 -my-1 text-dim underline decoration-dotted underline-offset-2 hover:text-brand">{L('changeDate')}</button></>}
       </div>
-      {open ? (
-        <div className="rounded-md mc-chip-inset p-2 space-y-1.5 text-[11px]">
-          <label className="flex flex-wrap items-center gap-1.5 text-dim">
-            {L('published')}
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mc-input rounded px-1.5 py-1 text-ink" />
-            <span className="text-[10px] text-faint">{L(s.guess_source)} — {L('fixDate')}</span>
-          </label>
-          {s.target_candidates.length > 0 && (
-            <div className="space-y-0.5">
-              <div className="text-[10px] text-faint">{L('targets')}</div>
-              {s.target_candidates.map((c) => (
-                <label key={c.n} className="flex items-start gap-1.5 text-[10px] text-dim">
-                  <input type="checkbox" checked={picked.includes(c.prompt)} onChange={() => toggle(c.prompt)} className="mt-0.5" />
-                  <span>Q{c.n} · {c.prompt}</span>
-                </label>
-              ))}
-            </div>
-          )}
-          <div className="flex items-center gap-2">
-            <button onClick={() => send({ action: 'confirm', publishedAt: date, targetPrompts: picked })} disabled={busy || !date} className="px-2 py-0.5 rounded bg-brand text-on-brand disabled:opacity-50">{L('confirm')}</button>
-            <button onClick={() => setOpen(false)} disabled={busy} className="px-2 py-0.5 rounded mc-chip-inset text-dim">{t('Cancel')}</button>
-          </div>
+      {can.confirm && s.target_candidates.length > 0 && (aiming ? (
+        <div className="space-y-0.5">
+          <div className="text-[10px] text-faint">{L('targets')}</div>
+          {s.target_candidates.map((c) => (
+            <label key={c.n} className="flex items-start gap-1.5 py-0.5 text-[11px] text-dim">
+              <input type="checkbox" checked={picked.includes(c.prompt)} onChange={() => toggle(c.prompt)} className="mt-0.5" />
+              <span>Q{c.n} · {c.prompt}</span>
+            </label>
+          ))}
+        </div>
+      ) : <button onClick={() => setAiming(true)} className="py-1 -my-0.5 text-[11px] text-dim underline decoration-dotted underline-offset-2 hover:text-brand">+ {L('pickTargets')}</button>)}
+      {can.confirm ? (
+        <div className="flex flex-wrap gap-1.5 pt-0.5">
+          <button onClick={() => send('confirm', { publishedAt: date, targetPrompts: picked })} disabled={!!busy || !date} data-act="confirm" className={`${BTN_PRIMARY} flex-auto min-w-[6.5rem]`}>
+            <Icon name="check" size={14} strokeWidth={2.25}  className={ICON} />{busy === 'confirm' ? '…' : L('confirm')}
+          </button>
+          {can.dismiss && dismiss(false)}
         </div>
       ) : (
-        <div className="flex items-center gap-2 text-[10px]">
-          {can.confirm && <button onClick={() => setOpen(true)} disabled={busy} className="px-2 py-0.5 rounded bg-brand text-on-brand disabled:opacity-50">{L('confirm')}</button>}
-          {can.dismiss && <button onClick={() => send({ action: 'dismiss' })} disabled={busy} className="px-2 py-0.5 rounded mc-chip-inset text-dim hover:text-brand disabled:opacity-50">{L('notOurs')}</button>}
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+          <span className="inline-flex items-center gap-1 text-[11px] text-gold" data-state="awaiting"><Icon name="waiting" size={13}  className={ICON} />{L('awaiting')}</span>
+          {can.dismiss && dismiss(true)}
         </div>
       )}
-      {err && <div className="text-[10px] text-garnet">{err}</div>}
+      {err && <div className="text-[11px] text-garnet">{err}</div>}
     </div>
   );
 }
 
-function SuggestedActions({ projectId, lang, t, list, can, onDone }: {
-  projectId: string; lang: 'en' | 'zh' | 'vi'; t: (s: string) => string; list: SuggestionItem[]; can: { confirm: boolean; dismiss: boolean }; onDone: () => void;
+function SuggestedActions({ projectId, lang, t, list, can, decided, onDone, onClear }: {
+  projectId: string; lang: Lang; t: T; list: SuggestionItem[]; can: { confirm: boolean; dismiss: boolean };
+  decided: Decided | null; onDone: (d: Decided) => void; onClear: () => void;
 }) {
   const [all, setAll] = useState(false);
-  if (!list.length) return null;
+  if (!list.length && !decided) return null;
   const shown = all ? list : list.slice(0, 4);
   return (
     <div className="rounded-md mc-chip-inset p-2 space-y-1.5">
-      <div className="text-[10px] uppercase tracking-widest text-gold">{SUGGEST_LABELS.heading[lang]} · {list.length}</div>
-      <div className="text-[10px] text-faint">{SUGGEST_LABELS.intro[lang]}</div>
-      {!can.confirm && <div className="text-[10px] text-dim">{SUGGEST_LABELS.waiting[lang]}</div>}
+      {list.length > 0 && <>
+        <div className="text-[10px] uppercase tracking-widest text-gold">{SUGGEST_LABELS.heading[lang]} · {list.length}</div>
+        <div className="text-[11px] leading-snug text-faint">{SUGGEST_LABELS.intro[lang]}</div>
+        {!can.confirm && (
+          <div className="flex items-start gap-1.5 rounded-md bg-gold/10 px-2 py-1.5 text-[11px] leading-snug text-ink" data-state="waiting">
+            <span className="shrink-0 mt-px text-gold"><Icon name="waiting" size={14}  className={ICON} /></span>{SUGGEST_LABELS.waiting[lang]}
+          </div>
+        )}
+      </>}
+      {decided && (
+        <div className="flex items-start justify-between gap-2 text-[11px] leading-snug text-ink" role="status">
+          <span className="flex items-start gap-1.5">
+            <span className={`shrink-0 mt-px ${decided.action === 'confirm' ? 'text-sage' : 'text-faint'}`}><Icon name={decided.action === 'confirm' ? 'check' : 'close'} size={13} strokeWidth={2.25} className={ICON} /></span>
+            {fill(SUGGEST_LABELS[decided.action === 'confirm' ? 'confirmed' : 'dismissed'][lang], { title: decided.title })}
+          </span>
+          <button onClick={onClear} aria-label={t('Close')} className="shrink-0 px-1 text-[12px] leading-none text-faint hover:text-brand">×</button>
+        </div>
+      )}
       {shown.map((s) => <SuggestionCard key={s.id} s={s} projectId={projectId} lang={lang} t={t} can={can} onDone={onDone} />)}
-      {!all && list.length > shown.length && <button onClick={() => setAll(true)} className="text-[10px] text-faint hover:text-brand">+ {list.length - shown.length} {SUGGEST_LABELS.more[lang]}</button>}
+      {!all && list.length > shown.length && <button onClick={() => setAll(true)} className="py-1 text-[11px] text-faint hover:text-brand">+ {list.length - shown.length} {SUGGEST_LABELS.more[lang]}</button>}
     </div>
   );
 }
@@ -369,7 +419,7 @@ const NO_REST: LedgerRest = { rows: [], outcomes: {}, citedAfter: {}, state: 'id
  *  shows in both. */
 export function useLedger(projectId: string | undefined, all = false) {
   const first = useInterventions(projectId, { withOutcomes: true, withPeople: true });
-  const [meta, setMeta] = useState<{ total: number | null; failed: boolean; hosts: string[]; core: string[] } | null>(null);
+  const [meta, setMeta] = useState<{ total: number | null; failed: boolean; hosts: string[]; core: string[]; canEdit: boolean; editable: boolean } | null>(null);
   const [rest, setRest] = useState<LedgerRest>(NO_REST);
   const unloaded = useRef(first.list); // the hook's starting list: while it is still this one, nothing has come back
   const round = useRef(0); // one per (re)load of the first page; answers of an older round are dropped
@@ -387,6 +437,7 @@ export function useLedger(projectId: string | undefined, all = false) {
       setMeta((was) => ({
         total: typeof d?.total === 'number' ? d.total : null, failed: !d,
         hosts: Array.isArray(d?.brandHosts) ? d.brandHosts : was?.hosts ?? NONE, core: Array.isArray(d?.core) ? d.core : was?.core ?? NONE,
+        canEdit: d ? d.canEdit === true : was?.canEdit ?? false, editable: d ? d.editable === true : was?.editable ?? false,
       }));
     })();
   }, [projectId, first.loading, first.list]);
@@ -432,6 +483,8 @@ export function useLedger(projectId: string | undefined, all = false) {
     rows, outcomes, citedAfter, failed, more, loaded: arrived && !!meta,
     total: Math.max(known ?? 0, rows.length), atLeast: known == null && more,
     hosts: meta?.hosts ?? NONE, core: meta?.core ?? NONE,
+    // Edit and remove: the caller may log actions here, and each change can be recorded with who made it.
+    canChange: !!meta?.canEdit && !!meta?.editable,
     rest: rest.state, loadRest, reload: first.reload,
   };
 }
@@ -577,18 +630,160 @@ function QuickAdd({ projectId, lang, t, hosts, core, onLogged }: {
   );
 }
 
+// ── Changing a logged action ─────────────────────────────────────────────────
+// Kept here with the form: these strings belong to it only.
+const CHANGE_LABELS = {
+  edit: { en: 'Edit', zh: '修改', vi: 'Sửa' },
+  remove: { en: 'Remove', zh: '移除', vi: 'Gỡ bỏ' },
+  editing: { en: 'Edit this action', zh: '修改这条行动', vi: 'Sửa hành động này' },
+  title: { en: 'Title', zh: '标题', vi: 'Tiêu đề' },
+  link: { en: 'Link', zh: '链接', vi: 'Đường dẫn' },
+  date: { en: 'Publish date', zh: '发布日期', vi: 'Ngày đăng' },
+  note: { en: 'Note', zh: '备注', vi: 'Ghi chú' },
+  targets: { en: 'Target questions', zh: '目标问题', vi: 'Câu hỏi mục tiêu' },
+  save: { en: 'Save changes', zh: '保存修改', vi: 'Lưu thay đổi' },
+  notice: {
+    en: 'The change is recorded with your name, the time and what it replaced. A new link is checked again; a new publish date moves the before/after comparison.',
+    zh: '修改会连同你的名字、时间和原来的内容一起记录。改了链接，平台会重新检查页面；改了发布日期，前后对比按新日期重算。',
+    vi: 'Thay đổi được ghi lại kèm tên bạn, thời điểm và nội dung cũ. Đường dẫn mới sẽ được kiểm tra lại; ngày đăng mới sẽ dời mốc so sánh trước/sau.',
+  },
+  removeAsk: {
+    en: 'Remove this action? It will no longer count in the before/after comparison or in the reports. The record is kept, with who removed it and when.',
+    zh: '移除这条行动？移除后它不再计入前后对比和报告；记录本身保留，并记下谁在何时移除。',
+    vi: 'Gỡ hành động này? Hành động sẽ không còn được tính trong so sánh trước/sau và trong báo cáo. Bản ghi vẫn được giữ, kèm người gỡ và thời điểm.',
+  },
+  removeYes: { en: 'Remove', zh: '确认移除', vi: 'Gỡ bỏ' },
+  edited: { en: 'Edited {date} by {who}', zh: '{date} 由 {who} 修改', vi: 'Đã sửa ngày {date} bởi {who}' },
+  saved: { en: 'Changes saved: {title}.', zh: '已保存修改：{title}。', vi: 'Đã lưu thay đổi: {title}.' },
+  removed: { en: 'Removed: {title}. The record is kept, with who removed it and when.', zh: '已移除：{title}。记录保留，并记下了谁在何时移除。', vi: 'Đã gỡ: {title}. Bản ghi vẫn được giữ, kèm người gỡ và thời điểm.' },
+  duplicate: { en: 'This link is already logged in another action (published {date}).', zh: '这个链接已登记在另一条行动里（发布于 {date}）。', vi: 'Đường dẫn này đã được ghi ở một hành động khác (đăng ngày {date}).' },
+} as const;
+type ChangeKey = keyof typeof CHANGE_LABELS;
+
+/** What was just done to a logged action, said once at the top of the panel. */
+export interface Changed { action: 'edit' | 'remove'; title: string }
+
+async function patchAction(body: Record<string, unknown>): Promise<{ row: InterventionRow | null; duplicate: InterventionRow | null; error: string | null }> {
+  const res = await fetch('/api/workspace/interventions', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => null);
+  const d = res ? await res.json().catch(() => ({})) : {};
+  if (res?.ok && d.intervention) return { row: d.intervention, duplicate: null, error: null };
+  return { row: null, duplicate: res?.status === 409 && d.duplicate ? d.duplicate : null, error: d.error || 'Failed' };
+}
+
+/** The form a logged action is changed in: every field it was logged with.
+ *  Only what moved is sent; the server records who changed what, and from what. */
+function EditAction({ iv, projectId, lang, t, core, onSaved, onCancel }: {
+  iv: InterventionRow; projectId: string; lang: Lang; t: T; core: string[]; onSaved: (row: InterventionRow) => void; onCancel: () => void;
+}) {
+  const C = (k: ChangeKey) => CHANGE_LABELS[k][lang];
+  const was = useMemo(() => (iv.target_prompts ?? []).map((p) => p.prompt), [iv]);
+  const [title, setTitle] = useState(iv.title ?? '');
+  const [url, setUrl] = useState(iv.url ?? '');
+  const [date, setDate] = useState(iv.published_at);
+  const [kind, setKind] = useState(iv.kind);
+  const [note, setNote] = useState(iv.note ?? '');
+  const [picked, setPicked] = useState<string[]>(was);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  // The project's core questions, then any the action already aims at that are not among them (kept, ticked).
+  const questions = [...core, ...was.filter((p) => !core.includes(p))];
+  const body: Record<string, unknown> = {};
+  if (title.trim() !== (iv.title ?? '')) body.title = title;
+  if (url.trim() !== (iv.url ?? '')) body.url = url;
+  if (date !== iv.published_at) body.publishedAt = date;
+  if (kind !== iv.kind) body.kind = kind;
+  if (note.trim() !== (iv.note ?? '')) body.note = note;
+  if ([...picked].sort().join('\n') !== [...was].sort().join('\n')) body.targetPrompts = picked;
+  const save = async () => {
+    if (!Object.keys(body).length) { onCancel(); return; }
+    setBusy(true); setErr(null);
+    const r = await patchAction({ projectId, id: iv.id, ...body });
+    setBusy(false);
+    if (r.duplicate) setErr(fill(C('duplicate'), { date: r.duplicate.published_at }));
+    else if (!r.row) setErr(r.error);
+    else onSaved(r.row);
+  };
+  const input = 'w-full mc-input rounded-md px-2 py-1.5 min-h-9 text-[12px] text-ink placeholder:text-faint';
+  const field = (label: string, el: ReactNode) => <label className="block space-y-0.5"><span className="block text-[10px] text-faint">{label}</span>{el}</label>;
+  return (
+    <div className="rounded-md mc-chip-inset p-2.5 space-y-2" role="group" aria-label={C('editing')} data-editing={iv.id}>
+      <div className="flex items-center gap-1.5 text-[12px] font-medium text-ink"><span className="text-brand"><Icon name="edit" size={14}  className={ICON} /></span>{C('editing')}</div>
+      {field(C('title'), <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={iv.page_title ?? ''} data-field="title" className={input} />)}
+      {field(C('link'), <input value={url} onChange={(e) => setUrl(e.target.value)} inputMode="url" placeholder="https://" data-field="url" className={input} />)}
+      <div className="flex flex-wrap gap-2">
+        <div className="flex-1 min-w-[9rem]">{field(C('date'), <input type="date" value={date} onChange={(e) => setDate(e.target.value)} data-field="date" className={input} />)}</div>
+        <div className="flex-1 min-w-[9rem]">{field(t('Kind'), (
+          <select value={kind} onChange={(e) => setKind(e.target.value)} data-field="kind" className={input}>
+            {Object.entries(KIND_LABELS).map(([k, l]) => <option key={k} value={k}>{l[lang]}</option>)}
+          </select>
+        ))}</div>
+      </div>
+      {field(C('note'), <textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} data-field="note" className={`${input} resize-y leading-snug`} />)}
+      {questions.length > 0 && (
+        <fieldset className="space-y-0.5">
+          <legend className="text-[10px] text-faint">{C('targets')}</legend>
+          <div className="max-h-40 overflow-y-auto space-y-0.5">
+            {questions.map((p, i) => (
+              <label key={p} className="flex items-start gap-1.5 py-0.5 text-[11px] text-dim">
+                <input type="checkbox" checked={picked.includes(p)} onChange={() => setPicked((cur) => (cur.includes(p) ? cur.filter((x) => x !== p) : [...cur, p]))} className="mt-0.5" />
+                <span>{i < core.length ? `Q${i + 1} · ` : ''}{p}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
+      <div className="text-[10px] leading-snug text-faint">{C('notice')}</div>
+      <div className="flex flex-wrap gap-1.5">
+        <button onClick={save} disabled={busy || !date} data-act="save" className={BTN_PRIMARY}><Icon name="check" size={14} strokeWidth={2.25}  className={ICON} />{busy ? '…' : C('save')}</button>
+        <button onClick={onCancel} disabled={busy} data-act="cancel" className={BTN_SECONDARY}>{t('Cancel')}</button>
+      </div>
+      {err && <div className="text-[11px] text-garnet" role="alert">{err}</div>}
+    </div>
+  );
+}
+
+/** Removing is asked once more, under the row it removes, with what it means. Cancel is where the cursor starts. */
+function RemoveAsk({ iv, projectId, lang, t, onRemoved, onCancel }: {
+  iv: InterventionRow; projectId: string; lang: Lang; t: T; onRemoved: () => void; onCancel: () => void;
+}) {
+  const C = (k: ChangeKey) => CHANGE_LABELS[k][lang];
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const go = async () => {
+    setBusy(true); setErr(null);
+    const res = await fetch(`/api/workspace/interventions?${new URLSearchParams({ projectId, id: iv.id })}`, { method: 'DELETE' }).catch(() => null);
+    const d = res ? await res.json().catch(() => ({})) : {};
+    setBusy(false);
+    if (res?.ok) onRemoved(); else setErr(d.error || 'Failed');
+  };
+  return (
+    <div className="rounded-md bg-garnet/10 p-2.5 space-y-2" role="alertdialog" aria-label={C('remove')} data-removing={iv.id}>
+      <div className="text-[11px] leading-snug text-ink">{C('removeAsk')}</div>
+      <div className="flex flex-wrap gap-1.5">
+        <button onClick={go} disabled={busy} data-act="remove-yes" className={`${BTN} bg-garnet text-on-brand hover:brightness-110`}><Icon name="remove" size={14}  className={ICON} />{busy ? '…' : C('removeYes')}</button>
+        <button onClick={onCancel} disabled={busy} autoFocus data-act="cancel" className={BTN_SECONDARY}>{t('Cancel')}</button>
+      </div>
+      {err && <div className="text-[11px] text-garnet" role="alert">{err}</div>}
+    </div>
+  );
+}
+
 /** One logged action: what it is, then kind and publish date as quiet labels, who logged it and from where, its note, the page check and the outcome.
  *  `wide` is the stage's row, laid out across where the column has the room (576 px):
  *    line 1  the title, with kind and publish date at the right edge
- *    line 2  who logged it, the channel, the on-behalf mark and the link
+ *    line 2  who logged it, the channel, the latest edit, the on-behalf mark and the link; Edit / Remove at the right
  *    then    the note, if there is one
  *    below   the page check on the left, the outcome on the right, their sentences run on
- *  Narrower than that it is the rail's order, one under the other. */
-function ActionRow({ iv, outcome, cited, lang, t, note, wide = false }: {
+ *  Narrower than that it is the rail's order, one under the other, Edit / Remove last.
+ *  `canChange`: the viewer may log actions here and a change can be recorded. */
+function ActionRow({ iv, outcome, cited, lang, t, note, wide = false, projectId, core = NONE, canChange = false, onChanged }: {
   iv: InterventionRow; outcome?: OutcomeRow; cited?: CitedAfterRow; lang: Lang; t: T; note?: 'inline' | 'above'; wide?: boolean;
+  projectId?: string; core?: string[]; canChange?: boolean; onChanged?: (c: Changed, iv: InterventionRow) => void;
 }) {
+  const C = (k: ChangeKey) => CHANGE_LABELS[k][lang];
   const [full, setFull] = useState(false);
   const [cut, setCut] = useState(false); // two lines do not hold the note, at the width it has now
+  const [mode, setMode] = useState<'view' | 'edit' | 'remove'>('view');
   const noteBox = useRef<HTMLDivElement>(null);
   const said = (iv.note ?? '').trim();
   useEffect(() => {
@@ -599,19 +794,27 @@ function ActionRow({ iv, outcome, cited, lang, t, note, wide = false }: {
     const watch = new ResizeObserver(measure);
     watch.observe(el);
     return () => watch.disconnect();
-  }, [said, full]);
+  }, [said, full, mode]);
   const kind = KIND_LABELS[iv.kind]?.[lang] ?? iv.kind;
   // The title as logged, else the page's own title, else the address; an action with neither is named by its kind.
   const title = iv.title || iv.page_title || '';
+  const named = title || (iv.url ? shortLink(iv.url) : kind);
+  if (mode === 'edit' && projectId) return (
+    <div className="border-t border-edge pt-2">
+      <EditAction iv={iv} projectId={projectId} lang={lang} t={t} core={core} onCancel={() => setMode('view')}
+        onSaved={(row) => { setMode('view'); onChanged?.({ action: 'edit', title: row.title || row.page_title || (row.url ? shortLink(row.url) : named) }, row); }} />
+    </div>
+  );
   const by = iv.logger !== undefined ? `${t('Logged by')}: ${iv.logger?.operator ? 'MemeCMO' : iv.logger?.name || t('not recorded')}` : '';
   const channel = iv.channel ? `${t('Channel')}: ${CHANNEL_LABELS[iv.channel]?.[lang] ?? iv.channel}` : '';
+  const edited = iv.edited ? fill(C('edited'), { date: iv.edited.at.slice(0, 10), who: iv.edited.by?.operator ? 'MemeCMO' : iv.edited.by?.name || t('not recorded') }) : '';
   const head = `${wide ? 'text-[13px]' : 'text-[12px]'} font-medium leading-snug`;
   const small = wide ? 'text-[11px]' : 'text-[10px]';
   const name = title ? <div className={`${head} text-ink`}>{title}</div>
     : iv.url ? <a href={iv.url} target="_blank" rel="noreferrer" title={iv.url} className={`block ${head} text-brand break-all ${wide ? '@xl:truncate' : ''}`}>{shortLink(iv.url)}</a>
     : <div className={`${head} text-ink`}>{kind}</div>;
   const labels = <>{title || iv.url ? `${kind} · ` : ''}<span className="whitespace-nowrap">{fill(t('published {date}'), { date: iv.published_at })}</span></>;
-  const who = (by || channel) && <>{by && <span className="min-w-0 break-words">{by}</span>}<span className="whitespace-nowrap">{channel}</span></>;
+  const who = (by || channel || edited) && <>{by && <span className="min-w-0 break-words">{by}</span>}<span className="whitespace-nowrap">{channel}</span>{edited && <span className="min-w-0 break-words" data-edited>{edited}</span>}</>;
   const behalf = said && ON_BEHALF.test(said.normalize('NFC')) && (
     <span className={`inline-block ${small} px-1.5 py-0.5 rounded bg-gold/15 text-gold border border-gold/30`}>{t('Entered on the client\'s behalf')}</span>
   );
@@ -622,8 +825,20 @@ function ActionRow({ iv, outcome, cited, lang, t, note, wide = false }: {
     </div>
   );
   const link = (cls: string) => title && iv.url && <a href={iv.url} target="_blank" rel="noreferrer" title={iv.url} className={`truncate ${small} text-brand ${cls}`}>{shortLink(iv.url)}</a>;
+  const tools = canChange && projectId && mode === 'view' && (
+    <span className="inline-flex flex-wrap gap-1.5" data-tools={iv.id}>
+      <button onClick={() => setMode('edit')} data-act="edit" aria-label={`${C('edit')}: ${named}`} className={`${TOOL} hover:text-brand`}><Icon name="edit" size={13}  className={ICON} />{C('edit')}</button>
+      <button onClick={() => setMode('remove')} data-act="remove" aria-label={`${C('remove')}: ${named}`} className={`${TOOL} hover:text-garnet`}><Icon name="remove" size={13}  className={ICON} />{C('remove')}</button>
+    </span>
+  );
+  const asking = mode === 'remove' && projectId && (
+    <div className="pt-1">
+      <RemoveAsk iv={iv} projectId={projectId} lang={lang} t={t} onCancel={() => setMode('view')}
+        onRemoved={() => { setMode('view'); onChanged?.({ action: 'remove', title: named }, iv); }} />
+    </div>
+  );
   if (!wide) return (
-    <div className="border-t border-edge pt-1.5 space-y-0.5">
+    <div className="border-t border-edge pt-1.5 space-y-0.5" data-row={iv.id}>
       {name}
       <div className={`${small} text-faint`}>{labels}</div>
       {who && <div className={`flex flex-wrap gap-x-2 ${small} text-faint`}>{who}</div>}
@@ -632,20 +847,23 @@ function ActionRow({ iv, outcome, cited, lang, t, note, wide = false }: {
       {link('block')}
       {iv.url && <VerifiedLine iv={iv} cited={cited} t={t} />}
       <OutcomeLine o={outcome} t={t} lang={lang} note={note} />
+      {tools && <div className="pt-1">{tools}</div>}
+      {asking}
     </div>
   );
   return (
-    <div className="border-t border-edge pt-2 space-y-0.5">
+    <div className="border-t border-edge pt-2 space-y-0.5" data-row={iv.id}>
       <div className="@xl:flex @xl:items-baseline @xl:justify-between @xl:gap-x-4">
         <div className="min-w-0">{name}</div>
         <div className={`${small} text-faint @xl:shrink-0 @xl:whitespace-nowrap`}>{labels}</div>
       </div>
-      {(who || behalf || (title && iv.url)) && (
-        <div className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 ${small} text-faint`}>{who}{behalf}{link('min-w-0 flex-[1_1_12rem]')}</div>
+      {(who || behalf || (title && iv.url) || tools) && (
+        <div className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 ${small} text-faint`}>{who}{behalf}{link('min-w-0 flex-[1_1_12rem]')}{tools && <span className="ml-auto">{tools}</span>}</div>
       )}
       {remark}
       {iv.url && <VerifiedLine iv={iv} cited={cited} t={t} flow />}
       <OutcomeLine o={outcome} t={t} lang={lang} note={note} flow />
+      {asking}
     </div>
   );
 }
@@ -662,6 +880,8 @@ export function ActionsPanel({ projectId, lang, t, ledger, whole = false, typing
 }) {
   const suggested = useSuggestions(whole ? undefined : projectId);
   const [logged, setLogged] = useState<Logged | null>(null);
+  const [changed, setChanged] = useState<Changed | null>(null); // a row just edited or removed
+  const [decided, setDecided] = useState<Decided | null>(null); // a found page just confirmed or set aside
   const { rows, total, rest, loadRest } = ledger;
   if (!projectId) return null;
 
@@ -677,7 +897,16 @@ export function ActionsPanel({ projectId, lang, t, ledger, whole = false, typing
   const where: 'inline' | 'above' = touched.length > 1 ? 'above' : 'inline';
   const breaks = Array.from(new Map(touched.flatMap((r) => ledger.outcomes[r.id]?.sourceBreaks ?? []).map((b) => [`${b.engine} ${b.from}`, b])).values());
 
-  const row = (iv: InterventionRow) => <ActionRow key={iv.id} iv={iv} outcome={ledger.outcomes[iv.id]} cited={ledger.citedAfter[iv.id]} lang={lang} t={t} note={where} wide={whole} />;
+  const onChanged = (c: Changed, iv: InterventionRow) => {
+    setChanged(c);
+    // A removed row leaves "just logged" too; an edited one is read again from the ledger (fresh).
+    if (c.action === 'remove') setLogged((l) => l && { ...l, rows: l.rows.filter((r) => r.id !== iv.id), already: l.already.filter((r) => r.id !== iv.id) });
+    ledger.reload();
+  };
+  const row = (iv: InterventionRow) => (
+    <ActionRow key={iv.id} iv={iv} outcome={ledger.outcomes[iv.id]} cited={ledger.citedAfter[iv.id]} lang={lang} t={t} note={where} wide={whole}
+      projectId={projectId} core={ledger.core} canChange={ledger.canChange} onChanged={onChanged} />
+  );
   const count = total > 0 ? ` · ${total}${ledger.atLeast ? '+' : ''}` : '';
   const alone = logged && logged.rows.length + logged.already.length + logged.failed.length === 1;
   const said = logged && sentences([
@@ -704,15 +933,28 @@ export function ActionsPanel({ projectId, lang, t, ledger, whole = false, typing
     </div>
   );
   const failure = ledger.failed && <div className={`${whole ? 'text-xs' : 'text-[10px]'} text-garnet`}>{t('Load failed')} · <button onClick={ledger.reload} className="underline hover:text-brand">{t('Retry')}</button></div>;
+  const changedNote = changed && (
+    <div className="flex items-start justify-between gap-2 rounded-md mc-chip-inset p-2 text-[11px] leading-snug text-ink" role="status" data-changed={changed.action}>
+      <span className="flex items-start gap-1.5">
+        <span className={`shrink-0 mt-px ${changed.action === 'edit' ? 'text-sage' : 'text-faint'}`}><Icon name={changed.action === 'edit' ? 'check' : 'remove'} size={13} className={ICON} /></span>
+        {fill(CHANGE_LABELS[changed.action === 'edit' ? 'saved' : 'removed'][lang], { title: changed.title })}
+      </span>
+      <button onClick={() => setChanged(null)} aria-label={t('Close')} className="shrink-0 px-1 text-[12px] leading-none text-faint hover:text-brand">×</button>
+    </div>
+  );
 
   if (!whole) {
-    const waiting = <SuggestedActions projectId={projectId} lang={lang} t={t} list={suggested.list} can={suggested.can} onDone={() => { suggested.reload(); ledger.reload(); }} />;
-    if (!canType) return suggested.list.length ? <div className="mc-card mc-card-sm p-3 space-y-2">{waiting}</div> : null;
+    const waiting = (
+      <SuggestedActions projectId={projectId} lang={lang} t={t} list={suggested.list} can={suggested.can} decided={decided} onClear={() => setDecided(null)}
+        onDone={(d) => { setDecided(d); suggested.reload(); ledger.reload(); }} />
+    );
+    if (!canType) return suggested.list.length || decided ? <div className="mc-card mc-card-sm p-3 space-y-2">{waiting}</div> : null;
     return (
       <div className="mc-card mc-card-sm p-3 space-y-2">
         <div className="flex items-center gap-1.5 text-[12px] font-medium text-ink"><span className="shrink-0 text-brand"><Icon name="actions" size={15} /></span>{t(LOG_HERE)}</div>
         <div className="text-[11px] leading-snug text-dim">{t(WHY_LOG)}</div>
         {typing}
+        {changedNote}
         {justLogged}
         {waiting}
         {failure}
@@ -740,6 +982,7 @@ export function ActionsPanel({ projectId, lang, t, ledger, whole = false, typing
         {typing}
         {justLogged}
       </div>
+      {changedNote && <div className="max-w-2xl">{changedNote}</div>}
       {failure}
       {noteAbove}
       {months.map((m) => (

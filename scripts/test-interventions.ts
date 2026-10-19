@@ -8,7 +8,7 @@
 
 import { INTERVENTION_KINDS as KINDS_FOR_BROWSER, brandHostsOf, kindFromLink, parseActionLine, parseActionLines } from '../lib/action-input';
 import {
-  INTERVENTION_KINDS, breaksAffecting, computeOutcomes, computeOutcomesAndBreaks, describeOutcome, outcomeFigures, seriesBreak, sourceCountBreaks,
+  INTERVENTION_KINDS, breaksAffecting, computeOutcomes, computeOutcomesAndBreaks, describeOutcome, diffAction, editTrailReady, lastEdits, outcomeFigures, recordEdit, seriesBreak, sourceCountBreaks,
   type Intervention, type Outcome,
 } from '../lib/interventions';
 import { unitHash } from '../lib/edits';
@@ -128,6 +128,21 @@ async function main() {
   breaksAffecting(plain.own, b);
   ok('asking leaves the outcome as it was', JSON.stringify(plain.own) === before && (plain.own as Outcome).sourceBreaks === undefined);
   ok('no actions: nothing loaded, nothing reported', JSON.stringify(await computeOutcomesAndBreaks(sb, 'p', [])) === '{"outcomes":{},"breaks":[]}');
+
+  // ─── a change to a logged action ───────────────────────────────────────────
+  {
+    const q = (p: string) => ({ hash: unitHash(p), prompt: p });
+    const row = iv({ id: 'x', url: 'https://liftmedia.example/a', domain: 'liftmedia.example', title: 'A', note: null, published_at: '2026-09-04', target_prompts: [q('q1'), q('q2')] });
+    ok('a change names only the fields that move, with what they were', JSON.stringify(diffAction(row, { title: 'B', published_at: '2026-09-05', url: 'https://liftmedia.example/a' }))
+      === JSON.stringify({ title: { from: 'A', to: 'B' }, published_at: { from: '2026-09-04', to: '2026-09-05' } }));
+    ok('the same questions in another order are no change', Object.keys(diffAction(row, { target_prompts: [q('q2'), q('q1')] })).length === 0);
+    ok('one question fewer is a change', diffAction(row, { target_prompts: [q('q2')] }).target_prompts !== undefined);
+    ok('clearing a title is a change to null; a field left out is no change', JSON.stringify(diffAction(row, { title: null, note: undefined })) === JSON.stringify({ title: { from: 'A', to: null } }));
+    ok('a note set where there was none is a change from null', JSON.stringify(diffAction(row, { note: 'n' })) === JSON.stringify({ note: { from: null, to: 'n' } }));
+    // No table for the record: nothing can be edited, and nothing says it was.
+    const missing = { from: () => { const c: any = { select: () => c, insert: () => c, in: () => c, eq: () => c, order: () => Promise.resolve({ data: null, error: { message: 'relation does not exist' } }), limit: () => Promise.resolve({ error: { message: 'relation "intervention_edits" does not exist' } }), single: () => Promise.resolve({ data: null, error: { message: 'relation does not exist' } }) }; return c; } };
+    ok('without the record\'s table: not ready, no record written, no "edited" line', !(await editTrailReady(missing)) && (await recordEdit(missing, { interventionId: 'x', projectId: 'p', action: 'edit', changes: {}, userId: 'u' })) === null && Object.keys(await lastEdits(missing, ['x'])).length === 0);
+  }
 
   // ─── a pasted line → an action ─────────────────────────────────────────────
   const hosts = ['liftmedia.example'];

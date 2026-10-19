@@ -24,6 +24,11 @@ const PATHS: Record<string, ReactNode> = {
   send: (<><path d="M5 12h13" /><path d="M13 6l6 6-6 6" /></>),
   sun: (<><circle cx="12" cy="12" r="4" /><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4" /></>),
   moon: (<><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" /></>),
+  // Decisions on a row: yes, no, waiting for someone else, take away
+  check: (<><path d="M5 12.5l4.3 4.3L19 7.2" /></>),
+  close: (<><path d="M7 7l10 10M17 7L7 17" /></>),
+  waiting: (<><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></>),
+  remove: (<><path d="M4.5 7h15" /><path d="M9.5 7V5.3c0-.7.6-1.3 1.3-1.3h2.4c.7 0 1.3.6 1.3 1.3V7" /><path d="M6.6 7l.8 11.2c.1 1 .9 1.8 1.9 1.8h5.4c1 0 1.8-.8 1.9-1.8L17.4 7" /><path d="M10.2 10.8v5.4M13.8 10.8v5.4" /></>),
 };
 
 export function Icon({ name, size = 18, className = '', strokeWidth = 1.75 }: {

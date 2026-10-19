@@ -102,7 +102,12 @@ export interface Logger { name: string | null; operator: boolean }
  *  is not sent; anyone else is named by sign-in email, as on the Lark card.
  *  Same split as collab-alignment: client team = org members minus root-org members. */
 export async function loggersOf(sb: any, orgId: string, list: Intervention[]): Promise<Record<string, Logger>> {
-  const ids = Array.from(new Set(list.map((iv) => iv.logged_by).filter(Boolean))) as string[];
+  return peopleOf(sb, orgId, list.map((iv) => iv.logged_by));
+}
+
+/** The same naming for any set of accounts (loggers, editors). */
+export async function peopleOf(sb: any, orgId: string, userIds: (string | null | undefined)[]): Promise<Record<string, Logger>> {
+  const ids = Array.from(new Set(userIds.filter(Boolean))) as string[];
   const out: Record<string, Logger> = {};
   if (!ids.length) return out;
   const operators = new Set<string>();
@@ -117,6 +122,62 @@ export async function loggersOf(sb: any, orgId: string, list: Intervention[]): P
     try { const { data } = await sb.auth.admin.getUserById(id); name = data?.user?.email ?? null; } catch { /* display only */ }
     out[id] = { name, operator: false };
   }));
+  return out;
+}
+
+// ── Changes to a logged action: who, when, from what ─────────────────────────
+// An action is the client's record. Its publish date splits the before/after
+// outcome, and the delivery scorecard counts who logged it, the date and the
+// target question, so a change must say who made it and what it replaced. The
+// row keeps the current values; each change is a row of intervention_edits:
+// { field: { from, to } }, its author and time ('remove' = status live → removed).
+// That table is not in the schema yet (decision open, 2026-10-19). Until it
+// exists nothing is edited: PATCH answers 503 and the panel offers no edit or
+// remove (editTrailReady). Readers of the outcome never read it.
+
+export const EDIT_TRAIL = 'intervention_edits';
+export type EditChanges = Record<string, { from: unknown; to: unknown }>;
+export interface LastEdit { at: string; by: string | null }
+
+let trail: { ok: boolean; at: number } | null = null;
+/** Can a change be recorded? Once the table answers it stays so; a missing one is asked again after a minute. */
+export async function editTrailReady(sb: any): Promise<boolean> {
+  if (trail && (trail.ok || Date.now() - trail.at < 60_000)) return trail.ok;
+  // A GET, not a HEAD: postgrest-js reads a HEAD's empty 404 (no such table) as success.
+  const { error } = await sb.from(EDIT_TRAIL).select('id').limit(1);
+  trail = { ok: !error, at: Date.now() };
+  return trail.ok;
+}
+
+/** Record one change before it is made. The id of the record, or null when it could not be written (then the change must not be made). */
+export async function recordEdit(sb: any, e: { interventionId: string; projectId: string; action: 'edit' | 'remove'; changes: EditChanges; userId: string; channel?: 'web' | 'lark' | 'connector' }): Promise<string | null> {
+  const { data, error } = await sb.from(EDIT_TRAIL).insert({
+    intervention_id: e.interventionId, project_id: e.projectId, action: e.action, changes: e.changes, edited_by: e.userId, channel: e.channel ?? 'web',
+  }).select('id').single();
+  if (error) { console.error('[interventions] edit not recorded', e.interventionId, error.message); return null; }
+  return data?.id ?? null;
+}
+
+/** The latest edit of each action, for "edited on … by …". Empty when the trail is not there. */
+export async function lastEdits(sb: any, ids: string[]): Promise<Record<string, LastEdit>> {
+  const out: Record<string, LastEdit> = {};
+  if (!ids.length || !(await editTrailReady(sb))) return out;
+  const { data } = await sb.from(EDIT_TRAIL).select('intervention_id, edited_by, edited_at').in('intervention_id', ids).eq('action', 'edit').order('edited_at', { ascending: false });
+  for (const r of data ?? []) if (!out[r.intervention_id]) out[r.intervention_id] = { at: String(r.edited_at), by: r.edited_by ?? null };
+  return out;
+}
+
+/** What a change would do to a row: only the fields whose value moves, as { from, to }. Target questions compare by their hashes. */
+export function diffAction(row: Intervention, next: Partial<Pick<Intervention, 'kind' | 'url' | 'title' | 'note' | 'published_at' | 'target_prompts'>>): EditChanges {
+  const out: EditChanges = {};
+  for (const [k, to] of Object.entries(next) as [keyof Intervention, unknown][]) {
+    if (to === undefined) continue;
+    const from = row[k] ?? null;
+    const same = k === 'target_prompts'
+      ? ((from as { hash: string }[] | null) ?? []).map((p) => p.hash).sort().join() === ((to as { hash: string }[]) ?? []).map((p) => p.hash).sort().join()
+      : from === to;
+    if (!same) out[k] = { from, to };
+  }
   return out;
 }
 
