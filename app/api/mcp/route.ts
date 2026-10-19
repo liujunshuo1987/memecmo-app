@@ -22,6 +22,7 @@ import {
   resolveProject, sourcesRanking, workspaceUrl, type OrgRef,
 } from '@/lib/connector/data';
 import { INTERVENTION_KINDS } from '@/lib/interventions';
+import { queryMap, MAP_WORLDS } from '@/lib/map/query';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -34,7 +35,8 @@ const INSTRUCTIONS =
   'builds publish-ready content grounded in the brand\'s public facts, and keeps a ledger of what the brand published (actions) so later scans can attribute change. ' +
   'Use list_projects first. Numbers are measured on a frozen prompt panel; quote them with their fractions. ' +
   'MemeCMO never publishes anything: when the user publishes in their own channels, call log_action with the live URL so the platform can verify it and attribute what moves. ' +
-  'Always keep the "source" and "workspace" fields when relaying results.';
+  'Always keep the "source" and "workspace" fields when relaying results. ' +
+  'get_map explains MemeCMO itself: the public business ontology map (offerings, instruments, loops, rules); ask it by object id to see what something touches.';
 
 const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
 const fail = (message: string) => ({ content: [{ type: 'text' as const, text: `Error: ${message}` }], isError: true as const });
@@ -157,6 +159,27 @@ function buildHandler(principal: ConnectorPrincipal) {
           annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
         },
         async ({ project }) => withProject('get_actions', project, async ({ project: p, org: o }) => envelope(o, p, { actions: await listActions(sb, p.id) })),
+      );
+
+      server.registerTool(
+        'get_map',
+        {
+          title: 'Get the MemeCMO business map',
+          description: 'The public view of MemeCMO\'s business ontology map (因陀罗网): what is sold, the instruments that measure, the loops that run, the rules that bind, what it all runs on. Without arguments: every public object and link plus the vocabulary (worlds, object types, link types). With `id`: that object, its reflections (links both ways, labelled) and its neighbourhood up to `depth` hops (1 or 2). With `world` or `type`: that slice. Ids are stable; cite them when explaining where something sits. Same data as https://app.memecmo.ai/map; no project needed.',
+          inputSchema: z.object({
+            id: z.string().optional().describe('object id, e.g. loop.measure_enter_prove or ins.aigvr'),
+            depth: z.number().int().min(1).max(2).optional().describe('hops around `id` (default 1)'),
+            world: z.enum(MAP_WORLDS).optional().describe('commercial | operation | measurement | rules | foundations'),
+            type: z.string().optional().describe('object type, e.g. Offering, Instrument, Loop, Agent, Policy'),
+          }),
+          annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+        },
+        async (args) => {
+          const t0 = Date.now();
+          const out = queryMap(args);
+          logConnectorEvent({ principal, tool: 'get_map', ok: !('error' in out), ms: Date.now() - t0 });
+          return 'error' in out ? fail(String(out.error)) : text(out);
+        },
       );
 
       server.registerTool(
