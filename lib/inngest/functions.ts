@@ -2,12 +2,12 @@
 
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { inngest } from './client';
-import { executeAgentRun } from '@/lib/agents/run';
+import { executeAgentRun, OUTAGE_RETRY_DELAY_MS } from '@/lib/agents/run';
 import { recordUsage, isMeteredKind } from '@/lib/commerce';
 import { sendProjectDigest, maybeSendScanAlert } from '@/lib/reports/digest';
 import { applyMonthlyGrant, applyPlanAllowance } from '@/lib/credits';
 import { sendEmail } from '@/lib/email';
-import { runEnginePatrol } from '@/lib/engines/health';
+import { checkEngineHealth, recheckEngineHealth, recheckTargets, recordPatrol, RECHECK_DELAY_MS, type HealthResult } from '@/lib/engines/health';
 import { dueUrls, fetchBatch, chunk, type DueUrl } from '@/lib/pages/queue';
 import { discoverSitePagesDated, registerSitePages } from '@/lib/pages/sitemap';
 import { verifyIntervention, verifyDueInterventions } from '@/lib/pages/verify';
@@ -73,6 +73,32 @@ async function enqueueScheduledRun(projectId: string, organizationId: string, ag
   await inngest.send({ name: 'agent/run.requested', data: { runId: run.id, agentId, projectId } });
   if (isMeteredKind(agentId)) await recordUsage({ orgId: organizationId, projectId, agentRunId: run.id, kind: agentId });
   return run.id;
+}
+
+// The row for the one re-run of a scheduled scan that an engine outage stopped
+// (lib/agents/run.ts requestOutageRetry). Checked again at queue time, three
+// hours on: still a first scheduled run, not re-run by another path (a
+// transient failure queues its own retry with the same retryOf), project and
+// org still active. The dispatch is a separate step, so a failed send is
+// retried without inserting a second row.
+async function queueOutageRetry(failedRunId: string, agentId: string, projectId: string): Promise<{ runId?: string; skipped?: string }> {
+  const sb = svc();
+  const { data: failed } = await sb.from('agent_runs').select('trigger_method, status, options').eq('id', failedRunId).maybeSingle();
+  if (failed?.trigger_method !== 'schedule') return { skipped: 'not a scheduled run' };
+  if ((failed.options as any)?.retryOf) return { skipped: 'already a re-run' };
+  if (failed.status !== 'failed') return { skipped: `run is ${failed.status}` };
+  const { data: prior } = await sb.from('agent_runs').select('id').eq('options->>retryOf', failedRunId).limit(1).maybeSingle();
+  if (prior) return { skipped: `already re-run as ${prior.id}` };
+  const { data: project } = await sb.from('projects').select('organization_id, status, organizations!inner(status)').eq('id', projectId).maybeSingle();
+  if (project?.status !== 'active' || (project as any).organizations?.status !== 'active') return { skipped: 'project or org no longer active' };
+  const { data: run, error } = await sb
+    .from('agent_runs')
+    .insert({ project_id: projectId, agent_id: agentId, trigger_method: 'schedule', status: 'queued', options: { retryOf: failedRunId, retryReason: 'engine_outage' } })
+    .select('id')
+    .single();
+  if (error || !run) throw new Error(`re-run row not created: ${error?.message ?? 'no row'}`);
+  if (isMeteredKind(agentId)) await recordUsage({ orgId: project.organization_id, projectId, agentRunId: run.id, kind: agentId });
+  return { runId: run.id };
 }
 
 // Handles 'agent/run.requested' — runs the requested agent end-to-end.
@@ -214,6 +240,8 @@ export const scheduledWeekly = inngest.createFunction(
   // Monday). Clients align the cadence to their management rhythm — FMVN:
   // Friday scan → Saturday digest → Monday leadership meeting (client request
   // 2026-08). metadata.reportSchedule.scanDay: 0=Sun … 6=Sat.
+  // A scan that an engine outage stops is queued again once, ~3 h later
+  // (scheduledOutageRetry below).
   { id: 'scheduled-weekly', name: 'Weekly GEO re-measure', triggers: [{ cron: '0 2 * * *' }] },
   async ({ step }) => {
     if (!schedulingEnabled()) return { skipped: 'SCHEDULED_SCANS_ENABLED!=1' };
@@ -230,6 +258,34 @@ export const scheduledWeekly = inngest.createFunction(
       if (id) enqueued++;
     }
     return { cadence: 'weekly', projects: projects.length, enqueued };
+  },
+);
+
+// One re-run of a scheduled scan stopped by an engine outage. Asked for by the
+// failed run itself (lib/agents/run.ts, only for trigger_method 'schedule' and
+// only when that run was not already a re-run); waits OUTAGE_RETRY_DELAY_MS,
+// then queues the same agent on the same project as a fresh scheduled run —
+// same preflight, same freeze rules (a frozen instrument still gets no
+// fallback). At most once per failed run: event id + idempotency key here, the
+// retryOf checks in queueOutageRetry, and a re-run that fails asks for nothing.
+export const scheduledOutageRetry = inngest.createFunction(
+  {
+    id: 'scheduled-outage-retry',
+    name: 'Re-run a scheduled scan after an engine outage',
+    idempotency: 'event.data.runId',
+    triggers: [{ event: 'agent/run.outage-retry' }],
+  },
+  async ({ event, step }) => {
+    const { runId, agentId, projectId } = ((event as any)?.data ?? {}) as { runId?: string; agentId?: string; projectId?: string };
+    if (!runId || !agentId || !projectId) return { skipped: 'incomplete event' };
+    await step.sleep('wait-for-upstream', OUTAGE_RETRY_DELAY_MS);
+    // The kill-switch may have been turned off in the meantime.
+    if (!schedulingEnabled()) return { skipped: 'SCHEDULED_SCANS_ENABLED!=1' };
+    const queued = (await step.run('queue-rerun', () => queueOutageRetry(runId, agentId, projectId))) as { runId?: string; skipped?: string };
+    if (!queued.runId) return { failedRunId: runId, ...queued };
+    const rerunId = queued.runId;
+    await step.run('dispatch-rerun', () => inngest.send({ id: `run-${rerunId}`, name: 'agent/run.requested', data: { runId: rerunId, agentId, projectId } }));
+    return { failedRunId: runId, rerunId };
   },
 );
 
@@ -386,9 +442,22 @@ export const scheduledTrialNurture = inngest.createFunction(
 // hour. Probes every primary and fallback model, the provider's model list and
 // the SerpAPI quota; persists to engine_health_checks; alerts the operator only
 // on conditions that would make tonight's scans fail or change methodology.
+// An engine whose primary failed is probed again five minutes later (01:35,
+// before the scans) and only then judged: recovered, outage (still listed) or
+// retired (gone from the list) — lib/engines/health.ts.
 export const engineHealthPatrol = inngest.createFunction(
   { id: 'engine-health-patrol', name: 'Daily engine liveness patrol', triggers: [{ cron: '30 1 * * *' }] },
-  async ({ step }) => (cronsEnabled() ? step.run('patrol', () => runEnginePatrol(svc())) : CRON_SKIPPED()),
+  async ({ step }) => {
+    if (!cronsEnabled()) return CRON_SKIPPED();
+    let result = (await step.run('patrol', () => checkEngineHealth())) as HealthResult;
+    if (recheckTargets(result).length) {
+      await step.sleep('recheck-wait', RECHECK_DELAY_MS);
+      const first = result;
+      result = (await step.run('recheck', () => recheckEngineHealth(first))) as HealthResult;
+    }
+    const final = result;
+    return step.run('record', () => recordPatrol(svc(), final));
+  },
 );
 
 // Cited-page fetcher: reads the pages the engines cited (features, not
@@ -487,4 +556,4 @@ export const larkSuggestionKeeper = inngest.createFunction(
   },
 );
 
-export const functions = [runAgent, scheduledWeekly, scheduledMonthly, scheduledDigest, scheduledTrialNurture, engineHealthPatrol, pagesFetch, interventionVerify, larkMessage, larkSuggestionKeeper];
+export const functions = [runAgent, scheduledWeekly, scheduledOutageRetry, scheduledMonthly, scheduledDigest, scheduledTrialNurture, engineHealthPatrol, pagesFetch, interventionVerify, larkMessage, larkSuggestionKeeper];
